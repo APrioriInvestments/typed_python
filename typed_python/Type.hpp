@@ -88,8 +88,6 @@ typedef uint8_t* instance_ptr;
 
 typedef void (*compiled_code_entrypoint)(instance_ptr, instance_ptr*);
 
-void updateTypeRepForType(Type* t, PyTypeObject* pyType);
-
 PyObject* getOrSetTypeResolver(PyObject* module = nullptr, PyObject* args = nullptr);
 
 enum class Maybe {
@@ -946,7 +944,7 @@ protected:
 
     TypeCategory m_typeCategory;
 
-    // this class is actively being deserialized. 
+    // this class is actively being deserialized.
     bool m_is_being_deserialized;
 
     size_t m_size;

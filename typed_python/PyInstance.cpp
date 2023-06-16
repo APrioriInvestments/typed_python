@@ -1198,7 +1198,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
             .tp_iternext = PyInstance::tp_iternext,     // iternextfunc
-            .tp_methods = typeMethods(inType),          // struct PyMethodDef*
+            .tp_methods = 0,             // struct PyMethodDef*
             .tp_members = 0,                            // struct PyMemberDef*
             .tp_getset = 0,                             // struct PyGetSetDef*
             .tp_base = 0,                               // struct _typeobject*
@@ -1250,16 +1250,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
         ((PyObject*)&types[inType]->typeObj)->ob_type = incref(classMetaclass);
     }
 
-    PyType_Ready((PyTypeObject*)types[inType]);
-
-    PyDict_SetItemString(
-        types[inType]->typeObj.tp_dict,
-        "__typed_python_category__",
-        categoryToPyString(inType->getTypeCategory())
-        );
-
     if (!inType->isActivelyBeingDeserialized()) {
-        mirrorTypeInformationIntoPyType(inType, &types[inType]->typeObj);
+        finalizePyTypeObject(inType, (PyTypeObject*)types[inType]);
     }
 
     return (PyTypeObject*)types[inType];
@@ -1535,7 +1527,18 @@ bool PyInstance::typeCanBeSubclassed(Type* t) {
 }
 
 // static
-void PyInstance::mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType) {
+void PyInstance::finalizePyTypeObject(Type* inType, PyTypeObject* pyType) {
+    // update the type methods
+    pyType->tp_methods = typeMethods(inType);
+
+    PyType_Ready(pyType);
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__typed_python_category__",
+        categoryToPyString(inType->getTypeCategory())
+    );
+
     specializeStatic(inType->getTypeCategory(), [&](auto* concrete_null_ptr) {
         typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 

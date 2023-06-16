@@ -3711,13 +3711,6 @@ static struct PyModuleDef moduledef = {
     .m_free = NULL
 };
 
-void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
-    //deliberately leak the name.
-    pyType->tp_name = (new std::string(type->nameWithModule()))->c_str();
-
-    PyInstance::mirrorTypeInformationIntoPyType(type, pyType);
-}
-
 PyMODINIT_FUNC
 PyInit__types(void)
 {

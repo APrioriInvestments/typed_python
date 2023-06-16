@@ -368,10 +368,24 @@ public:
                 );
             }
 
-            visitor.visitNamedTopo(
-                nameAndGlobal.first,
-                nameAndGlobal.second
-            );
+            PyObject* o = PyCell_Get(nameAndGlobal.second);
+            Type* t = PyInstance::extractTypeFrom(o);
+
+            if (t && t->isForwardDefined()) {
+                if (((Forward*)t)->isResolved()) {
+                    visitor.visitNamedTopo(
+                        nameAndGlobal.first,
+                        ((Forward*)t)->forwardResolvesTo()
+                    );
+                } else {
+                    // deliberately ignore non-resolved forwards
+                }
+            } else {
+                visitor.visitNamedTopo(
+                    nameAndGlobal.first,
+                    nameAndGlobal.second
+                );
+            }
         }
 
         if (mReturnType) {
@@ -401,7 +415,23 @@ public:
         visitor.visitHash(ShaHash(1));
 
         _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-            visitor.visitNamedTopo(name, val);
+            Type* t = PyInstance::extractTypeFrom(val);
+
+            if (t && t->isForwardDefined()) {
+                if (((Forward*)t)->isResolved()) {
+                    visitor.visitNamedTopo(
+                        name,
+                        ((Forward*)t)->forwardResolvesTo()
+                    );
+                } else {
+                    // deliberately ignore non-resolved forwards
+                }
+            } else {
+                visitor.visitNamedTopo(
+                    name,
+                    val
+                );
+            }
         });
 
         visitor.visitHash(ShaHash(1));
@@ -690,7 +720,7 @@ public:
         mFunctionGlobals = incref(globals);
     }
 
-    bool symbolIsUnresolved(std::string name, bool insistResolved) {
+    bool symbolIsUnresolved(std::string name, bool insistForwardsResolved) {
         if (mClosureBindings.find(name) != mClosureBindings.end()) {
             return false;
         }
@@ -698,7 +728,7 @@ public:
         auto it = mFunctionGlobalsInCells.find(name);
         if (it != mFunctionGlobalsInCells.end()) {
             if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
-                if (insistResolved) {
+                if (insistForwardsResolved) {
                     PyObject* o = PyCell_Get(it->second);
                     Type* t = PyInstance::extractTypeFrom(o);
                     if (t && t->isForwardDefined()) {
@@ -714,7 +744,7 @@ public:
 
         if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)) {
             if (PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
-                if (insistResolved) {
+                if (insistForwardsResolved) {
                     PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
                     Type* t = PyInstance::extractTypeFrom(o);
                     if (t && t->isForwardDefined()) {
@@ -789,12 +819,12 @@ public:
         }
     }
 
-    bool hasUnresolvedSymbols(bool insistResolved) {
+    bool hasUnresolvedSymbols(bool insistForwardsResolved) {
         std::set<std::string> allNames;
         extractGlobalAccessesFromCodeIncludingCells(allNames);
 
         for (auto nameStr: allNames) {
-            if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
+            if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistForwardsResolved)) {
                 return true;
             }
         }
@@ -802,12 +832,12 @@ public:
         return false;
     }
 
-    std::string firstUnresolvedSymbol(bool insistResolved) {
+    std::string firstUnresolvedSymbol(bool insistForwardsResolved) {
         std::set<std::string> allNames;
         extractGlobalAccessesFromCodeIncludingCells(allNames);
 
         for (auto nameStr: allNames) {
-            if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistResolved)) {
+            if (nameStr != "__module_hash__" && symbolIsUnresolved(nameStr, insistForwardsResolved)) {
                 return nameStr;
             }
         }

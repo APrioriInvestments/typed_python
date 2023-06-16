@@ -96,9 +96,10 @@ public:
     }
 
     // does this function have any of its globals that are not
-    // resolved to actual values. if 'insistResolved' then we
-    // also return 'true' if the symbols resolve to a forward defined
-    // type
+    // resolved to actual values. if 'insistForwardsResolved' then we
+    // return 'true' if the symbol resolves to a forward defined
+    // type - the symbol is only considered resolved when there are no
+    // visible forwards
     std::string firstUnresolvedSymbol(bool insistResolved) {
         for (auto& o: mOverloads) {
             std::string res = o.firstUnresolvedSymbol(insistResolved);
@@ -161,28 +162,6 @@ public:
         _visitReferencedTypes([&](Type*& typePtr) {
             updateTypeRefFromGroupMap(typePtr, groupMap);
         });
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisibleInternals(const visitor_type& v) {
-        v.visitHash(
-            ShaHash(1, m_typeCategory)
-            + ShaHash(mIsNocompile ? 2 : 1)
-            + ShaHash(mIsEntrypoint ? 2 : 1)
-        );
-
-        v.visitName(m_name);
-        v.visitName(mRootName);
-        v.visitName(mQualname);
-        v.visitName(mModulename);
-
-        v.visitTopo(mClosureType);
-
-        v.visitHash(ShaHash(mOverloads.size()));
-
-        for (auto o: mOverloads) {
-            o._visitCompilerVisibleInternals(v);
-        }
     }
 
     static Function* Make(
@@ -251,6 +230,28 @@ public:
 
         (*memo)[key] = concrete;
         return concrete;
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& v) {
+        v.visitHash(
+            ShaHash(1, m_typeCategory)
+            + ShaHash(mIsNocompile ? 2 : 1)
+            + ShaHash(mIsEntrypoint ? 2 : 1)
+        );
+
+        v.visitName(m_name);
+        v.visitName(mRootName);
+        v.visitName(mQualname);
+        v.visitName(mModulename);
+
+        v.visitTopo(mClosureType);
+
+        v.visitHash(ShaHash(mOverloads.size()));
+
+        for (auto o: mOverloads) {
+            o._visitCompilerVisibleInternals(v);
+        }
     }
 
     template<class visitor_type>

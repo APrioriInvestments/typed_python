@@ -679,7 +679,7 @@ void Type::typeFinishedBeingDeserialized() {
         // without it being finished.
         PyTypeObject* typeObj = PyInstance::typeObj(this);
 
-        PyInstance::mirrorTypeInformationIntoPyType(this, typeObj);
+        PyInstance::finalizePyTypeObject(this, typeObj);
 
         m_is_being_deserialized = false;
     }

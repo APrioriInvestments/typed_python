@@ -20,7 +20,7 @@
 #include "MutuallyRecursiveTypeGroup.hpp"
 #include "ScopedIndenter.hpp"
 
-#define TP_VERBOSE_SERIALIZE 1
+#define TP_VERBOSE_SERIALIZE 0
 
 // virtual
 // serialize a python object.  This function should work in any context.

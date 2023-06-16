@@ -45,7 +45,7 @@ from typed_python import (
     Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward, Final, Function, Entrypoint, TypeFunction, PointerTo,
-    SubclassOf, NotCompiled, resolveForwardDefinedType
+    SubclassOf, NotCompiled, resolveForwardDefinedType, identityHash
 )
 
 from typed_python._types import (
@@ -2415,6 +2415,7 @@ class TypesSerializationTest(unittest.TestCase):
             else:
                 return "FAILED"
 
+        # assert deserializeAndCall(aChildBytes) == "OK"
         assert callFunctionInFreshProcess(deserializeAndCall, (aChildBytes,)) == "OK"
 
     def test_call_method_dispatch_on_two_versions_of_self_referential_class_produced_differently(self):
@@ -2499,6 +2500,30 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert ser1 == ser2
 
+    def test_deserialize_external_class_with_int_ref(self):
+        def deserializeAndCall(x):
+            class B(Class):
+                def f(self):
+                    return x
+
+            return B
+
+        assert callFunctionInFreshProcess(deserializeAndCall, (1,)) is deserializeAndCall(1)
+        assert callFunctionInFreshProcess(deserializeAndCall, (1,)) is not deserializeAndCall(2)
+        assert callFunctionInFreshProcess(deserializeAndCall, (2,)) is deserializeAndCall(2)
+
+    def test_deserialize_external_subclass(self):
+        class Base(Class):
+            pass
+
+        def deserializeAndCall():
+            class Child(Base):
+                pass
+
+            return Child
+
+        assert callFunctionInFreshProcess(deserializeAndCall, ()) is deserializeAndCall()
+
     def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion(self):
         Base = Forward(lambda: Base)
 
@@ -2514,14 +2539,13 @@ class TypesSerializationTest(unittest.TestCase):
             return x.f(10)
 
         def deserializeAndCall():
-            # class Child(Base, Final):
-            #     def f(self, x) -> int:
-            #         return -1
+            class Child(Base, Final):
+                def f(self, x) -> int:
+                    return -1
 
-            # assert isinstance(Child(), Base)
+            assert isinstance(Child(), Base)
 
-            return SerializationContext().serialize(Base)
-            #return SerializationContext().serialize(Child())
+            return SerializationContext().serialize(Child())
 
         childBytes = callFunctionInFreshProcess(deserializeAndCall, ())
 

@@ -1,36 +1,46 @@
 import sys
 
-from typed_python import Class, SerializationContext, Held, isForwardDefined
+from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final
 from typed_python._types import typeWalkRecord, recursiveTypeGroupRepr
 
-
 def writer():
-	@Held
-	class C(Class):
-		def f(self):
-			return C
+    Base = Forward("Base")
 
-	assert not isForwardDefined(C)
+    @Base.define
+    class Base(Class):
+        def blah(self) -> Base:
+            return self
 
-	print("group is:")
-	print(typeWalkRecord(type(C.f).overloads[0].funcGlobalsInCells['C'], 'identity'))
-	print(typeWalkRecord(type(C.f).overloads[0].funcGlobalsInCells['C'], 'compiler'))
+        def f(self, x) -> int:
+            return x + 1
 
-	# with open("a.dat", "wb") as f:
-		# f.write(SerializationContext().serialize(C))
+    class Child(Base, Final):
+        def f(self, x) -> int:
+            return -1
+
+    aChild = Child()
+
+    aChildBytes = SerializationContext().serialize(aChild)
+
+    with open("a.dat", "wb") as f:
+        f.write(aChildBytes)
 
 
 def reader():
-	with open("a.dat", "rb") as f:
-		C = SerializationContext().deserialize(f.read())
+    with open("a.dat", "rb") as f:
+        aChild = SerializationContext().deserialize(f.read())
 
-	print(C)
-	#assert C().f() is C
+    # @Entrypoint
+    def callF(x):
+    	return x.f(10)
+
+    assert callF(aChild) == 11
+
 
 if sys.argv[1:] == ['r']:
-	reader()
+    reader()
 else:
-	writer()
+    writer()
 
 
 

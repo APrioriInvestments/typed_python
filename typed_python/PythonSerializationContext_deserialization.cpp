@@ -1222,9 +1222,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             ixAndType.second->typeFinishedBeingDeserialized();
         }
 
-        std::cout << "finalizing group:\n";
-        std::cout << outGroup->repr() << "\n";
-
         outGroup->finalizeDeserializerGroup();
     }
 
@@ -1547,7 +1544,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
     int isEntrypoint = 0;
     int isNocompile = 0;
 
-    std::vector<Class*> classBases;
+    std::vector<HeldClass*> classBases;
     bool classIsFinal = false;
     std::vector<std::pair<std::string, NamedTuple*> > alternativeMembers;
     std::map<std::string, Function*> classMethods, classStatics, classClassMethods, classPropertyFunctions;
@@ -1631,7 +1628,7 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
                                 t->name() + " of category " + t->getTypeCategoryString()
                             );
                         }
-                        classBases.push_back(((HeldClass*)t)->getClassType());
+                        classBases.push_back((HeldClass*)t);
                     });
                 } else if (fieldNumber == 8) {
                     assertWireTypesEqual(wireType, WireType::VARINT);
@@ -1757,20 +1754,24 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
             throw std::runtime_error("Shell is not a HeldClass");
         }
 
-        if (types.size() != 1 || !types[0]->isClass()) {
-            throw std::runtime_error("Corrupt 'HeldClass' - needed a Class");
+        if (types.size() != 1) {
+            throw std::runtime_error("Corrupt 'HeldClass' - needed a single type, not " + format(types.size()));
+        }
+
+        if (!types[0]->isClass()) {
+            throw std::runtime_error("Corrupt 'HeldClass' - needed a Class, not " + types[0]->getTypeCategoryString());
         }
 
         std::vector<HeldClass*> heldBases;
         for (auto b: classBases) {
             if (!b->isHeldClass()) {
-                throw std::runtime_error("Non-held base encountered!");
+                throw std::runtime_error("Non-held base encountered: its " + b->getTypeCategoryString());
             }
             heldBases.push_back((HeldClass*)b);
         }
 
         ((HeldClass*)blankShell)->initializeDuringDeserialization(
-            names[0],
+            "Held(" + names[0] + ")",
             heldBases,
             classIsFinal,
             classMembers,
