@@ -924,7 +924,8 @@ public:
         return m_is_being_deserialized;
     }
 
-    void typeFinishedBeingDeserialized();
+    void typeFinishedBeingDeserializedPhase1();
+    void typeFinishedBeingDeserializedPhase2();
 
 protected:
     Type(TypeCategory in_typeCategory) :

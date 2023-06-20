@@ -102,7 +102,7 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
             + canonical->repr()
             + "\n\nwhich has a different number of elements"
             + "\n\nmVisibilityType = " + visibilityTypeToStr(mVisibilityType)
-            + "\ncanonical->nmVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
+            + "\ncanonical->mVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
         );
     }
 
@@ -118,7 +118,7 @@ void MutuallyRecursiveTypeGroup::finalizeDeserializerGroup() {
             + canonical->repr()
             + "\n\nwhich has a different hash!"
             + "\n\nmVisibilityType = " + visibilityTypeToStr(mVisibilityType)
-            + "\ncanonical->nmVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
+            + "\ncanonical->mVisibilityType = " + visibilityTypeToStr(canonical->mVisibilityType)
         );
     }
 
@@ -174,7 +174,7 @@ void MutuallyRecursiveTypeGroup::_computeHashAndInstall() {
                 if (typeAndOrder.first.type() && mVisibilityType == VisibilityType::Identity) {
                     Type* t = typeAndOrder.first.type();
                     t->setRecursiveTypeGroup(
-                        this, 
+                        this,
                         typeAndOrder.second,
                         ShaHash(2) + this->hash() + ShaHash(typeAndOrder.second)
                     );
@@ -257,7 +257,8 @@ std::string MutuallyRecursiveTypeGroup::repr(bool deep) {
 
         std::string levelPrefix(level, ' ');
 
-        s << levelPrefix << "group with hash " << group->hash().digestAsHexString() << ":\n";
+        s << levelPrefix << "group with hash " << group->hash().digestAsHexString() << " and "
+            << "visibility=" << visibilityTypeToStr(mVisibilityType) << ":\n";
 
         // sort lexically and then by level, so that
         // we can tell what's going on when we have a discrepancy

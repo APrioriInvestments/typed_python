@@ -641,7 +641,9 @@ public:
     */
     static PyTypeObject* typeObjInternal(Type* inType);
 
-    static void finalizePyTypeObject(Type* inType, PyTypeObject* pyType);
+    static void finalizePyTypeObjectPhase1(Type* inType, PyTypeObject* pyType);
+
+    static void finalizePyTypeObjectPhase2(Type* inType, PyTypeObject* pyType);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType);
 

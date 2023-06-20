@@ -1046,6 +1046,46 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             });
         } else
         if (fieldNumber == 4) {
+            // now that we've constructed the type diagram, walk over all the types
+            // and finalize them. We have to do this before we wire function globals
+            // because sometime the function globals hold python references to type objects
+            // and the type objects have to be filled out completely and have PyType_Ready
+            // called on them before they are valid GC objects.
+            if (actuallyBuildGroup) {
+                // recompute type names
+                for (auto ixAndType: indicesOfNativeTypes) {
+                    ixAndType.second->recomputeName();
+                }
+
+                // do post-initialization
+                bool anyUpdated = true;
+                size_t passCt = 0;
+                while (anyUpdated) {
+                    anyUpdated = false;
+                    for (auto ixAndType: indicesOfNativeTypes) {
+                        if (ixAndType.second->postInitialize()) {
+                            anyUpdated = true;
+                        }
+                    }
+                    passCt += 1;
+
+                    // we can run this algorithm until all type sizes have stabilized. Conceivably we
+                    // could introduce an error that would cause this to not converge - this should
+                    // detect that.
+                    if (passCt > indicesOfNativeTypes.size() * 2 + 10) {
+                        throw std::runtime_error("Type size graph is not stabilizing.");
+                    }
+                }
+
+                for (auto ixAndType: indicesOfNativeTypes) {
+                    ixAndType.second->finalizeType();
+                }
+
+                for (auto ixAndType: indicesOfNativeTypes) {
+                    ixAndType.second->typeFinishedBeingDeserializedPhase1();
+                }
+            }
+
             // fill out the globals of function objects. we have to deserialize these
             // in a separate final pass because they can have references to existing
             // native types, and we need those objects to be filled out fully.
@@ -1189,37 +1229,8 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
     }
 
     if (actuallyBuildGroup) {
-        // recompute type names
         for (auto ixAndType: indicesOfNativeTypes) {
-            ixAndType.second->recomputeName();
-        }
-
-        // do post-initialization
-        bool anyUpdated = true;
-        size_t passCt = 0;
-        while (anyUpdated) {
-            anyUpdated = false;
-            for (auto ixAndType: indicesOfNativeTypes) {
-                if (ixAndType.second->postInitialize()) {
-                    anyUpdated = true;
-                }
-            }
-            passCt += 1;
-
-            // we can run this algorithm until all type sizes have stabilized. Conceivably we
-            // could introduce an error that would cause this to not converge - this should
-            // detect that.
-            if (passCt > indicesOfNativeTypes.size() * 2 + 10) {
-                throw std::runtime_error("Type size graph is not stabilizing.");
-            }
-        }
-
-        for (auto ixAndType: indicesOfNativeTypes) {
-            ixAndType.second->finalizeType();
-        }
-
-        for (auto ixAndType: indicesOfNativeTypes) {
-            ixAndType.second->typeFinishedBeingDeserialized();
+            ixAndType.second->typeFinishedBeingDeserializedPhase2();
         }
 
         outGroup->finalizeDeserializerGroup();

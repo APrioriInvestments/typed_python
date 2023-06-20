@@ -3,7 +3,7 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held
+    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled
 )
 
 from typed_python.test_util import CodeEvaluator
@@ -97,6 +97,15 @@ def test_autoresolve_on_decorator():
 
     assert not isForwardDefined(B)
     assert not isForwardDefined(type(callIt))
+
+
+def test_class_with_entrypointed_recursive_method():
+    class C(Class):
+        @NotCompiled
+        def f(self):
+            return C().g()
+
+    c = C()
 
 
 def test_autoresolve_forwards_with_nonforwards():

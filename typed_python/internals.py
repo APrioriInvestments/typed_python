@@ -170,11 +170,11 @@ def makeFunctionType(
 
                 if f.isEntrypoint:
                     # reapply the entrypoint flag
-                    res = type(res().withEntrypoint(True))
+                    res = typed_python._types.Function(res, 'Entrypoint')
 
                 if f.isNocompile:
-                    # reapply the entrypoint flag
-                    res = type(res().withNocompile(True))
+                    # reapply the notcompiled flag
+                    res = typed_python._types.Function(res, 'Nocompile')
 
                 return res
 

@@ -34,7 +34,7 @@ def reader():
     def callF(x):
     	return x.f(10)
 
-    assert callF(aChild) == 11
+    assert callF(aChild) == -1
 
 
 if sys.argv[1:] == ['r']:

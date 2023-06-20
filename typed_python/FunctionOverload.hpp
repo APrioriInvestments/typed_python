@@ -369,17 +369,20 @@ public:
             }
 
             PyObject* o = PyCell_Get(nameAndGlobal.second);
-            Type* t = PyInstance::extractTypeFrom(o);
+            Type* t = o && PyType_Check(o) ? PyInstance::extractTypeFrom(o) : nullptr;
 
             if (t && t->isForwardDefined()) {
-                if (((Forward*)t)->isResolved()) {
+                if (t->isResolved()) {
                     visitor.visitNamedTopo(
                         nameAndGlobal.first,
-                        ((Forward*)t)->forwardResolvesTo()
+                        t->forwardResolvesTo()
                     );
                 } else {
                     // deliberately ignore non-resolved forwards
+                    std::cout << "Deliberately ignoring " << nameAndGlobal.first << " -> " << TypeOrPyobj(t).name() << " since its not reoslved..\n";
                 }
+            } else if (t) {
+                visitor.visitNamedTopo(nameAndGlobal.first, t);
             } else {
                 visitor.visitNamedTopo(
                     nameAndGlobal.first,
@@ -418,14 +421,16 @@ public:
             Type* t = PyInstance::extractTypeFrom(val);
 
             if (t && t->isForwardDefined()) {
-                if (((Forward*)t)->isResolved()) {
+                if (t->isResolved()) {
                     visitor.visitNamedTopo(
                         name,
-                        ((Forward*)t)->forwardResolvesTo()
+                        t->forwardResolvesTo()
                     );
                 } else {
                     // deliberately ignore non-resolved forwards
                 }
+            } else if (t) {
+                visitor.visitNamedTopo(name, t);
             } else {
                 visitor.visitNamedTopo(
                     name,

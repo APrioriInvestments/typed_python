@@ -938,22 +938,41 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         Function* resType;
 
         if (PyTuple_Size(args) == 2) {
-            PyObjectHolder a0(PyTuple_GetItem(args, 0));
-            PyObjectHolder a1(PyTuple_GetItem(args, 1));
+            if (PyUnicode_Check(PyTuple_GetItem(args, 1))) {
+                PyObjectHolder a0(PyTuple_GetItem(args, 0));
+                Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
 
-            Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
-            Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+                if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
+                    throw PythonExceptionSet();
+                }
 
-            if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
-                PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
-                throw PythonExceptionSet();
+                if (PyUnicode_AsUTF8(PyTuple_GetItem(args, 1)) == std::string("Entrypoint")) {
+                    resType = ((Function*)t0)->withEntrypoint(true);
+                } else if (PyUnicode_AsUTF8(PyTuple_GetItem(args, 1)) == std::string("Nocompile")) {
+                    resType = ((Function*)t0)->withEntrypoint(true);
+                } else {
+                    PyErr_SetString(PyExc_TypeError, "Expected string argument to be Entrypoint or Nocompile");
+                    throw PythonExceptionSet();
+                }
+            } else {
+                PyObjectHolder a0(PyTuple_GetItem(args, 0));
+                PyObjectHolder a1(PyTuple_GetItem(args, 1));
+
+                Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
+                Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+                if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
+                    throw PythonExceptionSet();
+                }
+                if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+                    PyErr_SetString(PyExc_TypeError, "Expected second argument to be a function");
+                    throw PythonExceptionSet();
+                }
+
+                resType = Function::merge((Function*)t0, (Function*)t1);
             }
-            if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
-                PyErr_SetString(PyExc_TypeError, "Expected second argument to be a function");
-                throw PythonExceptionSet();
-            }
-
-            resType = Function::merge((Function*)t0, (Function*)t1);
         } else {
             PyObjectHolder nameObj(PyTuple_GetItem(args, 0));
             if (!PyUnicode_Check(nameObj)) {

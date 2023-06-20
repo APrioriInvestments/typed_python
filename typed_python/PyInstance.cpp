@@ -1251,7 +1251,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     }
 
     if (!inType->isActivelyBeingDeserialized()) {
-        finalizePyTypeObject(inType, (PyTypeObject*)types[inType]);
+        finalizePyTypeObjectPhase1(inType, (PyTypeObject*)types[inType]);
+        finalizePyTypeObjectPhase2(inType, (PyTypeObject*)types[inType]);
     }
 
     return (PyTypeObject*)types[inType];
@@ -1527,12 +1528,14 @@ bool PyInstance::typeCanBeSubclassed(Type* t) {
 }
 
 // static
-void PyInstance::finalizePyTypeObject(Type* inType, PyTypeObject* pyType) {
+void PyInstance::finalizePyTypeObjectPhase1(Type* inType, PyTypeObject* pyType) {
     // update the type methods
     pyType->tp_methods = typeMethods(inType);
 
     PyType_Ready(pyType);
+}
 
+void PyInstance::finalizePyTypeObjectPhase2(Type* inType, PyTypeObject* pyType) {
     PyDict_SetItemString(
         pyType->tp_dict,
         "__typed_python_category__",
@@ -1548,6 +1551,7 @@ void PyInstance::finalizePyTypeObject(Type* inType, PyTypeObject* pyType) {
             );
     });
 }
+
 void PyInstance::mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType) {
     //noop
 }

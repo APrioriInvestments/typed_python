@@ -508,6 +508,11 @@ void Type::attemptToResolve() {
         typeAndSource.first->finalizeType();
     }
 
+    std::cout << "resolving group:\n";
+    for (auto typeAndSource: resolutionSource) {
+        std::cout << "    " << TypeOrPyobj(typeAndSource.first).name() << " from " << TypeOrPyobj(typeAndSource.second).name() << "\n";
+    }
+
     // now internalize the types by their hash. For each type, we compute a hash
     // and then look to see if we've seen it before. We build a lookup table from
     // each existing type to the internalized type, and then do the same process we did
@@ -671,7 +676,7 @@ void Type::attemptAutoresolveWrite() {
     }
 }
 
-void Type::typeFinishedBeingDeserialized() {
+void Type::typeFinishedBeingDeserializedPhase1() {
     if (m_is_being_deserialized) {
         // during deserialization we have to defer anything that actually
         // looks hard at the type and copies data into the PyTypeObject
@@ -679,7 +684,19 @@ void Type::typeFinishedBeingDeserialized() {
         // without it being finished.
         PyTypeObject* typeObj = PyInstance::typeObj(this);
 
-        PyInstance::finalizePyTypeObject(this, typeObj);
+        PyInstance::finalizePyTypeObjectPhase1(this, typeObj);
+    }
+}
+
+void Type::typeFinishedBeingDeserializedPhase2() {
+    if (m_is_being_deserialized) {
+        // during deserialization we have to defer anything that actually
+        // looks hard at the type and copies data into the PyTypeObject
+        // because its not ready yet. This allows us to refer to the object
+        // without it being finished.
+        PyTypeObject* typeObj = PyInstance::typeObj(this);
+
+        PyInstance::finalizePyTypeObjectPhase2(this, typeObj);
 
         m_is_being_deserialized = false;
     }

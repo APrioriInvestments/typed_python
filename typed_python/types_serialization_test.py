@@ -2013,7 +2013,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert isinstance(Base() + Base() + Base(), Child)
 
     def test_serialize_self_referencing_class_basic(self):
-        def g(x):
+        def g2(x):
             return 10
 
         @TypeFunction
@@ -2025,9 +2025,19 @@ class TypesSerializationTest(unittest.TestCase):
 
                 @Entrypoint
                 def g(self):
-                    return g(10)
+                    return g2(10)
 
             return C_
+
+        print(recursiveTypeGroupRepr(C(int), "identity"))
+        print(recursiveTypeGroupRepr(C(int), "compiler"))
+        from typed_python._types import checkForHashInstability
+        checkForHashInstability()
+        #from typed_python._types import typeWalkRecord
+        #print(typeWalkRecord(type(C(int).s), 'identity'))
+        #print(typeWalkRecord(type(C(int).s), 'compiler'))
+
+        return
 
         c = callFunctionInFreshProcess(C(int), ())
 
@@ -2267,7 +2277,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         callFunctionInFreshProcess(getCls, ())
 
-    def test_can_deserialize_forward_class_methods_tp_class(self):
+    def test_can_deserialize_forward_class_methods_tp_class_2(self):
         Cls = Forward("Cls")
 
         @Cls.define

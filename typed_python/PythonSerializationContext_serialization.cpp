@@ -405,6 +405,10 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
         throw std::runtime_error("Can't serialize a mutually recursive type group with an invalid hash.");
     }
 
+    if (group->visibilityType() != VisibilityType::Identity) {
+        throw std::runtime_error("shouldn't be serializing a compiler identity group.");
+    }
+
     b.writeBeginCompound(fieldNumber);
         // group memo
         uint32_t id;
