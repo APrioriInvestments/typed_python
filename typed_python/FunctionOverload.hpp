@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2022 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -25,16 +25,16 @@
 #include "ClosureVariableBinding.hpp"
 #include "FunctionArg.hpp"
 #include "CompiledSpecialization.hpp"
+#include "FunctionGlobals.hpp"
 
 
 class FunctionOverload {
 public:
     FunctionOverload(
         PyObject* pyFuncCode,
-        PyObject* pyFuncGlobals,
         PyObject* pyFuncDefaults,
         PyObject* pyFuncAnnotations,
-        const std::map<std::string, PyObject*>& pyFuncGlobalsInCells,
+        const std::map<std::string, FunctionGlobal>& inGlobals,
         const std::vector<std::string>& pyFuncClosureVarnames,
         const std::map<std::string, ClosureVariableBinding> closureBindings,
         Type* returnType,
@@ -43,10 +43,9 @@ public:
         Type* methodOf
     ) :
             mFunctionCode(pyFuncCode),
-            mFunctionGlobals(pyFuncGlobals),
             mFunctionDefaults(pyFuncDefaults),
             mFunctionAnnotations(pyFuncAnnotations),
-            mFunctionGlobalsInCells(pyFuncGlobalsInCells),
+            mGlobals(inGlobals),
             mFunctionClosureVarnames(pyFuncClosureVarnames),
             mReturnType(returnType),
             mSignatureFunction(pySignatureFunction),
@@ -88,7 +87,7 @@ public:
         other.increfAllPyObjects();
 
         mFunctionCode = other.mFunctionCode;
-        mFunctionGlobals = other.mFunctionGlobals;
+        mGlobals = other.mGlobals;
         mFunctionDefaults = other.mFunctionDefaults;
         mFunctionAnnotations = other.mFunctionAnnotations;
         mSignatureFunction = other.mSignatureFunction;
@@ -123,10 +122,9 @@ public:
 
         return FunctionOverload(
             mFunctionCode,
-            mFunctionGlobals,
             mFunctionDefaults,
             mFunctionAnnotations,
-            mFunctionGlobalsInCells,
+            mGlobals,
             mFunctionClosureVarnames,
             bindings,
             mReturnType,
@@ -139,10 +137,9 @@ public:
     FunctionOverload withMethodOf(Type* methodOf) const {
         return FunctionOverload(
             mFunctionCode,
-            mFunctionGlobals,
             mFunctionDefaults,
             mFunctionAnnotations,
-            mFunctionGlobalsInCells,
+            mGlobals,
             mFunctionClosureVarnames,
             mClosureBindings,
             mReturnType,
@@ -155,10 +152,9 @@ public:
     FunctionOverload withClosureBindings(const std::map<std::string, ClosureVariableBinding> &bindings) const {
         return FunctionOverload(
             mFunctionCode,
-            mFunctionGlobals,
             mFunctionDefaults,
             mFunctionAnnotations,
-            mFunctionGlobalsInCells,
+            mGlobals,
             mFunctionClosureVarnames,
             bindings,
             mReturnType,
@@ -359,9 +355,9 @@ public:
             visitor.visitHash(ShaHash(2));
         }
 
-        visitor.visitHash(ShaHash(mFunctionGlobalsInCells.size()));
+        visitor.visitHash(ShaHash(mGlobals.size()));
 
-        for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+        for (auto nameAndGlobal: mGlobals) {
             if (!PyCell_Check(nameAndGlobal.second)) {
                 throw std::runtime_error(
                     "A global in mFunctionGlobalsInCells is somehow not a cell"
@@ -541,11 +537,8 @@ public:
         if (mFunctionCode < other.mFunctionCode) { return true; }
         if (mFunctionCode > other.mFunctionCode) { return false; }
 
-        if (mFunctionGlobals < other.mFunctionGlobals) { return true; }
-        if (mFunctionGlobals > other.mFunctionGlobals) { return false; }
-
-        if (mFunctionGlobalsInCells < other.mFunctionGlobalsInCells) { return true; }
-        if (mFunctionGlobalsInCells > other.mFunctionGlobalsInCells) { return false; }
+        if (mGlobals < other.mGlobals) { return true; }
+        if (mGlobals > other.mGlobals) { return false; }
 
         if (mClosureBindings < other.mClosureBindings) { return true; }
         if (mClosureBindings > other.mClosureBindings) { return false; }
@@ -590,8 +583,8 @@ public:
         return mFunctionGlobals;
     }
 
-    const std::map<std::string, PyObject*>& getFunctionGlobalsInCells() const {
-        return mFunctionGlobalsInCells;
+    const std::map<std::string, FunctionGlobal>& getGlobals() const {
+        return mGlobals;
     }
 
     /* walk over the opcodes in 'code' and extract all cases where we're accessing globals by name.
@@ -1080,10 +1073,9 @@ public:
 
         return FunctionOverload(
             functionCode,
-            functionGlobals,
             functionDefaults,
             functionAnnotations,
-            functionGlobalsInCellsRaw,
+            functionGlobals,
             closureVarnames,
             closureBindings,
             returnType,
@@ -1099,10 +1091,6 @@ public:
         incref(mFunctionDefaults);
         incref(mFunctionAnnotations);
         incref(mSignatureFunction);
-
-        for (auto nameAndOther: mFunctionGlobalsInCells) {
-            incref(nameAndOther.second);
-        }
     }
 
     void decrefAllPyObjects() {
@@ -1111,23 +1099,13 @@ public:
         decref(mFunctionDefaults);
         decref(mFunctionAnnotations);
         decref(mSignatureFunction);
-
-        for (auto nameAndOther: mFunctionGlobalsInCells) {
-            decref(nameAndOther.second);
-        }
     }
 
 private:
+    // every global we access not through our closure
+    std::map<std::string, FunctionGlobal> mGlobals;
+
     PyObject* mFunctionCode;
-
-    PyObject* mFunctionGlobals;
-
-    // globals that are stored in cells. This happens when class objects
-    // are defined inside of function scopes. We assume that anything in their
-    // closure is global (and therefore constant) but it may not be defined yet,
-    // so we can't just pull the value out and stick it in the function closure
-    // itself. Each value in the map is guaranteed to be a 'cell' object.
-    std::map<std::string, PyObject*> mFunctionGlobalsInCells;
 
     // the order (by name) of the variables in the __closure__ of the original
     // function. This is the order that the python code will expect.
@@ -1147,7 +1125,7 @@ private:
 
     Type* mReturnType;
 
-    // if we are a method of a class, what class? Used to
+    // if we are a method of a class, what class?
     Type* mMethodOf;
 
     std::vector<FunctionArg> mArgs;
