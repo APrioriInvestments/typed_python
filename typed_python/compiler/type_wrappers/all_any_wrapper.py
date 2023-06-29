@@ -59,4 +59,4 @@ class AnyWrapper(Wrapper):
         return native_ast.Type.Struct()
 
     def convert_call(self, context, expr, args, kwargs):
-        return context.call_py_function(all, args, kwargs)
+        return context.call_py_function(any, args, kwargs)
