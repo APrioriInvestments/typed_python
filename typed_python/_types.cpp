@@ -675,18 +675,20 @@ PyObject* initializeGlobalStatics(PyObject* nullValue, PyObject* args, PyObject*
         return NULL;
     }
 
-    // initialize all global references to modules.
-    // we can't initialize these lazily, because it may happen when we are
-    // doing something that prevents importing modules, like handling
-    // an exception
-    internalsModule();
-    runtimeModule();
-    builtinsModule();
-    sysModule();
-    osModule();
-    weakrefModule();
+    return translateExceptionToPyObject([&]() {
+        // initialize all global references to modules.
+        // we can't initialize these lazily, because it may happen when we are
+        // doing something that prevents importing modules, like handling
+        // an exception
+        internalsModule();
+        runtimeModule();
+        builtinsModule();
+        sysModule();
+        osModule();
+        weakrefModule();
 
-    return incref(Py_None);
+        return incref(Py_None);
+    });
 }
 
 PyObject* isValidArithmeticConversion(PyObject* nullValue, PyObject* args, PyObject* kwargs)
@@ -1135,7 +1137,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                             throw PythonExceptionSet();
                         }
 
-                        globals[closureVarnames[ix]] = FunctionGlobal::FromCell(cell);
+                        globals[closureVarnames[ix]] = FunctionGlobal::GlobalInCell(cell);
                     }
                 }
                 else {

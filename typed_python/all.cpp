@@ -62,6 +62,7 @@ compile the entire group all at once.
 #include "Type.cpp"
 #include "ClosureVariableBinding.cpp"
 #include "FunctionOverload.cpp"
+#include "FunctionGlobal.cpp"
 #include "ForwardType.cpp"
 #include "ValueType.cpp"
 

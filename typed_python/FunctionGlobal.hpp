@@ -25,19 +25,21 @@ class FunctionGlobal {
         Unbound = 1, // this global is not bound to anything - its a Name error
         NamedModuleMember = 2, // this global is a member of a particular module
         Constant = 3, // this global is bound to a constant that we resolved to at some point
-        ForwardInDict = 4, // this global is an unresolved variable residing in some python dict
-        ForwardInCell = 5, // this global is an unresolved variable residing in some PyCell
+        GlobalInDict = 4, // this global is an unresolved variable residing in some python dict
+        GlobalInCell = 5, // this global is an unresolved variable residing in some PyCell
     };
 
     FunctionGlobal(
         GlobalType inKind,
         PyObject* dictOrCell,
         std::string name,
+        std::string moduleName,
         CompilerVisiblePyObj* constant
     ) :
         mKind(inKind),
         mModuleDictOrCell(incref(dictOrCell)),
         mName(name),
+        mModuleName(name),
         mConstant(constant)
     {
     }
@@ -58,6 +60,7 @@ public:
             GlobalType::Constant,
             nullptr,
             "",
+            "",
             constant
         );
     }
@@ -68,47 +71,9 @@ public:
     static std::pair<std::string, FunctionGlobal> DottedGlobalsLookup(
         PyObject* funcGlobals,
         std::string dotSequence
-    ) {
-        if (!PyDict_Check(funcGlobals)) {
-            throw std::runtime_error("Can't handle a non-dict function globals");
-        }
+    );
 
-        std::string shortGlobalName = dotSequence;
-
-        size_t indexOfDot = shortGlobalName.find('.');
-        if (indexOfDot != std::string::npos) {
-            shortGlobalName = shortGlobalName.substr(0, indexOfDot);
-        }
-
-        PyObject* globalVal = PyDict_GetItemString(funcGlobals, shortGlobalName.c_str());
-
-        if (!globalVal) {
-            PyObject* builtins = PyDict_GetItemString(funcGlobals, "__builtins__");
-            if (builtins && PyDict_Check(builtins) && PyDict_GetItemString(builtins, shortGlobalName.c_str())) {
-                return std::make_pair(
-                    shortGlobalName,
-                    FunctionGlobal::NamedModuleMember(builtins, shortGlobalName)
-                );
-            }
-        }
-
-        // TODO: this should be more precise - we need to decide what to do if
-        // this is a named global in a globally visible module vs a module
-        // still being defined, or whatever
-        return std::make_pair(
-            shortGlobalName,
-            FunctionGlobal::ForwardInDict(funcGlobals, shortGlobalName)
-        );
-    }
-
-    // construct a Global from a cell. If the cell is defined, we can resolve immediately
-    static FunctionGlobal FromCell(PyObject* cell) {
-        // pass
-        throw std::runtime_error("FunctionGlobal::FromCell not implemented yet");
-    }
-
-
-    static FunctionGlobal NamedModuleMember(PyObject* moduleDict, std::string name) {
+    static FunctionGlobal NamedModuleMember(PyObject* moduleDict, std::string moduleName, std::string name) {
         if (!PyDict_Check(moduleDict)) {
             throw std::runtime_error("NamedModuleMember requires a Python dict object");
         }
@@ -117,32 +82,35 @@ public:
             GlobalType::NamedModuleMember,
             moduleDict,
             name,
+            "",
             nullptr
         );
     }
 
-    static FunctionGlobal ForwardInDict(PyObject* dict, std::string name) {
+    static FunctionGlobal GlobalInDict(PyObject* dict, std::string name) {
         if (!PyDict_Check(dict)) {
-            throw std::runtime_error("ForwardInDict requires a Python dict object");
+            throw std::runtime_error("GlobalInDict requires a Python dict object");
         }
 
         return FunctionGlobal(
-            GlobalType::ForwardInDict,
+            GlobalType::GlobalInDict,
             dict,
             name,
+            "",
             nullptr
         );
     }
 
-    static FunctionGlobal ForwardInCell(PyObject* cell, std::string name) {
+    static FunctionGlobal GlobalInCell(PyObject* cell) {
         if (!PyCell_Check(cell)) {
-            throw std::runtime_error("ForwardInCell requires a Python cell object");
+            throw std::runtime_error("GlobalInCell requires a Python cell object");
         }
 
         return FunctionGlobal(
-            GlobalType::ForwardInCell,
+            GlobalType::GlobalInCell,
             cell,
-            name,
+            "",
+            "",
             nullptr
         );
     }
@@ -159,12 +127,12 @@ public:
         return mKind == GlobalType::Constant;
     }
 
-    bool isForwardInDict() const {
-        return mKind == GlobalType::ForwardInDict;
+    bool isGlobalInDict() const {
+        return mKind == GlobalType::GlobalInDict;
     }
 
-    bool isForwardInCell() const {
-        return mKind == GlobalType::ForwardInCell;
+    bool isGlobalInCell() const {
+        return mKind == GlobalType::GlobalInCell;
     }
 
     PyObject* getValueAsPyobj() {
@@ -187,6 +155,23 @@ public:
         return mModuleDictOrCell;
     }
 
+    PyObject* extractGlobalRefFromDictOrCell() {
+        if (isGlobalInDict()) {
+            return PyDict_GetItemString(mModuleDictOrCell, mName.c_str());
+        }
+
+        if (isGlobalInCell()) {
+            return PyCell_Get(mModuleDictOrCell);
+        }
+
+        if (isNamedModuleMember()) {
+            return PyDict_GetItemString(mModuleDictOrCell, mName.c_str());
+        }
+
+        return nullptr;
+    }
+
+
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         if (isUnbound()) {
@@ -198,8 +183,31 @@ public:
             return;
         }
 
-        //TODO: what should we do here?
-        return;
+        if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
+            PyObject* obj = extractGlobalRefFromDictOrCell();
+
+            if (obj) {
+                _visitReferencedTypesInPyobj(obj, visitor);
+            }
+            return;
+        }
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypesInPyobj(PyObject* obj, visitor_type vis) {
+        if (!obj) {
+            return;
+        }
+
+        if (!PyType_Check(obj)) {
+            return;
+        }
+
+        Type* t = PyInstance::extractTypeFrom(obj);
+
+        if (t) {
+            vis(t);
+        }
     }
 
     template<class visitor_type>
@@ -208,120 +216,69 @@ public:
             return;
         }
 
-        if (isNamedModuleMember()) {
-            // TODO: need to know whether we're an identity or compiler visitor?
-            return;
-        }
-
         if (isConstant()) {
             mConstant->_visitCompilerVisibleInternals(visitor);
             return;
         }
 
-        if (isForwardInDict()) {
+        if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
+            PyObject* obj = extractGlobalRefFromDictOrCell();
+
+            if (obj) {
+                _visitCompilerVisibleInternalsInPyobj(obj, visitor);
+            }
+            return;
+        }
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInternalsInPyobj(PyObject* obj, const visitor_type& visitor) {
+        if (!PyType_Check(obj)) {
             return;
         }
 
-        if (isForwardInCell()) {
-            return;
+        Type* t = PyInstance::extractTypeFrom(obj);
+
+        if (t && t->isForwardDefined()) {
+            if (t->isResolved()) {
+                visitor.visitTopo(
+                    t->forwardResolvesTo()
+                );
+            } else {
+            }
+        } else if (t) {
+            visitor.visitTopo(t);
+        } else {
+            visitor.visitTopo(obj);
         }
-
-        // if (!PyCell_Check(nameAndGlobal.second)) {
-        //     throw std::runtime_error(
-        //         "A global in mFunctionGlobalsInCells is somehow not a cell"
-        //     );
-        // }
-
-        // PyObject* o = PyCell_Get(nameAndGlobal.second);
-        // Type* t = o && PyType_Check(o) ? PyInstance::extractTypeFrom(o) : nullptr;
-
-        // if (t && t->isForwardDefined()) {
-        //     if (t->isResolved()) {
-        //         visitor.visitNamedTopo(
-        //             nameAndGlobal.first,
-        //             t->forwardResolvesTo()
-        //         );
-        //     } else {
-        //         // deliberately ignore non-resolved forwards
-        //         std::cout << "Deliberately ignoring " << nameAndGlobal.first << " -> " << TypeOrPyobj(t).name() << " since its not reoslved..\n";
-        //     }
-        // } else if (t) {
-        //     visitor.visitNamedTopo(nameAndGlobal.first, t);
-        // } else {
-        //     visitor.visitNamedTopo(
-        //         nameAndGlobal.first,
-        //         nameAndGlobal.second
-        //     );
-        // }
-
-
-
-        // or alternatively
-        //
-        // _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-        //     Type* t = PyInstance::extractTypeFrom(val);
-
-        //     if (t && t->isForwardDefined()) {
-        //         if (t->isResolved()) {
-        //             visitor.visitNamedTopo(
-        //                 name,
-        //                 t->forwardResolvesTo()
-        //             );
-        //         } else {
-        //             // deliberately ignore non-resolved forwards
-        //         }
-        //     } else if (t) {
-        //         visitor.visitNamedTopo(name, t);
-        //     } else {
-        //         visitor.visitNamedTopo(
-        //             name,
-        //             val
-        //         );
-        //     }
-        // });
-
     }
 
     bool isUnresolved(bool insistForwardsResolved) {
-        throw std::runtime_error("FunctionGlobal::isUnresolved not implemented yet");
+        if (isConstant()) {
+            return false;
+        }
+        if (isUnbound()) {
+            return false;
+        }
 
-        // auto it = mFunctionGlobalsInCells.find(name);
-        // if (it != mFunctionGlobalsInCells.end()) {
-        //     if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
-        //         if (insistForwardsResolved) {
-        //             PyObject* o = PyCell_Get(it->second);
-        //             Type* t = PyInstance::extractTypeFrom(o);
-        //             if (t && t->isForwardDefined()) {
-        //                 return true;
-        //             }
-        //         }
+        if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
+            PyObject* obj = extractGlobalRefFromDictOrCell();
 
-        //         return false;
-        //     }
+            if (!obj) {
+                return true;
+            }
 
-        //     return true;
-        // }
+            if (insistForwardsResolved) {
+                Type* t = PyInstance::extractTypeFrom(obj);
+                if (t && t->isForwardDefined()) {
+                    return true;
+                }
+            }
 
-        // if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)) {
-        //     if (PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
-        //         if (insistForwardsResolved) {
-        //             PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
-        //             Type* t = PyInstance::extractTypeFrom(o);
-        //             if (t && t->isForwardDefined()) {
-        //                 return true;
-        //             }
-        //         }
+            return false;
+        }
 
-        //         return false;
-        //     }
-
-        //     PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
-        //     if (builtins && PyDict_GetItemString(builtins, name.c_str())) {
-        //         return false;
-        //     }
-        // }
-
-        // return true;
+        return true;
     }
 
     void autoresolveGlobal(
@@ -419,5 +376,6 @@ private:
     CompilerVisiblePyObj* mConstant;
 
     std::string mName;
+    std::string mModuleName;
     PyObject* mModuleDictOrCell;
 };

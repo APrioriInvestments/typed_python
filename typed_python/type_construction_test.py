@@ -3,10 +3,10 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled
+    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held#, NotCompiled
 )
 
-from typed_python.test_util import CodeEvaluator
+# from typed_python.test_util import CodeEvaluator
 
 
 def test_identity_hash_of_alternative_stable():

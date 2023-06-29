@@ -146,14 +146,20 @@ public:
         const visitor_2& nameVisit,
         const visitor_3& topoVisitor,
         const visitor_4& namedVisitor,
-        const visitor_5& onErr
+        const visitor_5& onErr,
+        VisibilityType visType
     ):
         mHashVisit(hashVisit),
         mNameVisit(nameVisit),
         mTopoVisitor(topoVisitor),
         mNamedVisitor(namedVisitor),
-        mOnErr(onErr)
+        mOnErr(onErr),
+        mVisType(visType)
     {}
+
+    VisibilityType visibilityType() const {
+        return mVisType;
+    }
 
     void visitHash(ShaHash h) const {
         mHashVisit(h);
@@ -234,6 +240,8 @@ private:
     const visitor_3& mTopoVisitor;
     const visitor_4& mNamedVisitor;
     const visitor_5& mOnErr;
+
+    VisibilityType mVisType;
 };
 
 
@@ -278,7 +286,7 @@ public:
             obj,
             visibility,
             LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
-                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
+                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr, visibility
             )
         );
     }
@@ -557,7 +565,7 @@ private:
         walk(obj,
             visibility,
             LambdaVisitor<visitor_1, visitor_2, visitor_3, visitor_4, visitor_5>(
-                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr
+                hashVisit, nameVisit, topoVisitor, namedVisitor, onErr, visibility
             )
         );
     }
