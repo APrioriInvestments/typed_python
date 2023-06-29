@@ -25,7 +25,7 @@
 #include "ClosureVariableBinding.hpp"
 #include "FunctionArg.hpp"
 #include "CompiledSpecialization.hpp"
-#include "FunctionGlobals.hpp"
+#include "FunctionGlobal.hpp"
 
 
 class FunctionOverload {
@@ -104,8 +104,6 @@ public:
         mHasKwarg = other.mHasKwarg;
         mMinPositionalArgs = other.mMinPositionalArgs;
         mMaxPositionalArgs = other.mMaxPositionalArgs;
-
-        mFunctionGlobalsInCells = other.mFunctionGlobalsInCells;
 
         mCachedFunctionObj = other.mCachedFunctionObj;
     }
@@ -285,31 +283,9 @@ public:
             visitor(mMethodOf);
         }
 
-        for (auto nameAndGlobal: mFunctionGlobalsInCells) {
-            if (!PyCell_Check(nameAndGlobal.second)) {
-                throw std::runtime_error(
-                    "A global in mFunctionGlobalsInCells is somehow not a cell"
-                );
-            }
-
-            PyObject* cellContents = PyCell_Get(nameAndGlobal.second);
-
-            if (cellContents && PyType_Check(cellContents)) {
-                Type* t = PyInstance::extractTypeFrom(cellContents);
-                if (t) {
-                    visitor(t);
-                }
-            }
+        for (auto& nameAndGlobal: mGlobals) {
+            nameAndGlobal.second._visitReferencedTypes(visitor);
         }
-
-        _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-            if (PyType_Check(val)) {
-                Type* t = PyInstance::extractTypeFrom(val);
-                if (t) {
-                    visitor(t);
-                }
-            }
-        });
     }
 
     template<class visitor_type>
@@ -357,34 +333,8 @@ public:
 
         visitor.visitHash(ShaHash(mGlobals.size()));
 
-        for (auto nameAndGlobal: mGlobals) {
-            if (!PyCell_Check(nameAndGlobal.second)) {
-                throw std::runtime_error(
-                    "A global in mFunctionGlobalsInCells is somehow not a cell"
-                );
-            }
-
-            PyObject* o = PyCell_Get(nameAndGlobal.second);
-            Type* t = o && PyType_Check(o) ? PyInstance::extractTypeFrom(o) : nullptr;
-
-            if (t && t->isForwardDefined()) {
-                if (t->isResolved()) {
-                    visitor.visitNamedTopo(
-                        nameAndGlobal.first,
-                        t->forwardResolvesTo()
-                    );
-                } else {
-                    // deliberately ignore non-resolved forwards
-                    std::cout << "Deliberately ignoring " << nameAndGlobal.first << " -> " << TypeOrPyobj(t).name() << " since its not reoslved..\n";
-                }
-            } else if (t) {
-                visitor.visitNamedTopo(nameAndGlobal.first, t);
-            } else {
-                visitor.visitNamedTopo(
-                    nameAndGlobal.first,
-                    nameAndGlobal.second
-                );
-            }
+        for (auto& nameAndGlobal: mGlobals) {
+            nameAndGlobal.second._visitCompilerVisibleInternals(visitor);
         }
 
         if (mReturnType) {
@@ -412,28 +362,12 @@ public:
         }
 
         visitor.visitHash(ShaHash(1));
+        visitor.visitHash(ShaHash(mGlobals.size()));
 
-        _visitCompilerVisibleGlobals([&](const std::string& name, PyObject* val) {
-            Type* t = PyInstance::extractTypeFrom(val);
-
-            if (t && t->isForwardDefined()) {
-                if (t->isResolved()) {
-                    visitor.visitNamedTopo(
-                        name,
-                        t->forwardResolvesTo()
-                    );
-                } else {
-                    // deliberately ignore non-resolved forwards
-                }
-            } else if (t) {
-                visitor.visitNamedTopo(name, t);
-            } else {
-                visitor.visitNamedTopo(
-                    name,
-                    val
-                );
-            }
-        });
+        for (auto& nameAndGlobal: mGlobals) {
+            visitor.visitName(nameAndGlobal.first);
+            nameAndGlobal.second._visitCompilerVisibleInternals(visitor);
+        }
 
         visitor.visitHash(ShaHash(1));
     }
@@ -500,11 +434,6 @@ public:
         for (auto& sequence: dotAccesses) {
             visitSequence(sequence);
         }
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisibleGlobals(const visitor_type& visitor) {
-        visitCompilerVisibleGlobals(visitor, (PyCodeObject*)mFunctionCode, mFunctionGlobals);
     }
 
     template<class visitor_type>
@@ -579,10 +508,6 @@ public:
         return mSignatureFunction;
     }
 
-    PyObject* getFunctionGlobals() const {
-        return mFunctionGlobals;
-    }
-
     const std::map<std::string, FunctionGlobal>& getGlobals() const {
         return mGlobals;
     }
@@ -653,6 +578,10 @@ public:
         });
     }
 
+    // get a list of all "global dot accesses" contained in 'code'.  This will pull out every
+    // case where we have a sequence of opcodes that access a global variable by name and then
+    // sequentially access members. So if you write 'x.y.z' and 'x' is a reference that will
+    // be looked up using a 'LOAD_GLOBAL' then we will include 'x.y.z' in outAccesses.
     static void extractGlobalAccessesFromCode(PyCodeObject* code, std::set<std::string>& outAccesses) {
         uint8_t* bytes;
         Py_ssize_t bytecount;
@@ -704,7 +633,7 @@ public:
     void extractGlobalAccessesFromCodeIncludingCells(
         std::set<std::string>& outNames
     ) const {
-        for (auto nameAndGlobal: mFunctionGlobalsInCells) {
+        for (auto nameAndGlobal: mGlobals) {
             outNames.insert(nameAndGlobal.first);
         }
 
@@ -713,96 +642,28 @@ public:
         extractGlobalAccessesFromCode((PyCodeObject*)mFunctionCode, outNames);
     }
 
-    void setGlobals(PyObject* globals) {
-        decref(mFunctionGlobals);
-        mFunctionGlobals = incref(globals);
-    }
-
     bool symbolIsUnresolved(std::string name, bool insistForwardsResolved) {
         if (mClosureBindings.find(name) != mClosureBindings.end()) {
             return false;
         }
 
-        auto it = mFunctionGlobalsInCells.find(name);
-        if (it != mFunctionGlobalsInCells.end()) {
-            if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
-                if (insistForwardsResolved) {
-                    PyObject* o = PyCell_Get(it->second);
-                    Type* t = PyInstance::extractTypeFrom(o);
-                    if (t && t->isForwardDefined()) {
-                        return true;
-                    }
-                }
+        auto it = mGlobals.find(name);
 
-                return false;
-            }
-
+        if (it == mGlobals.end()) {
             return true;
         }
 
-        if (mFunctionGlobals && PyDict_Check(mFunctionGlobals)) {
-            if (PyDict_GetItemString(mFunctionGlobals, name.c_str())) {
-                if (insistForwardsResolved) {
-                    PyObject* o = PyDict_GetItemString(mFunctionGlobals, name.c_str());
-                    Type* t = PyInstance::extractTypeFrom(o);
-                    if (t && t->isForwardDefined()) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
-            if (builtins && PyDict_GetItemString(builtins, name.c_str())) {
-                return false;
-            }
-        }
-
-        return true;
+        return it->second.isUnresolved(insistForwardsResolved);
     }
 
     void autoresolveGlobal(
         std::string name,
         const std::set<Type*>& resolvedForwards
     ) {
-        auto it = mFunctionGlobalsInCells.find(name);
-        if (it != mFunctionGlobalsInCells.end()) {
-            if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
-                if (PyType_Check(PyCell_GET(it->second))) {
-                    Type* cellContents = PyInstance::extractTypeFrom(
-                        (PyTypeObject*)PyCell_Get(it->second)
-                    );
+        auto it = mGlobals.find(name);
 
-                    if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-                        PyCell_Set(
-                            it->second,
-                            (PyObject*)PyInstance::typeObj(
-                                cellContents->forwardResolvesTo()
-                            )
-                        );
-                    }
-                }
-            }
-
-            return;
-        }
-
-        PyObject* dictVal = PyDict_GetItemString(mFunctionGlobals, name.c_str());
-        if (dictVal && PyType_Check(dictVal)) {
-            Type* cellContents = PyInstance::extractTypeFrom(
-                (PyTypeObject*)dictVal
-            );
-
-            if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-                PyDict_SetItemString(
-                    mFunctionGlobals,
-                    name.c_str(),
-                    (PyObject*)PyInstance::typeObj(
-                        cellContents->forwardResolvesTo()
-                    )
-                );
-            }
+        if (it != mGlobals.end()) {
+            it->second.autoresolveGlobal(resolvedForwards);
         }
     }
 
@@ -843,73 +704,41 @@ public:
         return "";
     }
 
-    PyObject* getUsedGlobals() const {
-        // restrict the globals to contain only the values it references.
-        PyObject* result = PyDict_New();
-
+    static void buildInitialGlobalsDict(
+        std::map<std::string, FunctionGlobal>& outGlobals,
+        PyObject* inFuncGlobals,
+        PyCodeObject* inFuncCode
+    ) {
         std::set<std::string> allNamesString;
-        extractGlobalAccessesFromCodeIncludingCells(allNamesString);
+        extractGlobalAccessesFromCode(inFuncCode, allNamesString);
 
         for (auto nameStr: allNamesString) {
-            if (nameStr != "__module_hash__" && mClosureBindings.find(nameStr) != mClosureBindings.end()) {
+            if (nameStr != "__module_hash__" && outGlobals.find(nameStr) != outGlobals.end()) {
                 throw std::runtime_error(
-                    "Somehow we have both a closure binding and a global for "
-                    + nameStr
+                    "Somehow we already a closure binding for " + nameStr
+                    + " and somehow we want to register a global binding?"
                 );
             }
+
+            std::pair<std::string, FunctionGlobal> ref = FunctionGlobal::DottedGlobalsLookup(
+                inFuncGlobals,
+                nameStr
+            );
+
+            outGlobals[ref.first] = ref.second;
         }
-
-        // iterate mFunctionGlobals, keeping any where the name is in allNames
-        // note we split on '.' and take the first part so that if a module
-        // like lxml.etree is included, and we use 'lxml', we'll take the reference
-        // to etree as well. This ensures that submodules in anonymously serialized
-        // code can get pulled along.
-        PyObject *key, *value;
-        Py_ssize_t pos = 0;
-
-        // place them in sorted order
-        std::map<std::string, std::pair<PyObject*, PyObject*> > toCopy;
-
-        while (PyDict_Next(mFunctionGlobals, &pos, &key, &value)) {
-            if (PyUnicode_Check(key)) {
-                std::string globalName = PyUnicode_AsUTF8(key);
-                std::string shortGlobalName = globalName;
-
-                size_t indexOfDot = shortGlobalName.find('.');
-                if (indexOfDot != std::string::npos) {
-                    shortGlobalName = shortGlobalName.substr(0, indexOfDot);
-                }
-
-                if (allNamesString.find(shortGlobalName) != allNamesString.end()) {
-                    toCopy[globalName] = std::make_pair(key, value);
-                }
-            }
-        }
-
-        for (auto& nameandKV: toCopy) {
-            if (PyDict_SetItem(result, nameandKV.second.first, nameandKV.second.second)) {
-                throw PythonExceptionSet();
-            }
-        }
-
-        PyObject* builtins = PyDict_GetItemString(mFunctionGlobals, "__builtins__");
-        if (builtins) {
-            PyDict_SetItemString(result, "__builtins__", builtins);
-        }
-
-        return result;
     }
 
     // create a new function object for this closure (or cache it
     // if we have no closure)
-    PyObject* buildFunctionObj(Type* closureType, instance_ptr closureData) const;
+    PyObject* buildFunctionObj(Type* closureType, instance_ptr closureData);
 
     FunctionOverload& operator=(const FunctionOverload& other) {
         other.increfAllPyObjects();
         decrefAllPyObjects();
 
         mFunctionCode = other.mFunctionCode;
-        mFunctionGlobals = other.mFunctionGlobals;
+        mGlobals = other.mGlobals;
         mFunctionDefaults = other.mFunctionDefaults;
         mFunctionAnnotations = other.mFunctionAnnotations;
         mSignatureFunction = other.mSignatureFunction;
@@ -927,7 +756,6 @@ public:
         mHasKwarg = other.mHasKwarg;
         mMinPositionalArgs = other.mMinPositionalArgs;
         mMaxPositionalArgs = other.mMaxPositionalArgs;
-        mFunctionGlobalsInCells = other.mFunctionGlobalsInCells;
 
         mCachedFunctionObj = other.mCachedFunctionObj;
 
@@ -957,9 +785,9 @@ public:
 
         buffer.writeBeginCompound(5);
             int varIx = 0;
-            for (auto nameAndCell: mFunctionGlobalsInCells) {
-                buffer.writeStringObject(varIx++, nameAndCell.first);
-                context.serializePythonObject(nameAndCell.second, buffer, varIx++);
+            for (auto& nameAndGlobal: mGlobals) {
+                buffer.writeStringObject(varIx++, nameAndGlobal.first);
+                nameAndGlobal.second.serialize(context, buffer, varIx++);
             }
         buffer.writeEndCompound();
 
@@ -998,19 +826,15 @@ public:
     template<class serialization_context_t, class buf_t>
     static FunctionOverload deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
         PyObjectHolder functionCode;
-        PyObjectHolder functionGlobals;
         PyObjectHolder functionAnnotations;
         PyObjectHolder functionDefaults;
         PyObjectHolder functionSignature;
         std::vector<std::string> closureVarnames;
-        std::map<std::string, PyObjectHolder> functionGlobalsInCells;
-        std::map<std::string, PyObject*> functionGlobalsInCellsRaw;
+        std::map<std::string, FunctionGlobal> functionGlobals;
         std::map<std::string, ClosureVariableBinding> closureBindings;
         Type* returnType = nullptr;
         Type* methodOf = nullptr;
         std::vector<FunctionArg> args;
-
-        functionGlobals.steal(PyDict_New());
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -1038,8 +862,7 @@ public:
                         if (last == "") {
                             throw std::runtime_error("Corrupt Function closure encountered");
                         }
-                        functionGlobalsInCells[last].steal(context.deserializePythonObject(buffer, wireType));
-                        functionGlobalsInCellsRaw[last] = functionGlobalsInCells[last];
+                        functionGlobals[last] = FunctionGlobal::deserialize(context, buffer, wireType);
                         last = "";
                     }
                 });
@@ -1087,7 +910,6 @@ public:
 
     void increfAllPyObjects() const {
         incref(mFunctionCode);
-        incref(mFunctionGlobals);
         incref(mFunctionDefaults);
         incref(mFunctionAnnotations);
         incref(mSignatureFunction);
@@ -1095,7 +917,6 @@ public:
 
     void decrefAllPyObjects() {
         decref(mFunctionCode);
-        decref(mFunctionGlobals);
         decref(mFunctionDefaults);
         decref(mFunctionAnnotations);
         decref(mSignatureFunction);

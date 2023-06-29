@@ -1096,8 +1096,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
             std::vector<std::string> closureVarnames;
             std::vector<Type*> closureVarTypes;
-            std::map<std::string, PyObject*> globalsInCells;
             std::map<std::string, ClosureVariableBinding> closureBindings;
+            std::map<std::string, FunctionGlobal> globals;
 
             PyObject* closure = PyFunction_GetClosure(funcObj);
 
@@ -1135,7 +1135,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                             throw PythonExceptionSet();
                         }
 
-                        globalsInCells[closureVarnames[ix]] = incref(cell);
+                        globals[closureVarnames[ix]] = FunctionGlobal::FromCell(cell);
                     }
                 }
                 else {
@@ -1148,13 +1148,18 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 }
             }
 
+            FunctionOverload::buildInitialGlobalsDict(
+                globals,
+                PyFunction_GetGlobals(funcObj),
+                (PyCodeObject*)PyFunction_GetCode(funcObj)
+            );
+
             overloads.push_back(
                 FunctionOverload(
                     PyFunction_GetCode(funcObj),
-                    PyFunction_GetGlobals(funcObj),
                     PyFunction_GetDefaults(funcObj),
                     ((PyFunctionObject*)(PyObject*)funcObj)->func_annotations,
-                    globalsInCells,
+                    globals,
                     closureVarnames,
                     closureBindings,
                     rType,

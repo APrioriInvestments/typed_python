@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <vector>
+#include "Type.hpp"
 #include "Instance.hpp"
 
 
@@ -81,19 +83,40 @@ public:
         return mElements;
     }
 
-    Type* getType() const {
+    ::Type* getType() const {
         return mType;
     }
 
-    const Instance& getInstance() const {
+    const ::Instance& getInstance() const {
         return mInstance;
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {
+        if (mKind == Kind::Type) {
+            v(mType);
+            return;
+        }
+
+        if (mKind == Kind::Instance) {
+            // TODO: what to do here?
+        }
+
+        if (mKind == Kind::PyTuple) {
+            // TODO: what to do here?
+        }
+    }
+
+    template<class visitor_type>
+    void _visitCompilerVisibleInternals(const visitor_type& visitor) {
+
     }
 
 private:
     Kind mKind;
 
-    Type* mType;
-    Instance mInstance;
+    ::Type* mType;
+    ::Instance mInstance;
 
     std::vector<CompilerVisiblePyObj*> mElements;
 };

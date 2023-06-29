@@ -35,7 +35,7 @@ PyObject* PyFunctionInstance::prepareArgumentToBePassedToCompiler(PyObject* o) {
 
 // static
 std::pair<bool, PyObject*>
-PyFunctionInstance::tryToCallAnyOverload(const Function* f, instance_ptr funcClosure, PyObject* self,
+PyFunctionInstance::tryToCallAnyOverload(Function* f, instance_ptr funcClosure, PyObject* self,
                                          PyObject* args, PyObject* kwargs) {
     //if we are an entrypoint, map any untyped function arguments to typed functions
     PyObjectHolder mappedArgs;
@@ -97,7 +97,7 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, instance_ptr funcClo
 
 // static
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
-        const Function* f,
+        Function* f,
         instance_ptr functionClosure,
         long overloadIx,
         PyObject* self,
@@ -105,8 +105,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
         PyObject* kwargs,
         ConversionLevel conversionLevel
 ) {
-    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
-
+    FunctionOverload& overload(f->getOverloads()[overloadIx]);
     FunctionCallArgMapping mapping(overload);
 
     mapping.pushArguments(self, args, kwargs);
@@ -192,11 +191,11 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(
 }
 
 std::pair<Type*, bool> PyFunctionInstance::getOverloadReturnType(
-    const Function* f,
+    Function* f,
     long overloadIx,
     FunctionCallArgMapping& matchedArgs
 ) {
-    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
+    FunctionOverload& overload(f->getOverloads()[overloadIx]);
     Type* returnType = overload.getReturnType();
 
     if (overload.getSignatureFunction()) {
@@ -228,7 +227,7 @@ std::pair<Type*, bool> PyFunctionInstance::getOverloadReturnType(
 }
 
 std::pair<Type*, bool> PyFunctionInstance::determineReturnTypeForMatchedCall(
-    const Function* f,
+    Function* f,
     long overloadIx,
     FunctionCallArgMapping& matchedArgs,
     PyObject* self,
@@ -356,7 +355,7 @@ std::pair<Type*, bool> PyFunctionInstance::determineReturnTypeForMatchedCall(
     return std::make_pair(actualReturnTypeAndCls.first, false);
 }
 
-std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, instance_ptr closure, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(Function* f, instance_ptr closure, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     PyObjectStealer argTuple(
         (arg0 && arg1 && arg2) ?
             PyTuple_Pack(3, arg0, arg1, arg2) :
@@ -371,12 +370,12 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, inst
 
 // static
 std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
-        const Function* f,
+        Function* f,
         instance_ptr functionClosure,
         long overloadIx,
         const FunctionCallArgMapping& mapper
     ) {
-    const FunctionOverload& overload(f->getOverloads()[overloadIx]);
+    FunctionOverload& overload(f->getOverloads()[overloadIx]);
 
     for (const auto& spec: overload.getCompiledSpecializations()) {
         auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -420,7 +419,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
             throw std::runtime_error("Somehow, the number of overloads in the function changed.");
         }
 
-        const FunctionOverload& overload2(convertedF->getOverloads()[overloadIx]);
+        FunctionOverload& overload2(convertedF->getOverloads()[overloadIx]);
 
         for (const auto& spec: overload2.getCompiledSpecializations()) {
             auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -457,7 +456,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(
 
         decref(res);
 
-        const FunctionOverload& convertedOverload(convertedF->getOverloads()[overloadIx]);
+        FunctionOverload& convertedOverload(convertedF->getOverloads()[overloadIx]);
 
         for (const auto& spec: convertedOverload.getCompiledSpecializations()) {
             auto res = dispatchFunctionCallToCompiledSpecialization(
@@ -568,10 +567,13 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
 
         PyObjectStealer pyIndex(PyLong_FromLong(k));
 
-        PyObjectStealer pyGlobalCellDict(PyDict_New());
+        PyObjectStealer pyFunctionGlobals(PyDict_New());
 
-        for (auto nameAndCell: overload.getFunctionGlobalsInCells()) {
-            PyDict_SetItemString(pyGlobalCellDict, nameAndCell.first.c_str(), nameAndCell.second);
+        for (auto nameAndGlobal: overload.getGlobals()) {
+            PyObject* val = nameAndGlobal.second.getValueAsPyobj();
+            if (val) {
+                PyDict_SetItemString(pyFunctionGlobals, nameAndGlobal.first.c_str(), val);
+            }
         }
 
         PyObjectStealer pyClosureVarsDict(PyDict_New());
@@ -639,11 +641,10 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         PyDict_SetItemString(pyOverloadInstDict, "index", (PyObject*)pyIndex);
         PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
         PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
-        PyDict_SetItemString(pyOverloadInstDict, "funcGlobalsInCells", (PyObject*)pyGlobalCellDict);
+        PyDict_SetItemString(pyOverloadInstDict, "functionGlobals", (PyObject*)pyFunctionGlobals);
         PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "methodOf", overload.getMethodOf() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
-        PyDict_SetItemString(pyOverloadInstDict, "_realizedGlobals", Py_None);
         PyDict_SetItemString(pyOverloadInstDict, "args", argsTup);
 
         PyTuple_SetItem(overloadTuple, k, incref(pyOverloadInst));
@@ -776,35 +777,6 @@ PyObject* PyFunctionInstance::extractPyFun(PyObject* funcObj, PyObject* args, Py
             fType->getClosureType(),
             ((PyInstance*)funcObj)->dataPtr()
         );
-    });
-}
-
-/* static */
-PyObject* PyFunctionInstance::extractOverloadGlobals(PyObject* cls, PyObject* args, PyObject* kwargs) {
-    Type* selfType = PyInstance::unwrapTypeArgToTypePtr(cls);
-
-    if (!selfType || selfType->getTypeCategory() != Type::TypeCategory::catFunction) {
-        PyErr_Format(PyExc_TypeError, "Expected class to be a Function");
-        return nullptr;
-    }
-
-    Function* fType = (Function*)selfType;
-
-    static const char *kwlist[] = {"overloadIx", NULL};
-
-    long overloadIx;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "l", (char**)kwlist, &overloadIx)) {
-        return nullptr;
-    }
-
-    if (overloadIx < 0 || overloadIx >= fType->getOverloads().size()) {
-        PyErr_SetString(PyExc_IndexError, "Overload index out of bounds");
-        return nullptr;
-    }
-
-    return translateExceptionToPyObject([&]() {
-        return incref(fType->getOverloads()[overloadIx].getFunctionGlobals());
     });
 }
 
@@ -1002,7 +974,6 @@ PyMethodDef* PyFunctionInstance::typeMethodsConcrete(Type* t) {
         {"typeWithNocompile", (PyCFunction)PyFunctionInstance::typeWithNocompile, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"resultTypeFor", (PyCFunction)PyFunctionInstance::resultTypeFor, METH_VARARGS | METH_KEYWORDS, NULL},
         {"extractPyFun", (PyCFunction)PyFunctionInstance::extractPyFun, METH_VARARGS | METH_KEYWORDS, NULL},
-        {"extractOverloadGlobals", (PyCFunction)PyFunctionInstance::extractOverloadGlobals, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"getClosure", (PyCFunction)PyFunctionInstance::getClosure, METH_VARARGS | METH_KEYWORDS, NULL},
         {"withClosureType", (PyCFunction)PyFunctionInstance::withClosureType, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"withOverloadVariableBindings", (PyCFunction)PyFunctionInstance::withOverloadVariableBindings, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},

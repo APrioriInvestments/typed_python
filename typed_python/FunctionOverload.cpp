@@ -2,12 +2,33 @@
 
 
 /* static */
-PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr closureData) const {
+PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr closureData) {
     if (mCachedFunctionObj) {
         return incref(mCachedFunctionObj);
     }
 
-    PyObject* res = PyFunction_New(mFunctionCode, mFunctionGlobals);
+    std::set<std::string> globalsInCells(
+        mFunctionClosureVarnames.begin(),
+        mFunctionClosureVarnames.end()
+    );
+
+    PyObjectStealer funcGlobals(PyDict_New());
+
+    for (auto& nameAndGlobal: mGlobals) {
+        if (globalsInCells.find(nameAndGlobal.first) == globalsInCells.end()) {
+            PyObject* val = nameAndGlobal.second.getValueAsPyobj();
+
+            if (val) {
+                PyDict_SetItemString(
+                    (PyObject*)funcGlobals,
+                    nameAndGlobal.first.c_str(),
+                    val
+                );
+            }
+        }
+    }
+
+    PyObject* res = PyFunction_New(mFunctionCode, (PyObject*)funcGlobals);
 
     if (!res) {
         throw PythonExceptionSet();
@@ -42,64 +63,68 @@ PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr clo
         for (long k = 0; k < closureVarCount; k++) {
             std::string varname = mFunctionClosureVarnames[k];
 
-            auto globalIt = mFunctionGlobalsInCells.find(varname);
-            if (globalIt != mFunctionGlobalsInCells.end()) {
-                if (varname == "__class__" && getMethodOf()) {
-                    PyTuple_SetItem(
-                        (PyObject*)closureTup,
-                        k,
-                        PyCell_New((PyObject*)PyInstance::typeObj(
-                            ((HeldClass*)getMethodOf())->getClassType()
-                        ))
-                    );
-                } else {
-                    PyTuple_SetItem(
-                        (PyObject*)closureTup,
-                        k,
-                        incref(globalIt->second)
-                    );
-                }
+            if (varname == "__class__" && getMethodOf()) {
+                PyTuple_SetItem(
+                    (PyObject*)closureTup,
+                    k,
+                    PyCell_New((PyObject*)PyInstance::typeObj(
+                        ((HeldClass*)getMethodOf())->getClassType()
+                    ))
+                );
             } else {
-                auto bindingIt = mClosureBindings.find(varname);
-                if (bindingIt == mClosureBindings.end()) {
-                    throw std::runtime_error("Closure variable " + varname + " not in globals or closure bindings.");
-                }
+                auto globalIt = mGlobals.find(varname);
+                if (globalIt != mGlobals.end()) {
+                    PyObject* globalVal = globalIt->second.getValueAsPyobj();
 
-                ClosureVariableBinding binding = bindingIt->second;
-
-                Instance bindingValue = binding.extractValueOrContainingClosure(closureType, closureData);
-
-                if (bindingValue.type()->getTypeCategory() == Type::TypeCategory::catPyCell) {
-                    PyTuple_SetItem(
-                        (PyObject*)closureTup,
-                        k,
-                        incref(
-                            ((PyCellType*)bindingValue.type())->getPyObj(bindingValue.data())
-                        )
-                    );
+                    if (globalVal) {
+                        PyTuple_SetItem(
+                            (PyObject*)closureTup,
+                            k,
+                            incref(globalVal)
+                        );
+                    }
                 } else {
-                    // it's not a cell. We have to encode it as a PyCell for the interpreter
-                    // to be able to handle it.
-                    PyObjectHolder newCellContents;
+                    auto bindingIt = mClosureBindings.find(varname);
+                    if (bindingIt == mClosureBindings.end()) {
+                        throw std::runtime_error("Closure variable " + varname + " not in globals or closure bindings.");
+                    }
 
-                    if (bindingValue.type()->getTypeCategory() == Type::TypeCategory::catTypedCell) {
-                        newCellContents.steal(
-                            PyInstance::extractPythonObject(
-                                ((TypedCellType*)bindingValue.type())->get(bindingValue.data()),
-                                ((TypedCellType*)bindingValue.type())->getHeldType()
+                    ClosureVariableBinding binding = bindingIt->second;
+
+                    Instance bindingValue = binding.extractValueOrContainingClosure(closureType, closureData);
+
+                    if (bindingValue.type()->getTypeCategory() == Type::TypeCategory::catPyCell) {
+                        PyTuple_SetItem(
+                            (PyObject*)closureTup,
+                            k,
+                            incref(
+                                ((PyCellType*)bindingValue.type())->getPyObj(bindingValue.data())
                             )
                         );
                     } else {
-                        newCellContents.steal(
-                            PyInstance::fromInstance(bindingValue)
+                        // it's not a cell. We have to encode it as a PyCell for the interpreter
+                        // to be able to handle it.
+                        PyObjectHolder newCellContents;
+
+                        if (bindingValue.type()->getTypeCategory() == Type::TypeCategory::catTypedCell) {
+                            newCellContents.steal(
+                                PyInstance::extractPythonObject(
+                                    ((TypedCellType*)bindingValue.type())->get(bindingValue.data()),
+                                    ((TypedCellType*)bindingValue.type())->getHeldType()
+                                )
+                            );
+                        } else {
+                            newCellContents.steal(
+                                PyInstance::fromInstance(bindingValue)
+                            );
+                        }
+
+                        PyTuple_SetItem(
+                            (PyObject*)closureTup,
+                            k,
+                            PyCell_New(newCellContents)
                         );
                     }
-
-                    PyTuple_SetItem(
-                        (PyObject*)closureTup,
-                        k,
-                        PyCell_New(newCellContents)
-                    );
                 }
             }
         }

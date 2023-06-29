@@ -226,10 +226,9 @@ public:
                     overloads.push_back(
                         FunctionOverload(
                             o.getFunctionCode(),
-                            copyObj(o.getFunctionGlobals()),
                             copyObj(o.getFunctionDefaults()),
                             copyObj(o.getFunctionAnnotations()),
-                            o.getFunctionGlobalsInCells(),
+                            o.getGlobals(),
                             o.getFunctionClosureVarnames(),
                             o.getClosureVariableBindings(),
                             copyType(o.getReturnType()),
@@ -654,12 +653,11 @@ public:
                         }
                     }
 
-                    reachable.insert(PyObjectHandle(o.getFunctionGlobals()));
-
-                    for (auto nameAndObj: o.getFunctionGlobalsInCells()) {
-                        if (nameAndObj.second) {
-                            reachable.insert(PyObjectHandle(nameAndObj.second));
-                        }
+                    for (auto nameAndGlobal: o.getGlobals()) {
+                        throw std::runtime_error("ModuleRepresentationCopyContext doesn't know what to do with new globals yet");
+                        // if (nameAndObj.second) {
+                        //     reachable.insert(PyObjectHandle(nameAndObj.second));
+                        // }
                     }
 
                     if (o.getFunctionAnnotations()) {

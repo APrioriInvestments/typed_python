@@ -811,30 +811,6 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
         b.writeEndCompound();
 
-#       if TP_VERBOSE_SERIALIZE
-        std::cout << s.prefix() << "Serializing used globals\n";
-#       endif
-
-        b.writeBeginCompound(4);
-
-            for (auto& indexAndObj: group->getIndexToObject()) {
-                if (indexAndObj.second.type() && indexAndObj.second.type()->isFunction()) {
-                    // we need to serialize the 'globals' dict of each function object
-                    Function* f = (Function*)indexAndObj.second.type();
-
-                    b.writeBeginCompound(indexAndObj.first);
-
-                        for (long k = 0; k < f->getOverloads().size(); k++) {
-                            PyObjectStealer globals(f->getOverloads()[k].getUsedGlobals());
-                            serializePythonObject(globals, b, k);
-                        }
-
-                    b.writeEndCompound();
-                }
-            }
-
-        b.writeEndCompound();
-
     b.writeEndCompound();
 }
 

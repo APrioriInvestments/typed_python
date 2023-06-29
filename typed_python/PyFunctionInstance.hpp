@@ -30,13 +30,13 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(modeled_type* type, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level);
 
-    static std::pair<bool, PyObject*> tryToCall(const Function* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
+    static std::pair<bool, PyObject*> tryToCall(Function* f, instance_ptr functionClosure, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
-    static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, instance_ptr functionClosure, PyObject* self, PyObject* args, PyObject* kwargs);
+    static std::pair<bool, PyObject*> tryToCallAnyOverload(Function* f, instance_ptr functionClosure, PyObject* self, PyObject* args, PyObject* kwargs);
 
     // determine the exact return type of a specific overload. Returns <result, isException>
     static std::pair<Type*, bool> getOverloadReturnType(
-        const Function* f,
+        Function* f,
         long overloadIx,
         FunctionCallArgMapping& matchedArgs
     );
@@ -45,7 +45,7 @@ public:
     // this calls signature functions, and checks for return type consistency.
     // Returns <result, isException>
     static std::pair<Type*, bool> determineReturnTypeForMatchedCall(
-        const Function* f,
+        Function* f,
         long overloadIx,
         FunctionCallArgMapping& matchedArgs,
         PyObject* self,
@@ -60,7 +60,7 @@ public:
     static PyObject* prepareArgumentToBePassedToCompiler(PyObject* o);
 
     static std::pair<bool, PyObject*> tryToCallOverload(
-        const Function* f,
+        Function* f,
         instance_ptr funcClosure,
         long overloadIx,
         PyObject* self,
@@ -74,7 +74,7 @@ public:
     //if 'isEntrypoint', then if we don't match a compiled specialization, ask the runtime to produce
     //one for us.
     static std::pair<bool, PyObject*> dispatchFunctionCallToNative(
-        const Function* f,
+        Function* f,
         instance_ptr functionClosure,
         long overloadIx,
         const FunctionCallArgMapping& mapping
@@ -108,8 +108,6 @@ public:
     static PyObject* getClosure(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* extractPyFun(PyObject* funcObj, PyObject* args, PyObject* kwargs);
-
-    static PyObject* extractOverloadGlobals(PyObject* funcObj, PyObject* args, PyObject* kwargs);
 
     static PyObject* typeWithEntrypoint(PyObject* cls, PyObject* args, PyObject* kwargs);
 

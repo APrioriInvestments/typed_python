@@ -428,15 +428,16 @@ class FunctionOverloadArg:
 
 
 class FunctionOverload:
-    def __init__(self, functionTypeObject, index, code, funcGlobalsInCells, closureVarLookups, returnType, signatureFunction, methodOf):
+    def __init__(self, functionTypeObject, index, code, functionGlobals, closureVarLookups, returnType, signatureFunction, methodOf):
         """Initialize a FunctionOverload.
 
         Args:
             functionTypeObject - a _types.Function type object representing the function
             index - the index within the _types.Function sequence of overloads we represent
             code - the code object for the function we're wrapping
-            funcGlobals - the globals for the function we're wrapping
-            funcGlobalsInCells - a dict of cells that also act like globals
+            functionGlobals - the globals for the function we're wrapping. These will have been
+                resolved by the forward type resolver, and so this dict may not be the same
+                as the actual function globals we started with.
             closureVarLookups - a dict from str to a list of ClosureVariableBindingSteps indicating
                 how each function's closure variables are found in the closure of the
                 actual function.
@@ -450,16 +451,11 @@ class FunctionOverload:
         self.index = index
         self.closureVarLookups = closureVarLookups
         self.functionCode = code
-        self.funcGlobalsInCells = funcGlobalsInCells
+        self.functionGlobals = functionGlobals
         self.returnType = returnType
         self.signatureFunction = signatureFunction
-        self._realizedGlobals = None
         self.methodOf = methodOf
         self.args = ()
-
-    @property
-    def functionGlobals(self):
-        return self.functionTypeObject.extractOverloadGlobals(self.index)
 
     @staticmethod
     def extractGlobalNamesFromCode(codeObj):
@@ -471,31 +467,6 @@ class FunctionOverload:
                 res.update(FunctionOverload.extractGlobalNamesFromCode(const))
 
         return res
-
-    @property
-    def realizedGlobals(self):
-        """Merge the 'functionGlobals' and the set of globals in 'cells' into a single dict."""
-        if self._realizedGlobals is None:
-            res = {}
-
-            globalNames = set(self.extractGlobalNamesFromCode(self.functionCode))
-
-            for name in self.functionGlobals:
-                if name.split(".")[0] in globalNames:
-                    res[name] = self.functionGlobals[name]
-
-            if '__module_hash__' in self.functionGlobals:
-                res['__module_hash__'] = self.functionGlobals['__module_hash__']
-
-            for varname, cell in self.funcGlobalsInCells.items():
-                res[varname] = cell.cell_contents
-
-            if self.methodOf is not None:
-                res['__class__'] = self.methodOf.Class
-
-            self._realizedGlobals = res
-
-        return self._realizedGlobals
 
     @property
     def name(self):

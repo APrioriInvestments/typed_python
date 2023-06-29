@@ -1086,31 +1086,6 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
                 }
             }
 
-            // fill out the globals of function objects. we have to deserialize these
-            // in a separate final pass because they can have references to existing
-            // native types, and we need those objects to be filled out fully.
-            b.consumeCompoundMessage(wireType, [&](size_t indexInGroup, size_t subWireType) {
-                b.consumeCompoundMessage(subWireType, [&](size_t overloadIx, size_t subSubWireType) {
-                    PyObjectStealer overloadGlobals(deserializePythonObject(b, subSubWireType));
-
-                    if (actuallyBuildGroup) {
-                        if (!indicesOfNativeTypes[indexInGroup] ||
-                                !indicesOfNativeTypes[indexInGroup]->isFunction()) {
-                            throw std::runtime_error("Invalid function overload globals: not a function");
-                        }
-
-                        Function* f = (Function*)indicesOfNativeTypes[indexInGroup];
-                        if (overloadIx >= f->getOverloads().size()) {
-                            throw std::runtime_error(
-                                "Invalid function overload globals: overload index out of bounds"
-                            );
-                        }
-
-                        ((FunctionOverload*)&f->getOverloads()[overloadIx])->setGlobals(overloadGlobals);
-                    }
-                });
-            });
-
             // now that we've set function globals, we need to go over all the classes and
             // held classes and make sure the versions of the function types they're actually
             // using have the new definitions. Unfortunately, Overload objects are not pointers

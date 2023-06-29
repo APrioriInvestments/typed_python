@@ -380,6 +380,10 @@ public:
         return mOverloads;
     }
 
+    std::vector<FunctionOverload>& getOverloads() {
+        return mOverloads;
+    }
+
     void addCompiledSpecialization(
                     long whichOverload,
                     compiled_code_entrypoint entrypoint,
