@@ -159,9 +159,11 @@ public:
     }
 
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
-        _visitReferencedTypes([&](Type*& typePtr) {
-            updateTypeRefFromGroupMap(typePtr, groupMap);
-        });
+        updateTypeRefFromGroupMap(mClosureType, groupMap);
+
+        for (auto& o: mOverloads) {
+            o.updateInternalTypePointers(groupMap);
+        }
     }
 
     static Function* Make(

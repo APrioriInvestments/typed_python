@@ -112,6 +112,16 @@ public:
 
     }
 
+    // get the python object representation of this object, which isn't guaranteed
+    // to exist and may need to be constructed on demand.
+    PyObject* getPyObj() {
+        if (mKind == Kind::Type) {
+            return (PyObject*)PyInstance::typeObj(mType);
+        }
+
+        throw std::runtime_error("Can't make a python object representation for this pyobj");
+    }
+
 private:
     Kind mKind;
 

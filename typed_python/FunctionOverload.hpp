@@ -263,6 +263,32 @@ public:
         }
     }
 
+    void updateInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
+        if (mReturnType) {
+            Type::updateTypeRefFromGroupMap(mReturnType, groupMap);
+        }
+
+        for (auto& a: mArgs) {
+            a._visitReferencedTypes([&](Type*& typePtr) {
+                Type::updateTypeRefFromGroupMap(typePtr, groupMap);
+            });
+        }
+
+        for (auto& varnameAndBinding: mClosureBindings) {
+            varnameAndBinding.second._visitReferencedTypes([&](Type*& typePtr) {
+                Type::updateTypeRefFromGroupMap(typePtr, groupMap);
+            });
+        }
+
+        if (mMethodOf) {
+            Type::updateTypeRefFromGroupMap(mMethodOf, groupMap);
+        }
+
+        for (auto& nameAndGlobal: mGlobals) {
+            nameAndGlobal.second = nameAndGlobal.second.withUpdatedInternalTypePointers(groupMap);
+        }
+    }
+
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         // we need to keep mArgs and mReturnType in sync with

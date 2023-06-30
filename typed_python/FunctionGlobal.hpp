@@ -135,8 +135,29 @@ public:
         return mKind == GlobalType::GlobalInCell;
     }
 
+    Type* getValueAsType() {
+        PyObject* obj = getValueAsPyobj();
+        if (obj) {
+            return PyInstance::extractTypeFrom(obj);
+        }
+        return nullptr;
+    }
+
     PyObject* getValueAsPyobj() {
-        throw std::runtime_error("FunctionGlobal::getValueAsPyobj not implemented");
+        if (isGlobalInCell() || isGlobalInCell() || isNamedModuleMember()) {
+            return extractGlobalRefFromDictOrCell();
+        }
+
+        if (isUnbound()) {
+            throw std::runtime_error("Unbound globals don't have python values.");
+        }
+
+        if (isConstant()) {
+            return mConstant->getPyObj();
+        }
+
+
+        throw std::runtime_error("Unknown global kind.");
     }
 
     GlobalType getKind() const {
@@ -253,6 +274,22 @@ public:
         }
     }
 
+    FunctionGlobal withUpdatedInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
+        Type* t = getValueAsType();
+
+        auto it = groupMap.find(t);
+
+        if (it != groupMap.end()) {
+            // we're actually a constant!
+            return FunctionGlobal::Constant(
+                CompilerVisiblePyObj::Type(it->second)
+            );
+        }
+
+        return *this;
+    }
+
+
     bool isUnresolved(bool insistForwardsResolved) {
         if (isConstant()) {
             return false;
@@ -284,45 +321,42 @@ public:
     void autoresolveGlobal(
         const std::set<Type*>& resolvedForwards
     ) {
-        throw std::runtime_error("FunctionGlobal::autoresolveGlobal not implemented yet");
+        if (isGlobalInCell()) {
+            Type* cellContents = PyInstance::extractTypeFrom(
+                (PyTypeObject*)PyCell_Get(mModuleDictOrCell)
+            );
 
-        // if (it != mFunctionGlobalsInCells.end()) {
-        //     if (PyCell_Check(it->second) && PyCell_GET(it->second)) {
-        //         if (PyType_Check(PyCell_GET(it->second))) {
-        //             Type* cellContents = PyInstance::extractTypeFrom(
-        //                 (PyTypeObject*)PyCell_Get(it->second)
-        //             );
+            if (cellContents && resolvedForwards.find(cellContents) != resolvedForwards.end()) {
+                PyCell_Set(
+                    mModuleDictOrCell,
+                    (PyObject*)PyInstance::typeObj(
+                        cellContents->forwardResolvesTo()
+                    )
+                );
+            }
 
-        //             if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-        //                 PyCell_Set(
-        //                     it->second,
-        //                     (PyObject*)PyInstance::typeObj(
-        //                         cellContents->forwardResolvesTo()
-        //                     )
-        //                 );
-        //             }
-        //         }
-        //     }
+            return;
+        }
 
-        //     return;
-        // }
+        if (isGlobalInDict() || isNamedModuleMember()) {
+            PyObject* dictVal = PyDict_GetItemString(mModuleDictOrCell, mName.c_str());
 
-        // PyObject* dictVal = PyDict_GetItemString(mFunctionGlobals, name.c_str());
-        // if (dictVal && PyType_Check(dictVal)) {
-        //     Type* cellContents = PyInstance::extractTypeFrom(
-        //         (PyTypeObject*)dictVal
-        //     );
+            if (dictVal) {
+                Type* cellContents = PyInstance::extractTypeFrom(
+                    (PyTypeObject*)dictVal
+                );
 
-        //     if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
-        //         PyDict_SetItemString(
-        //             mFunctionGlobals,
-        //             name.c_str(),
-        //             (PyObject*)PyInstance::typeObj(
-        //                 cellContents->forwardResolvesTo()
-        //             )
-        //         );
-        //     }
-        // }
+                if (resolvedForwards.find(cellContents) != resolvedForwards.end()) {
+                    PyDict_SetItemString(
+                        mModuleDictOrCell,
+                        mName.c_str(),
+                        (PyObject*)PyInstance::typeObj(
+                            cellContents->forwardResolvesTo()
+                        )
+                    );
+                }
+            }
+        }
     }
 
     template<class serialization_context_t, class buf_t>
