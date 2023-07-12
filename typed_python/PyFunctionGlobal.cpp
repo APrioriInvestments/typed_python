@@ -22,18 +22,80 @@ PyDoc_STRVAR(PyFunctionGlobal_doc,
 );
 
 PyMethodDef PyFunctionGlobal_methods[] = {
+    {"isUnresolved", (PyCFunction)PyFunctionGlobal::isUnresolved, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getValue", (PyCFunction)PyFunctionGlobal::getValue, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
+
+
+PyObject* PyFunctionGlobal::getValue(PyFunctionGlobal* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        PyObject* result = self->getGlobal().getValueAsPyobj();
+        if (!result) {
+            // TODO: should this throw a NameError?
+            throw std::runtime_error("Global is not resolved");
+        }
+        return incref(result);
+    });
+}
+
+PyObject* PyFunctionGlobal::isUnresolved(PyFunctionGlobal* self, PyObject* args, PyObject* kwargs) {
+    static const char* kwlist[] = {"insistForwardsResolved", NULL};
+
+    int insistForwardsResolved = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|p", (char**)kwlist, &insistForwardsResolved)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        return incref(self->getGlobal().isUnresolved(insistForwardsResolved) ? Py_True : Py_False);
+    });
+}
+
+FunctionGlobal& PyFunctionGlobal::getGlobal() {
+    if (!mFuncType) {
+        throw std::runtime_error("FunctionGlobal is missing a function type");
+    }
+
+    if (!mName) {
+        throw std::runtime_error("FunctionGlobal is missing a name");
+    }
+
+    if (mOverloadIx < 0 || mOverloadIx >= mFuncType->getOverloads().size()){
+        throw std::runtime_error("FunctionGlobal overload is out of bounds");
+    }
+
+    FunctionOverload& o = mFuncType->getOverloads()[mOverloadIx];
+
+    auto it = o.getGlobals().find(*mName);
+    if (it == o.getGlobals().end()) {
+        throw std::runtime_error("FunctionGlobal has no global named " + *mName);
+    }
+
+    return it->second;
+}
 
 /* static */
 void PyFunctionGlobal::dealloc(PyFunctionGlobal *self)
 {
+    if (self->mName) {
+        delete self->mName;
+    }
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-PyObject* PyFunctionGlobal::newPyFunctionGlobal(FunctionGlobal* g) {
+PyObject* PyFunctionGlobal::newPyFunctionGlobal(Function* func, long overloadIx, std::string globalName) {
     PyFunctionGlobal* self = (PyFunctionGlobal*)PyType_FunctionGlobal.tp_alloc(&PyType_FunctionGlobal, 0);
-    self->mGlobal = g;
+    self->mFuncType = func;
+    self->mOverloadIx = overloadIx;
+    self->mName = new std::string(globalName);
     return (PyObject*)self;
 }
 
@@ -45,7 +107,9 @@ PyObject* PyFunctionGlobal::new_(PyTypeObject *type, PyObject *args, PyObject *k
     self = (PyFunctionGlobal*)type->tp_alloc(type, 0);
 
     if (self != NULL) {
-        self->mGlobal = nullptr;
+        self->mFuncType = nullptr;
+        self->mOverloadIx = 0;
+        self->mName = nullptr;
     }
 
     return (PyObject*)self;

@@ -33,8 +33,11 @@ void PyFunctionOverload::dealloc(PyFunctionOverload *self)
 
 PyObject* PyFunctionOverload::newPyFunctionOverload(Function* f, int64_t overloadIndex) {
     PyFunctionOverload* self = (PyFunctionOverload*)PyType_FunctionOverload.tp_alloc(&PyType_FunctionOverload, 0);
+    
     self->mFunction = f;
     self->mOverloadIx = overloadIndex;
+    self->initFields();
+
     return (PyObject*)self;
 }
 
@@ -53,36 +56,113 @@ PyObject* PyFunctionOverload::new_(PyTypeObject *type, PyObject *args, PyObject 
     return (PyObject*)self;
 }
 
+void PyFunctionOverload::initFields() {
+    FunctionOverload& overload = mFunction->getOverloads()[mOverloadIx];
+
+    PyObjectStealer pyClosureVarsDict(PyDict_New());
+
+    // note that we can't actually call into the Python interpreter during this call,
+    // because that can release the GIL and allow other threads to access our type
+    // object before it's done.
+    PyObjectStealer argsTup(PyTuple_New(overload.getArgs().size()));
+
+    PyObject* closureVariableCellLookupSingleton = staticPythonInstance("typed_python.internals", "CellAccess");
+    PyObject* funcOverloadArg = staticPythonInstance("typed_python.internals", "FunctionOverloadArg");
+    
+    PyObjectStealer pyFunctionGlobals(PyDict_New());
+
+    for (auto nameAndGlobal: overload.getGlobals()) {
+        PyObject* val = nameAndGlobal.second.getValueAsPyobj();
+        if (val) {
+            PyDict_SetItemString(
+                pyFunctionGlobals, 
+                nameAndGlobal.first.c_str(),
+                PyFunctionGlobal::newPyFunctionGlobal(
+                    mFunction,
+                    mOverloadIx,
+                    nameAndGlobal.first
+                )
+            );
+        }
+    }
+
+    for (auto nameAndClosureVar: overload.getClosureVariableBindings()) {
+        PyObjectStealer bindingObj(PyTuple_New(nameAndClosureVar.second.size()));
+
+        for (long k = 0; k < nameAndClosureVar.second.size(); k++) {
+            ClosureVariableBindingStep step = nameAndClosureVar.second[k];
+
+            if (step.isFunction()) {
+                // recall that 'PyTuple_SetItem' steals a reference, so we need to incref it here
+                PyTuple_SetItem(bindingObj, k, incref((PyObject*)PyInstance::typePtrToPyTypeRepresentation(step.getFunction())));
+            } else
+            if (step.isNamedField()) {
+                PyTuple_SetItem(bindingObj, k, PyUnicode_FromString(step.getNamedField().c_str()));
+            } else
+            if (step.isIndexedField()) {
+                PyTuple_SetItem(bindingObj, k, PyLong_FromLong(step.getIndexedField()));
+            } else
+            if (step.isCellAccess()) {
+                PyTuple_SetItem(bindingObj, k, incref(closureVariableCellLookupSingleton));
+            } else {
+                throw std::runtime_error("Corrupt ClosureVariableBindingStep encountered");
+            }
+        }
+
+        PyDict_SetItemString(pyClosureVarsDict, nameAndClosureVar.first.c_str(), bindingObj);
+    }
+
+    PyObjectStealer emptyTup(PyTuple_New(0));
+    PyObjectStealer emptyDict(PyDict_New());
+
+    for (long argIx = 0; argIx < overload.getArgs().size(); argIx++) {
+        auto arg = overload.getArgs()[argIx];
+
+        PyObjectStealer pyArgInst(
+            ((PyTypeObject*)funcOverloadArg)->tp_new((PyTypeObject*)funcOverloadArg, emptyTup, emptyDict)
+        );
+
+        PyObjectStealer pyArgInstDict(PyObject_GenericGetDict(pyArgInst, nullptr));
+
+        PyObjectStealer pyName(PyUnicode_FromString(arg.getName().c_str()));
+        PyDict_SetItemString(pyArgInstDict, "name", pyName);
+        PyDict_SetItemString(pyArgInstDict, "defaultValue", arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None);
+        PyDict_SetItemString(pyArgInstDict, "_typeFilter", arg.getTypeFilter() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None);
+        PyDict_SetItemString(pyArgInstDict, "isStarArg", arg.getIsStarArg() ? Py_True : Py_False);
+        PyDict_SetItemString(pyArgInstDict, "isKwarg", arg.getIsKwarg() ? Py_True : Py_False);
+
+        PyTuple_SetItem(argsTup, argIx, incref(pyArgInst));
+    }
+
+    PyObjectStealer pyOverloadInstDict(PyObject_GenericGetDict((PyObject*)this, nullptr));
+
+    PyDict_SetItemString(pyOverloadInstDict, "functionTypeObject", PyInstance::typePtrToPyTypeRepresentation(mFunction));
+    PyDict_SetItemString(pyOverloadInstDict, "index", (PyObject*)PyLong_FromLong(mOverloadIx));
+
+    PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
+    PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
+    PyDict_SetItemString(pyOverloadInstDict, "functionGlobals", (PyObject*)pyFunctionGlobals);
+    PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
+    PyDict_SetItemString(pyOverloadInstDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
+    PyDict_SetItemString(pyOverloadInstDict, "methodOf", overload.getMethodOf() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
+    PyDict_SetItemString(pyOverloadInstDict, "args", argsTup);
+    PyDict_SetItemString(pyOverloadInstDict, "name", PyUnicode_FromString(mFunction->name().c_str()));
+}
+
 /* static */
 int PyFunctionOverload::init(PyFunctionOverload *self, PyObject *args, PyObject *kwargs)
 {
-    static const char* kwlist[] = {"functionType", "overloadIx", NULL};
+    PyErr_Format(PyExc_RuntimeError, "FunctionOverload cannot be initialized directly");
+    return -1;
+}
 
-    PyObject* funcTypeObj;
-    long index;
+// static
+PyObject* PyFunctionOverload::tp_repr(PyObject *selfObj) {
+    PyFunctionOverload* self = (PyFunctionOverload*)selfObj;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Ol", (char**)kwlist, &funcTypeObj, &index)) {
-        return -1;
-    }
-
-    return translateExceptionToPyObjectReturningInt([&]() {
-        Type* t = PyInstance::unwrapTypeArgToTypePtr(funcTypeObj);
-
-        if (!t || !t->isFunction()) {
-            throw std::runtime_error("Expected 'functionType' to be a Function type object");
-        }
-
-        Function* f = (Function*)t;
-
-        if (index < 0 || index >= f->getOverloads().size()) {
-            throw std::runtime_error("overloadIx is out of bounds");
-        }
-
-        self->mFunction = f;
-        self->mOverloadIx = index;
-
-        return 0;
-    });
+    return PyUnicode_FromString(
+        self->mFunction->getOverloads()[self->mOverloadIx].signatureStr().c_str()
+    );
 }
 
 PyTypeObject PyType_FunctionOverload = {
@@ -99,7 +179,7 @@ PyTypeObject PyType_FunctionOverload = {
     .tp_getattr = 0,
     .tp_setattr = 0,
     .tp_as_async = 0,
-    .tp_repr = 0,
+    .tp_repr = PyFunctionOverload::tp_repr,
     .tp_as_number = 0,
     .tp_as_sequence = 0,
     .tp_as_mapping = 0,

@@ -22,15 +22,25 @@ class PyFunctionGlobal {
 public:
     PyObject_HEAD
 
-    FunctionGlobal* mGlobal;
+    Function* mFuncType;
+
+    int64_t mOverloadIx;
+
+    std::string* mName;
+
+    FunctionGlobal& getGlobal();
 
     static void dealloc(PyFunctionGlobal *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
 
-    static PyObject* newPyFunctionGlobal(FunctionGlobal* g);
+    static PyObject* newPyFunctionGlobal(Function* func, long overloadIx, std::string globalName);
 
     static int init(PyFunctionGlobal *self, PyObject *args, PyObject *kwargs);
+
+    static PyObject* isUnresolved(PyFunctionGlobal* self, PyObject* args, PyObject* kwargs);
+
+    static PyObject* getValue(PyFunctionGlobal* self, PyObject* args, PyObject* kwargs);
 };
 
 extern PyTypeObject PyType_FunctionGlobal;

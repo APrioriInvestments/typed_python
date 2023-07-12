@@ -538,6 +538,54 @@ public:
         return mGlobals;
     }
 
+    std::map<std::string, FunctionGlobal>& getGlobals() {
+        return mGlobals;
+    }
+
+    std::string signatureStr() {
+        if (mMethodOf) {
+            return "FunctionOverload(" 
+                + mMethodOf->name() 
+                + ", returns " + (mReturnType ? mReturnType->name() : std::string("anything"))
+                + ", "
+                + argsStr()
+                + ")";
+        } else {
+            return "FunctionOverload(" 
+                "returns " + (mReturnType ? mReturnType->name() : std::string("anything"))
+                + ", "
+                + argsStr()
+                + ")";
+        }
+    }
+
+    std::string argsStr() {
+        std::ostringstream s;
+
+        for (long i = 0; i < mArgs.size(); i++) {
+            if (i) {
+                s << ", ";
+            }
+
+            if (mArgs[i].getIsStarArg()) {
+                s << "*";
+            }
+
+            s << mArgs[i].getName();
+
+            if (mArgs[i].getTypeFilter()) {
+                s << ": " << mArgs[i].getTypeFilter()->name();
+            }
+
+            // TODO: default values should really be held in CompilerVisiblePyObj
+            if (mArgs[i].getDefaultValue()) {
+                s << " = " << "...";
+            }
+        }
+
+        return s.str();
+    }
+
     /* walk over the opcodes in 'code' and extract all cases where we're accessing globals by name.
 
     In cases where we write something like 'x.y.z' the compiler shouldn't have a reference to 'x',

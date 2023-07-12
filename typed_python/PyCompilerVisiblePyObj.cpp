@@ -32,8 +32,18 @@ void PyCompilerVisiblePyObj::dealloc(PyCompilerVisiblePyObj *self)
 }
 
 PyObject* PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(CompilerVisiblePyObj* g) {
+    static std::unordered_map<CompilerVisiblePyObj*, PyObject*> memo;
+
+    auto it = memo.find(g);
+    if (it != memo.end()) {
+        return incref(it->second);
+    }
+
     PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)PyType_CompilerVisiblePyObj.tp_alloc(&PyType_CompilerVisiblePyObj, 0);
     self->mPyobj = g;
+    
+    memo[g] = (PyObject*)self;
+
     return (PyObject*)self;
 }
 

@@ -26,6 +26,10 @@ public:
 
     int64_t mOverloadIx;
 
+    void initFields();
+
+    static PyObject* tp_repr(PyObject *self);
+
     static void dealloc(PyFunctionOverload *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);

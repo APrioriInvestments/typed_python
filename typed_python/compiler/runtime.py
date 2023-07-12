@@ -346,7 +346,9 @@ class Runtime:
 
                 fp = self.converter.functionPointerByName(wrappingCallTargetName)
 
-                overload._installNativePointer(
+                typed_python._types.installNativeFunctionPointer(
+                    functionType,
+                    overloadIx,
                     fp.fp,
                     callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
                     [i.typeRepresentation for i in callTarget.input_types]

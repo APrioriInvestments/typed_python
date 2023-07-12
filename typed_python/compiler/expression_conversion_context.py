@@ -807,6 +807,23 @@ class ExpressionConversionContext:
             )
 
     @staticmethod
+    def minPositionalCount(args):
+        for i in range(len(args)):
+            a = args[i]
+            if a.defaultValue or a.isStarArg or a.isKwarg:
+                return i
+        return len(args)
+
+    @staticmethod
+    def maxPositionalCount(args):
+        for i in range(len(args)):
+            a = args[i]
+            if a.isStarArg:
+                return None
+        return len(args)
+
+
+    @staticmethod
     def mapFunctionArguments(functionOverload: FunctionOverload, args, kwargs) -> OneOf(str, ListOf(FunctionArgMapping)):
         """Figure out how to call 'functionOverload' with 'args' and 'kwargs'.
 
@@ -831,8 +848,8 @@ class ExpressionConversionContext:
         outArgs = ListOf(FunctionArgMapping)()
         curTargetIx = 0
 
-        minPositional = functionOverload.minPositionalCount()
-        maxPositional = functionOverload.maxPositionalCount()
+        minPositional = ExpressionConversionContext.minPositionalCount(functionOverload.args)
+        maxPositional = ExpressionConversionContext.maxPositionalCount(functionOverload.args)
 
         consumedPositionalNames = set()
 
