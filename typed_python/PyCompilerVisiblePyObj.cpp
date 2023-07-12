@@ -41,8 +41,8 @@ PyObject* PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(CompilerVisiblePyObj
 
     PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)PyType_CompilerVisiblePyObj.tp_alloc(&PyType_CompilerVisiblePyObj, 0);
     self->mPyobj = g;
-    
-    memo[g] = (PyObject*)self;
+
+    memo[g] = incref((PyObject*)self);
 
     return (PyObject*)self;
 }
@@ -59,6 +59,56 @@ PyObject* PyCompilerVisiblePyObj::new_(PyTypeObject *type, PyObject *args, PyObj
     }
 
     return (PyObject*)self;
+}
+
+PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrName) {
+    PyCompilerVisiblePyObj* pyCVPO = (PyCompilerVisiblePyObj*)selfObj;
+
+    return translateExceptionToPyObject([&] {
+        if (!PyUnicode_Check(attrName)) {
+            throw std::runtime_error("Expected a string for attribute name");
+        }
+
+        std::string attr(PyUnicode_AsUTF8(attrName));
+
+        CompilerVisiblePyObj* obj = pyCVPO->mPyobj;
+
+        if (attr == "kind") {
+            if (obj->isUninitialized()) {
+                return PyUnicode_FromString("Uninitialized");
+            }
+
+            if (obj->isType()) {
+                return PyUnicode_FromString("Type");
+            }
+
+            if (obj->isInstance()) {
+                return PyUnicode_FromString("Instance");
+            }
+
+            if (obj->isPyTuple()) {
+                return PyUnicode_FromString("Py2Tuple");
+            }
+
+            throw std::runtime_error("Unknown CompilerVisiblePyObj Kind");
+        }
+
+        if (attr == "type" && obj->isType()) {
+            Type* t = obj->getType();
+
+            if (!t) {
+                throw std::runtime_error("Somehow we don't have a type");
+            }
+
+            return incref((PyObject*)PyInstance::typeObj(t));
+        }
+
+        if (attr == "instance" && obj->isInstance()) {
+            return PyInstance::fromInstance(obj->getInstance());
+        }
+
+        return PyObject_GenericGetAttr(selfObj, attrName);
+    });
 }
 
 /* static */
@@ -89,7 +139,7 @@ PyTypeObject PyType_CompilerVisiblePyObj = {
     .tp_hash = 0,
     .tp_call = 0,
     .tp_str = 0,
-    .tp_getattro = 0,
+    .tp_getattro = PyCompilerVisiblePyObj::tp_getattro,
     .tp_setattro = 0,
     .tp_as_buffer = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,

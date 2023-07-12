@@ -80,7 +80,7 @@ PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr clo
                         PyTuple_SetItem(
                             (PyObject*)closureTup,
                             k,
-                            incref(globalVal)
+                            PyCell_New(globalVal)
                         );
                     }
                 } else {
@@ -97,7 +97,7 @@ PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr clo
                         PyTuple_SetItem(
                             (PyObject*)closureTup,
                             k,
-                            incref(
+                            PyCell_New(
                                 ((PyCellType*)bindingValue.type())->getPyObj(bindingValue.data())
                             )
                         );

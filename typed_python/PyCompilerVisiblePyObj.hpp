@@ -24,6 +24,8 @@ public:
 
     CompilerVisiblePyObj* mPyobj;
 
+    static PyObject* tp_getattro(PyObject* selfObj, PyObject* attr);
+
     static void dealloc(PyCompilerVisiblePyObj *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);

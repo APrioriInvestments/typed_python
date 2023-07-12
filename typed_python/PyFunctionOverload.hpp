@@ -26,7 +26,13 @@ public:
 
     int64_t mOverloadIx;
 
+    PyObject* mDict;
+
+    FunctionOverload& getOverload();
+
     void initFields();
+
+    static PyObject* tp_getattro(PyObject *o, PyObject* attrName);
 
     static PyObject* tp_repr(PyObject *self);
 

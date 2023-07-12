@@ -25,17 +25,31 @@ PyMethodDef PyFunctionOverload_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+FunctionOverload& PyFunctionOverload::getOverload() {
+    if (!mFunction) {
+        throw std::runtime_error("FunctionOverload has an empty FunctionType");
+    }
+
+    if (mOverloadIx < 0 || mOverloadIx >= mFunction->getOverloads().size()) {
+        throw std::runtime_error("FunctionOverload overloadIx out of bounds");
+    }
+
+    return mFunction->getOverloads()[mOverloadIx];
+}
+
 /* static */
 void PyFunctionOverload::dealloc(PyFunctionOverload *self)
 {
+    decref(self->mDict);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 PyObject* PyFunctionOverload::newPyFunctionOverload(Function* f, int64_t overloadIndex) {
     PyFunctionOverload* self = (PyFunctionOverload*)PyType_FunctionOverload.tp_alloc(&PyType_FunctionOverload, 0);
-    
+
     self->mFunction = f;
     self->mOverloadIx = overloadIndex;
+    self->mDict = PyDict_New();
     self->initFields();
 
     return (PyObject*)self;
@@ -51,13 +65,14 @@ PyObject* PyFunctionOverload::new_(PyTypeObject *type, PyObject *args, PyObject 
     if (self != NULL) {
         self->mFunction = nullptr;
         self->mOverloadIx = 0;
+        self->mDict = PyDict_New();
     }
 
     return (PyObject*)self;
 }
 
 void PyFunctionOverload::initFields() {
-    FunctionOverload& overload = mFunction->getOverloads()[mOverloadIx];
+    FunctionOverload& overload = getOverload();
 
     PyObjectStealer pyClosureVarsDict(PyDict_New());
 
@@ -68,22 +83,19 @@ void PyFunctionOverload::initFields() {
 
     PyObject* closureVariableCellLookupSingleton = staticPythonInstance("typed_python.internals", "CellAccess");
     PyObject* funcOverloadArg = staticPythonInstance("typed_python.internals", "FunctionOverloadArg");
-    
+
     PyObjectStealer pyFunctionGlobals(PyDict_New());
 
     for (auto nameAndGlobal: overload.getGlobals()) {
-        PyObject* val = nameAndGlobal.second.getValueAsPyobj();
-        if (val) {
-            PyDict_SetItemString(
-                pyFunctionGlobals, 
-                nameAndGlobal.first.c_str(),
-                PyFunctionGlobal::newPyFunctionGlobal(
-                    mFunction,
-                    mOverloadIx,
-                    nameAndGlobal.first
-                )
-            );
-        }
+        PyDict_SetItemString(
+            pyFunctionGlobals,
+            nameAndGlobal.first.c_str(),
+            PyFunctionGlobal::newPyFunctionGlobal(
+                mFunction,
+                mOverloadIx,
+                nameAndGlobal.first
+            )
+        );
     }
 
     for (auto nameAndClosureVar: overload.getClosureVariableBindings()) {
@@ -141,7 +153,7 @@ void PyFunctionOverload::initFields() {
 
     PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
     PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
-    PyDict_SetItemString(pyOverloadInstDict, "functionGlobals", (PyObject*)pyFunctionGlobals);
+    PyDict_SetItemString(pyOverloadInstDict, "globals", (PyObject*)pyFunctionGlobals);
     PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
     PyDict_SetItemString(pyOverloadInstDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
     PyDict_SetItemString(pyOverloadInstDict, "methodOf", overload.getMethodOf() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
@@ -161,9 +173,44 @@ PyObject* PyFunctionOverload::tp_repr(PyObject *selfObj) {
     PyFunctionOverload* self = (PyFunctionOverload*)selfObj;
 
     return PyUnicode_FromString(
-        self->mFunction->getOverloads()[self->mOverloadIx].signatureStr().c_str()
+        ("FunctionOverload(" + self->mFunction->getOverloads()[self->mOverloadIx].toString() + ")").c_str()
     );
 }
+
+PyObject* PyFunctionOverload::tp_getattro(PyObject *o, PyObject* attrName) {
+    PyFunctionOverload* pyFuncOverload = (PyFunctionOverload*)o;
+
+    return translateExceptionToPyObject([&] {
+        if (!PyUnicode_Check(attrName)) {
+            throw std::runtime_error("Expected a string for attribute name");
+        }
+
+        std::string attr(PyUnicode_AsUTF8(attrName));
+
+        if (attr == "realizedGlobals") {
+            PyObject* pyFunctionGlobals = PyDict_New();
+
+            FunctionOverload& overload = pyFuncOverload->getOverload();
+
+            for (auto nameAndGlobal: overload.getGlobals()) {
+                PyObject* val = nameAndGlobal.second.getValueAsPyobj();
+
+                if (val) {
+                    PyDict_SetItemString(
+                        pyFunctionGlobals,
+                        nameAndGlobal.first.c_str(),
+                        val
+                    );
+                }
+            }
+
+            return pyFunctionGlobals;
+        }
+
+        return PyObject_GenericGetAttr(o, attrName);
+    });
+}
+
 
 PyTypeObject PyType_FunctionOverload = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -186,7 +233,7 @@ PyTypeObject PyType_FunctionOverload = {
     .tp_hash = 0,
     .tp_call = 0,
     .tp_str = 0,
-    .tp_getattro = 0,
+    .tp_getattro = PyFunctionOverload::tp_getattro,
     .tp_setattro = 0,
     .tp_as_buffer = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -204,7 +251,7 @@ PyTypeObject PyType_FunctionOverload = {
     .tp_dict = 0,
     .tp_descr_get = 0,
     .tp_descr_set = 0,
-    .tp_dictoffset = 0,
+    .tp_dictoffset = offsetof(PyFunctionOverload, mDict),
     .tp_init = (initproc) PyFunctionOverload::init,
     .tp_alloc = 0,
     .tp_new = PyFunctionOverload::new_,

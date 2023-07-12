@@ -115,6 +115,74 @@ PyObject* PyFunctionGlobal::new_(PyTypeObject *type, PyObject *args, PyObject *k
     return (PyObject*)self;
 }
 
+PyObject* PyFunctionGlobal::tp_repr(PyObject *selfObj) {
+    PyFunctionGlobal* self = (PyFunctionGlobal*)selfObj;
+
+    return translateExceptionToPyObject([&]() {
+        return PyUnicode_FromString(self->getGlobal().toString().c_str());
+    });
+}
+
+PyObject* PyFunctionGlobal::tp_getattro(PyObject* selfObj, PyObject* attrName) {
+    PyFunctionGlobal* pyFuncGlobal = (PyFunctionGlobal*)selfObj;
+
+    return translateExceptionToPyObject([&] {
+        if (!PyUnicode_Check(attrName)) {
+            throw std::runtime_error("Expected a string for attribute name");
+        }
+
+        std::string attr(PyUnicode_AsUTF8(attrName));
+
+        auto& global = pyFuncGlobal->getGlobal();
+
+        if (attr == "kind") {
+            if (global.isUnbound()) {
+                return PyUnicode_FromString("Unbound");
+            }
+
+            if (global.isNamedModuleMember()) {
+                return PyUnicode_FromString("NamedModuleMember");
+            }
+
+            if (global.isGlobalInCell()) {
+                return PyUnicode_FromString("GlobalInCell");
+            }
+
+            if (global.isGlobalInDict()) {
+                return PyUnicode_FromString("GlobalInDict");
+            }
+
+            if (global.isConstant()) {
+                return PyUnicode_FromString("Constant");
+            }
+
+            throw std::runtime_error("Unknown Global Kind");
+        }
+
+        if (attr == "constant" && global.isConstant()) {
+            return PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(global.getConstant());
+        }
+
+        if (attr == "name" && (global.isNamedModuleMember() || global.isGlobalInDict())) {
+            return PyUnicode_FromString(global.getName().c_str());
+        }
+
+        if (attr == "moduleName" && global.isNamedModuleMember()) {
+            return PyUnicode_FromString(global.getModuleName().c_str());
+        }
+
+        if (attr == "cell" && global.isGlobalInCell()) {
+            return incref(global.getModuleDictOrCell());
+        }
+
+        if (attr == "moduleDict" && (global.isNamedModuleMember() || global.isGlobalInDict())) {
+            return incref(global.getModuleDictOrCell());
+        }
+
+        return PyObject_GenericGetAttr(selfObj, attrName);
+    });
+}
+
 /* static */
 int PyFunctionGlobal::init(PyFunctionGlobal *self, PyObject *args, PyObject *kwargs)
 {
@@ -136,14 +204,14 @@ PyTypeObject PyType_FunctionGlobal = {
     .tp_getattr = 0,
     .tp_setattr = 0,
     .tp_as_async = 0,
-    .tp_repr = 0,
+    .tp_repr = PyFunctionGlobal::tp_repr,
     .tp_as_number = 0,
     .tp_as_sequence = 0,
     .tp_as_mapping = 0,
     .tp_hash = 0,
     .tp_call = 0,
     .tp_str = 0,
-    .tp_getattro = 0,
+    .tp_getattro = PyFunctionGlobal::tp_getattro,
     .tp_setattro = 0,
     .tp_as_buffer = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,

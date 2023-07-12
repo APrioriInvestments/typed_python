@@ -35,6 +35,11 @@ def test_identity_hash_of_alternative_stable():
 def test_type_looks_resolvable_alternative():
     A = Alternative("A_", X={}, f=lambda self: B)
 
+    # hide a reference to this forward in a tuple that the autoresolver can't see
+    AFwd = (A,)
+
+    assert isForwardDefined(A)
+
     assert typeLooksResolvable(A, unambiguously=False)
     assert not typeLooksResolvable(A, unambiguously=True)
 
@@ -47,6 +52,18 @@ def test_type_looks_resolvable_alternative():
 
     A = resolveForwardDefinedType(A)
     B = resolveForwardDefinedType(B)
+
+    bGlobal = A.f.overloads[0].globals['B']
+    assert bGlobal.kind == "Constant"
+    assert bGlobal.constant.kind == "Type"
+    assert bGlobal.constant.type is B
+
+    bFwdGlobal = AFwd[0].f.overloads[0].globals['B']
+    assert bFwdGlobal.kind == "GlobalInCell"
+    assert bFwdGlobal.getValue() is B
+
+    assert not isForwardDefined(A)
+    assert isForwardDefined(AFwd[0])
 
     assert A().f() is B
     assert B().g() is A

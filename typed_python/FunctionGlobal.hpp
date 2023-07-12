@@ -51,6 +51,30 @@ public:
     {
     }
 
+    std::string toString() {
+        if (isUnbound()) {
+            return "FunctionGlobal.Unbound()";
+        }
+
+        if (isNamedModuleMember()) {
+            return "FunctionGlobal.NamedModuleMember(" + mModuleName + ", " + mName + ")";
+        }
+
+        if (isGlobalInCell()) {
+            return "FunctionGlobal.GlobalInCell()";
+        }
+
+        if (isGlobalInDict()) {
+            return "FunctionGlobal.GlobalInDict()";
+        }
+
+        if (isConstant()) {
+            return "FunctionGlobal.Constant(" + mConstant->toString() + ")";
+        }
+
+        throw std::runtime_error("Unknown FunctionGlobal Kind");
+    }
+
     static FunctionGlobal Unbound() {
         return FunctionGlobal();
     }
@@ -82,7 +106,7 @@ public:
             GlobalType::NamedModuleMember,
             moduleDict,
             name,
-            "",
+            moduleName,
             nullptr
         );
     }
@@ -170,6 +194,10 @@ public:
 
     const std::string& getName() const {
         return mName;
+    }
+
+    const std::string& getModuleName() const {
+        return mModuleName;
     }
 
     PyObject* getModuleDictOrCell() const {

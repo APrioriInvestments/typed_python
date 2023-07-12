@@ -45,6 +45,22 @@ class CompilerVisiblePyObj {
     }
 
 public:
+    bool isUninitialized() const {
+        return mKind == Kind::Uninitialized;
+    }
+
+    bool isType() const {
+        return mKind == Kind::Type;
+    }
+
+    bool isInstance() const {
+        return mKind == Kind::Instance;
+    }
+
+    bool isPyTuple() const {
+        return mKind == Kind::PyTuple;
+    }
+
     static CompilerVisiblePyObj* Type(Type* t) {
         CompilerVisiblePyObj* res = new CompilerVisiblePyObj();
 
@@ -120,6 +136,22 @@ public:
         }
 
         throw std::runtime_error("Can't make a python object representation for this pyobj");
+    }
+
+    std::string toString() {
+        if (mKind == Kind::Type) {
+            return "CompilerVisiblePyObj.Type(" + mType->name() + ")";
+        }
+
+        if (mKind == Kind::Instance) {
+            return "CompilerVisiblePyObj.Instance(" + mInstance.type()->name() + ")";
+        }
+
+        if (mKind == Kind::PyTuple) {
+            return "CompilerVisiblePyObj.PyTuple()";
+        }
+
+        throw std::runtime_error("Unknown CompilerVisiblePyObj Kind.");
     }
 
 private:

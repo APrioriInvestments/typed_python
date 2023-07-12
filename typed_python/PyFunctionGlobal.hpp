@@ -30,6 +30,10 @@ public:
 
     FunctionGlobal& getGlobal();
 
+    static PyObject* tp_getattro(PyObject* selfObj, PyObject* attr);
+
+    static PyObject* tp_repr(PyObject *selfObj);
+
     static void dealloc(PyFunctionGlobal *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
