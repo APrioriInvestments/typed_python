@@ -1,6 +1,5 @@
-
 /******************************************************************************
-   Copyright 2017-2019 typed_python Authors
+   Copyright 2017-2023 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -36,6 +35,9 @@
 #include "UnicodeProps.hpp"
 #include "PyTemporaryReferenceTracer.hpp"
 #include "PySlab.hpp"
+#include "PyFunctionOverload.hpp"
+#include "PyFunctionGlobal.hpp"
+#include "PyCompilerVisiblePyObj.hpp"
 #include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
 #include "CompilerVisibleObjectVisitor.hpp"
@@ -3793,10 +3795,25 @@ PyInit__types(void)
         return NULL;
     }
 
+    if (PyType_Ready(&PyType_FunctionOverload) < 0) {
+        return NULL;
+    }
+
     if (PyType_Ready(&PyType_ModuleRepresentation) < 0) {
         return NULL;
     }
 
+    if (PyType_Ready(&PyType_FunctionGlobal) < 0) {
+        return NULL;
+    }
+
+    if (PyType_Ready(&PyType_CompilerVisiblePyObj) < 0) {
+        return NULL;
+    }
+
+    PyModule_AddObject(module, "FunctionOverload", (PyObject*)incref(&PyType_FunctionOverload));
+    PyModule_AddObject(module, "CompilerVisiblePyObj", (PyObject*)incref(&PyType_CompilerVisiblePyObj));
+    PyModule_AddObject(module, "FunctionGlobal", (PyObject*)incref(&PyType_FunctionGlobal));
     PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
     PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(&PyType_ModuleRepresentation));
 

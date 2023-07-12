@@ -76,6 +76,9 @@ compile the entire group all at once.
 #include "PyModuleRepresentation.cpp"
 #include "Slab.cpp"
 #include "PyTemporaryReferenceTracer.cpp"
+#include "PyFunctionOverload.cpp"
+#include "PyFunctionGlobal.cpp"
+#include "PyCompilerVisiblePyObj.cpp"
 
 #include "lz4.c"
 #include "lz4frame.c"
