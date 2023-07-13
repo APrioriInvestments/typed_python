@@ -3,10 +3,10 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held#, NotCompiled
+    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled
 )
 
-# from typed_python.test_util import CodeEvaluator
+from typed_python.test_util import CodeEvaluator
 
 
 def test_identity_hash_of_alternative_stable():
@@ -122,7 +122,7 @@ def test_class_with_entrypointed_recursive_method():
         def f(self):
             return C().g()
 
-    c = C()
+    C()
 
 
 def test_autoresolve_forwards_with_nonforwards():

@@ -23,7 +23,8 @@ import types
 from typed_python.compiler.type_wrappers.slice_type_object_wrapper import SliceWrapper
 from typed_python.compiler.conversion_level import ConversionLevel
 from typed_python.SerializationContext import SerializationContext
-from typed_python.internals import makeFunctionType, FunctionOverload
+from typed_python.internals import makeFunctionType
+from typed_python._types import FunctionOverload
 from typed_python.compiler.function_stack_state import FunctionStackState
 from typed_python.compiler.python_object_representation import pythonObjectRepresentation
 from typed_python.compiler.python_object_representation import pythonObjectRepresentationType
@@ -821,7 +822,6 @@ class ExpressionConversionContext:
             if a.isStarArg:
                 return None
         return len(args)
-
 
     @staticmethod
     def mapFunctionArguments(functionOverload: FunctionOverload, args, kwargs) -> OneOf(str, ListOf(FunctionArgMapping)):

@@ -75,17 +75,17 @@ PyCell = _types.PyCell()
 
 _types._enableTypeAutoresolution(True)
 
-# from typed_python.SerializationContext import SerializationContext  # noqa
-# from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled, Runtime  # noqa
+from typed_python.SerializationContext import SerializationContext  # noqa
+from typed_python.compiler.runtime import Entrypoint, Compiled, NotCompiled, Runtime  # noqa
 
-# from typed_python.generator import Generator  # noqa
+from typed_python.generator import Generator  # noqa
 
-# # this has to come at the end to break import cyclic
-# from typed_python.lib.map import map  # noqa
-# from typed_python.lib.pmap import pmap  # noqa
-# from typed_python.lib.reduce import reduce  # noqa
+# this has to come at the end to break import cyclic
+from typed_python.lib.map import map  # noqa
+from typed_python.lib.pmap import pmap  # noqa
+from typed_python.lib.reduce import reduce  # noqa
 
-# _types.initializeGlobalStatics()
+_types.initializeGlobalStatics()
 
 # start a background thread to release the GIL for us. Instead of immediately releasing the GIL,
 # we prefer to release it a short time after our C code no longer needs it, in case it

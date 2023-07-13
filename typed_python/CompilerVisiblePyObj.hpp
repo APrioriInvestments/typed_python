@@ -125,7 +125,19 @@ public:
 
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& visitor) {
+        if (mKind == Kind::Type) {
+            visitor.visitTopo(mType);
+        }
 
+        if (mKind == Kind::Instance) {
+            // TODO: what to do here?
+            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals");
+        }
+
+        if (mKind == Kind::PyTuple) {
+            // TODO: what to do here?
+            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals");
+        }
     }
 
     // get the python object representation of this object, which isn't guaranteed

@@ -168,7 +168,7 @@ public:
     }
 
     PyObject* getValueAsPyobj() {
-        if (isGlobalInCell() || isGlobalInCell() || isNamedModuleMember()) {
+        if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
             return extractGlobalRefFromDictOrCell();
         }
 
@@ -179,7 +179,6 @@ public:
         if (isConstant()) {
             return mConstant->getPyObj();
         }
-
 
         throw std::runtime_error("Unknown global kind.");
     }

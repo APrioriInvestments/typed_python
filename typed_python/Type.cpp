@@ -508,10 +508,10 @@ void Type::attemptToResolve() {
         typeAndSource.first->finalizeType();
     }
 
-    std::cout << "resolving group:\n";
-    for (auto typeAndSource: resolutionSource) {
-        std::cout << "    " << TypeOrPyobj(typeAndSource.first).name() << " from " << TypeOrPyobj(typeAndSource.second).name() << "\n";
-    }
+    // std::cout << "resolving group:\n";
+    // for (auto typeAndSource: resolutionSource) {
+    //     std::cout << "    " << TypeOrPyobj(typeAndSource.first).name() << " from " << TypeOrPyobj(typeAndSource.second).name() << "\n";
+    // }
 
     // now internalize the types by their hash. For each type, we compute a hash
     // and then look to see if we've seen it before. We build a lookup table from
