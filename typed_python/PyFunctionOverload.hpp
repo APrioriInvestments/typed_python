@@ -28,9 +28,13 @@ public:
 
     PyObject* mDict;
 
+    bool mIsInitialized;
+
     FunctionOverload& getOverload();
 
     void initFields();
+
+    void ensureInitialized();
 
     static PyObject* tp_getattro(PyObject *o, PyObject* attrName);
 

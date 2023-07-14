@@ -811,6 +811,9 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 
         b.writeEndCompound();
 
+        b.writeBeginCompound(4);
+        b.writeEndCompound();
+
     b.writeEndCompound();
 }
 

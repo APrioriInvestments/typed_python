@@ -1046,6 +1046,8 @@ MutuallyRecursiveTypeGroup* PythonSerializationContext::deserializeMutuallyRecur
             });
         } else
         if (fieldNumber == 4) {
+            b.consumeCompoundMessage(wireType, [&](size_t indexInGroup, size_t subWireType) {});
+
             // now that we've constructed the type diagram, walk over all the types
             // and finalize them. We have to do this before we wire function globals
             // because sometime the function globals hold python references to type objects

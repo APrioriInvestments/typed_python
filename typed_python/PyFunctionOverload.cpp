@@ -50,7 +50,7 @@ PyObject* PyFunctionOverload::newPyFunctionOverload(Function* f, int64_t overloa
     self->mFunction = f;
     self->mOverloadIx = overloadIndex;
     self->mDict = PyDict_New();
-    self->initFields();
+    self->mIsInitialized = false;
 
     return (PyObject*)self;
 }
@@ -66,12 +66,23 @@ PyObject* PyFunctionOverload::new_(PyTypeObject *type, PyObject *args, PyObject 
         self->mFunction = nullptr;
         self->mOverloadIx = 0;
         self->mDict = PyDict_New();
+        self->mIsInitialized = false;
     }
 
     return (PyObject*)self;
 }
 
+void PyFunctionOverload::ensureInitialized() {
+    if (!mIsInitialized) {
+        initFields();
+    }
+}
+
 void PyFunctionOverload::initFields() {
+    if (mIsInitialized) {
+        throw std::runtime_error("Can't initialize a PyFunctionOverload twice.");
+    }
+
     FunctionOverload& overload = getOverload();
 
     PyObjectStealer pyClosureVarsDict(PyDict_New());
@@ -146,19 +157,20 @@ void PyFunctionOverload::initFields() {
         PyTuple_SetItem(argsTup, argIx, incref(pyArgInst));
     }
 
-    PyObjectStealer pyOverloadInstDict(PyObject_GenericGetDict((PyObject*)this, nullptr));
+    PyObject* funcTypeObj = PyInstance::typePtrToPyTypeRepresentation(mFunction);
+    PyDict_SetItemString(mDict, "functionTypeObject", funcTypeObj);
+    PyDict_SetItemString(mDict, "index", (PyObject*)PyLong_FromLong(mOverloadIx));
 
-    PyDict_SetItemString(pyOverloadInstDict, "functionTypeObject", PyInstance::typePtrToPyTypeRepresentation(mFunction));
-    PyDict_SetItemString(pyOverloadInstDict, "index", (PyObject*)PyLong_FromLong(mOverloadIx));
+    PyDict_SetItemString(mDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
+    PyDict_SetItemString(mDict, "functionCode", (PyObject*)overload.getFunctionCode());
+    PyDict_SetItemString(mDict, "globals", (PyObject*)pyFunctionGlobals);
+    PyDict_SetItemString(mDict, "returnType", overload.getReturnType() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
+    PyDict_SetItemString(mDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
+    PyDict_SetItemString(mDict, "methodOf", overload.getMethodOf() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
+    PyDict_SetItemString(mDict, "args", argsTup);
+    PyDict_SetItemString(mDict, "name", PyUnicode_FromString(mFunction->name().c_str()));
 
-    PyDict_SetItemString(pyOverloadInstDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
-    PyDict_SetItemString(pyOverloadInstDict, "functionCode", (PyObject*)overload.getFunctionCode());
-    PyDict_SetItemString(pyOverloadInstDict, "globals", (PyObject*)pyFunctionGlobals);
-    PyDict_SetItemString(pyOverloadInstDict, "returnType", overload.getReturnType() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);
-    PyDict_SetItemString(pyOverloadInstDict, "signatureFunction", overload.getSignatureFunction() ? (PyObject*)overload.getSignatureFunction() : Py_None);
-    PyDict_SetItemString(pyOverloadInstDict, "methodOf", overload.getMethodOf() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getMethodOf()) : Py_None);
-    PyDict_SetItemString(pyOverloadInstDict, "args", argsTup);
-    PyDict_SetItemString(pyOverloadInstDict, "name", PyUnicode_FromString(mFunction->name().c_str()));
+    mIsInitialized = true;
 }
 
 /* static */
@@ -179,6 +191,8 @@ PyObject* PyFunctionOverload::tp_repr(PyObject *selfObj) {
 
 PyObject* PyFunctionOverload::tp_getattro(PyObject *o, PyObject* attrName) {
     PyFunctionOverload* pyFuncOverload = (PyFunctionOverload*)o;
+
+    pyFuncOverload->ensureInitialized();
 
     return translateExceptionToPyObject([&] {
         if (!PyUnicode_Check(attrName)) {

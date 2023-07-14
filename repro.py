@@ -1,47 +1,29 @@
 import sys
 
-from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final
+from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final, Function, ListOf
 from typed_python._types import typeWalkRecord, recursiveTypeGroupRepr
 
 def writer():
-    Base = Forward("Base")
-
-    @Base.define
     class Base(Class):
-        def blah(self) -> Base:
+        def f(self):
             return self
 
-        def f(self, x) -> int:
-            return x + 1
-
-    class Child(Base, Final):
-        def f(self, x) -> int:
-            return -1
-
-    aChild = Child()
-
-    aChildBytes = SerializationContext().serialize(aChild)
+    bytesToWrite = SerializationContext().serialize(Base)
 
     with open("a.dat", "wb") as f:
-        f.write(aChildBytes)
+        f.write(bytesToWrite)
 
 
 def reader():
     with open("a.dat", "rb") as f:
-        aChild = SerializationContext().deserialize(f.read())
+        x = SerializationContext().deserialize(f.read())
 
-    # @Entrypoint
-    def callF(x):
-    	return x.f(10)
-
-    assert callF(aChild) == -1
+    print(x.__name__)
+    print(x.f.overloads[0].globals)
+    print(x().f().f())
 
 
 if sys.argv[1:] == ['r']:
     reader()
 else:
     writer()
-
-
-
-

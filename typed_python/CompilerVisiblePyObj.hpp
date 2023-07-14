@@ -87,6 +87,15 @@ public:
         return res;
     }
 
+    static CompilerVisiblePyObj* PyTuple(const std::vector<CompilerVisiblePyObj*>& elts) {
+        CompilerVisiblePyObj* res = new CompilerVisiblePyObj();
+
+        res->mKind = Kind::PyTuple;
+        res->mElements = elts;
+
+        return res;
+    }
+
     void append(CompilerVisiblePyObj* elt) {
         if (mKind != Kind::PyTuple) {
             throw std::runtime_error("Expected a PyTuple");
@@ -164,6 +173,84 @@ public:
         }
 
         throw std::runtime_error("Unknown CompilerVisiblePyObj Kind.");
+    }
+
+
+
+    template<class serialization_context_t, class buf_t>
+    void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+
+        TODO: implement memoize!
+
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeRegisterType(0, (uint64_t)mKind);
+
+        if (mKind == Kind::Type) {
+            context.serializeNativeType(mType, buffer, 1);
+        } else
+        if (mKind == Kind::Instance) {
+            buffer.writeBeginCompound(2);
+            context.serializeNativeType(mInstance.type(), buffer, 0);
+            mInstance.type()->serialize(mInstance.data(), buffer, 1);
+            buffer.writeEndCompound();
+        } else
+        if (mKind == Kind::PyTuple) {
+            buffer.writeBeginCompound(3);
+            for (long i = 0; i < mElements.size(); i++) {
+                mElements[i]->serialize(context, buffer, i);
+            }
+            buffer.writeEndCompound();
+        }
+
+        buffer.writeEndCompound();
+    }
+
+    template<class serialization_context_t, class buf_t>
+    static CompilerVisiblePyObj* deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+        int64_t kind = 0;
+
+        ::Type* type = nullptr;
+
+        std::vector<CompilerVisiblePyObj*> vec;
+        ::Instance i;
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber == 0) {
+                buffer.readRegisterType(&kind, wireType);
+            } else
+            if (fieldNumber == 1) {
+                type = context.deserializeNativeType(buffer, wireType);
+            } else
+            if (fieldNumber == 2) {
+                i = context.deserializeNativeInstance(buffer, wireType);
+            } else
+            if (fieldNumber == 3) {
+                buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                    vec.push_back(CompilerVisiblePyObj::deserialize(context, buffer, wireType));
+                });
+            }
+        });
+
+        if (kind == (int)Kind::Type) {
+            if (!type) {
+                throw std::runtime_error("Corrupt CompilerVisiblePyObj::Type");
+            }
+            return CompilerVisiblePyObj::Type(type);
+        }
+
+        if (kind == (int)Kind::Instance) {
+            return CompilerVisiblePyObj::Instance(i);
+        }
+
+        if (kind == (int)Kind::PyTuple) {
+            return CompilerVisiblePyObj::PyTuple(vec);
+        }
+
+        if (kind == (int)Kind::Uninitialized) {
+            return new CompilerVisiblePyObj();
+        }
+
+        throw std::runtime_error("Corrupt CompilerVisiblePyObj - invalid kind");
     }
 
 private:

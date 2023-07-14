@@ -76,13 +76,11 @@ PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr clo
                 if (globalIt != mGlobals.end()) {
                     PyObject* globalVal = globalIt->second.getValueAsPyobj();
 
-                    if (globalVal) {
-                        PyTuple_SetItem(
-                            (PyObject*)closureTup,
-                            k,
-                            PyCell_New(globalVal)
-                        );
-                    }
+                    PyTuple_SetItem(
+                        (PyObject*)closureTup,
+                        k,
+                        PyCell_New(globalVal)
+                    );
                 } else {
                     auto bindingIt = mClosureBindings.find(varname);
                     if (bindingIt == mClosureBindings.end()) {

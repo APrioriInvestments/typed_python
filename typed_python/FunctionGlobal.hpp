@@ -173,7 +173,7 @@ public:
         }
 
         if (isUnbound()) {
-            throw std::runtime_error("Unbound globals don't have python values.");
+            return nullptr;
         }
 
         if (isConstant()) {
@@ -304,6 +304,10 @@ public:
     FunctionGlobal withUpdatedInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
         Type* t = getValueAsType();
 
+        if (!t) {
+            return *this;
+        }
+
         auto it = groupMap.find(t);
 
         if (it != groupMap.end()) {
@@ -388,15 +392,83 @@ public:
 
     template<class serialization_context_t, class buf_t>
     void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
-        // context.serializePythonObject(nameAndCell.second, buffer, varIx++);
-        throw std::runtime_error("FunctionGlobal::serialize not implemented yet");
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeRegisterType(0, (uint64_t)mKind);
+
+        if (mKind == GlobalType::NamedModuleMember) {
+            context.serializePythonObject(mModuleDictOrCell, buffer, 1);
+            buffer.writeStringObject(2, mName);
+            buffer.writeStringObject(3, mModuleName);
+        } else
+        if (mKind == GlobalType::Constant) {
+            mConstant->serialize(context, buffer, 4);
+        } else
+        if (mKind == GlobalType::GlobalInDict) {
+            context.serializePythonObject(mModuleDictOrCell, buffer, 1);
+            buffer.writeStringObject(2, mName);
+        } else
+        if (mKind == GlobalType::GlobalInCell) {
+            context.serializePythonObject(mModuleDictOrCell, buffer, 1);
+        }
+
+        buffer.writeEndCompound();
     }
 
     template<class serialization_context_t, class buf_t>
     static FunctionGlobal deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
-        throw std::runtime_error("FunctionGlobal::deserialize not implemented yet");
-        // functionGlobalsInCells[last].steal(context.deserializePythonObject(buffer, wireType));
-        // functionGlobalsInCellsRaw[last] = functionGlobalsInCells[last];
+        uint64_t kind = 0;
+        std::string name, moduleName;
+        PyObjectHolder cellOrModule;
+        CompilerVisiblePyObj* constant = nullptr;
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber == 0) {
+                buffer.readRegisterType(&kind, wireType);
+            } else
+            if (fieldNumber == 1) {
+                cellOrModule.steal(context.deserializePythonObject(buffer, wireType));
+            } else
+            if (fieldNumber == 2) {
+                name = buffer.readStringObject();
+            } else
+            if (fieldNumber == 3) {
+                moduleName = buffer.readStringObject();
+            } else
+            if (fieldNumber == 4) {
+                constant = CompilerVisiblePyObj::deserialize(context, buffer, wireType);
+            }
+        });
+
+        if (kind == (int)GlobalType::Unbound) {
+            return FunctionGlobal::Unbound();
+        }
+        if (kind == (int)GlobalType::NamedModuleMember) {
+            if (!cellOrModule || !name.size() || !moduleName.size()) {
+                throw std::runtime_error("Corrupt FunctionGlobal - invalid NamedModuleMember");
+            }
+            return FunctionGlobal::NamedModuleMember(cellOrModule, name, moduleName);
+        }
+        if (kind == (int)GlobalType::Constant) {
+            if (constant) {
+                throw std::runtime_error("Corrupt FunctionGlobal - invalid constant");
+            }
+            return FunctionGlobal::Constant(constant);
+        }
+        if (kind == (int)GlobalType::GlobalInDict) {
+            if (!cellOrModule || !name.size()) {
+                throw std::runtime_error("Corrupt FunctionGlobal - invalid GlobalInDict");
+            }
+            return FunctionGlobal::GlobalInDict(cellOrModule, name);
+        }
+        if (kind == (int)GlobalType::GlobalInCell) {
+            if (!cellOrModule) {
+                throw std::runtime_error("Corrupt FunctionGlobal - invalid cell");
+            }
+            return FunctionGlobal::GlobalInCell((PyObject*)cellOrModule);
+        }
+
+        asm("int3");
+        throw std::runtime_error("Corrupt FunctionGlobal - invalid 'kind'");
     }
 
     bool operator<(const FunctionGlobal& g) const {
