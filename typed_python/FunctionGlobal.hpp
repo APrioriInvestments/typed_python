@@ -467,7 +467,6 @@ public:
             return FunctionGlobal::GlobalInCell((PyObject*)cellOrModule);
         }
 
-        asm("int3");
         throw std::runtime_error("Corrupt FunctionGlobal - invalid 'kind'");
     }
 

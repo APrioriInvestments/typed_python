@@ -32,6 +32,33 @@ def test_identity_hash_of_alternative_stable():
     assert m['h1'] == m['h2']
 
 
+def test_function_global_resolving_to_builtin():
+    @NotCompiled
+    def f():
+        return str(x)
+
+    assert f.overloads[0].globals['str'].getValue() is str
+
+
+def test_reference_to_builtin_is_resolvable():
+    A = Alternative("A", X={}, f=lambda self: str(self) + B)
+
+    # A is forward defined because it depends on B
+    assert isForwardDefined(A)
+
+    assert A.f.overloads[0].globals['str'].kind == 'NamedModuleMember'
+    assert A.f.overloads[0].globals['str'].moduleName == 'builtins'
+    assert A.f.overloads[0].globals['str'].name == 'str'
+
+
+def test_reference_to_builtin_doesnt_prevent_autoresolve():
+    A = Alternative("A", X={}, f=lambda self: str(self))
+
+    assert not isForwardDefined(A)
+
+    assert A().f() == str(A())
+
+
 def test_type_looks_resolvable_alternative():
     A = Alternative("A_", X={}, f=lambda self: B)
 

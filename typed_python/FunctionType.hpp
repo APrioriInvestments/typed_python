@@ -439,11 +439,24 @@ public:
     }
 
     Function* withEntrypoint(bool isEntrypoint) const {
-        return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, isEntrypoint, mIsNocompile);
+        Function* f = Function::Make(
+            mRootName, mQualname, mModulename, mOverloads, mClosureType, isEntrypoint, mIsNocompile
+        );
+
+        if (f->isForwardDefined() && !isForwardDefined()) {
+            return (Function*)f->forwardResolvesTo();
+        }
+        return f;
     }
 
     Function* withNocompile(bool isNocompile) const {
-        return Function::Make(mRootName, mQualname, mModulename, mOverloads, mClosureType, mIsEntrypoint, isNocompile);
+        Function* f = Function::Make(
+            mRootName, mQualname, mModulename, mOverloads, mClosureType, mIsEntrypoint, isNocompile
+        );
+        if (f->isForwardDefined() && !isForwardDefined()) {
+            return (Function*)f->forwardResolvesTo();
+        }
+        return f;
     }
 
     Type* getClosureType() const {
