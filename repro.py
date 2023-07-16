@@ -1,14 +1,17 @@
 import sys
 
-from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final, Function, ListOf
+from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final, Function, ListOf, NotCompiled
 from typed_python._types import typeWalkRecord, recursiveTypeGroupRepr
 
-def writer():
-    class Base(Class):
-        def f(self):
-            return self
 
-    bytesToWrite = SerializationContext().serialize(Base)
+def writer():
+    @NotCompiled
+    def fn(x) -> str:
+        return str(x)
+
+    print(fn.overloads[0].globals)
+
+    bytesToWrite = SerializationContext().serialize(fn)
 
     with open("a.dat", "wb") as f:
         f.write(bytesToWrite)

@@ -39,7 +39,7 @@ class FunctionGlobal {
         mKind(inKind),
         mModuleDictOrCell(incref(dictOrCell)),
         mName(name),
-        mModuleName(name),
+        mModuleName(moduleName),
         mConstant(constant)
     {
     }
@@ -449,7 +449,7 @@ public:
             return FunctionGlobal::NamedModuleMember(cellOrModule, name, moduleName);
         }
         if (kind == (int)GlobalType::Constant) {
-            if (constant) {
+            if (!constant) {
                 throw std::runtime_error("Corrupt FunctionGlobal - invalid constant");
             }
             return FunctionGlobal::Constant(constant);

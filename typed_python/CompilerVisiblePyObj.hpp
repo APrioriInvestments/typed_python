@@ -179,30 +179,39 @@ public:
 
     template<class serialization_context_t, class buf_t>
     void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
+        uint32_t id;
+        bool isNew;
+        std::tie(id, isNew) = buffer.cachePointer((void*)this, nullptr);
 
-        TODO: implement memoize!
-
-        buffer.writeBeginCompound(fieldNumber);
-        buffer.writeRegisterType(0, (uint64_t)mKind);
-
-        if (mKind == Kind::Type) {
-            context.serializeNativeType(mType, buffer, 1);
-        } else
-        if (mKind == Kind::Instance) {
-            buffer.writeBeginCompound(2);
-            context.serializeNativeType(mInstance.type(), buffer, 0);
-            mInstance.type()->serialize(mInstance.data(), buffer, 1);
+        if (!isNew) {
+            buffer.writeBeginCompound(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
             buffer.writeEndCompound();
-        } else
-        if (mKind == Kind::PyTuple) {
-            buffer.writeBeginCompound(3);
-            for (long i = 0; i < mElements.size(); i++) {
-                mElements[i]->serialize(context, buffer, i);
+            return;
+        } else {
+            buffer.writeBeginCompound(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
+            buffer.writeUnsignedVarintObject(1, (int)mKind);
+
+            if (mKind == Kind::Type) {
+                context.serializeNativeType(mType, buffer, 2);
+            } else
+            if (mKind == Kind::Instance) {
+                buffer.writeBeginCompound(3);
+                context.serializeNativeType(mInstance.type(), buffer, 0);
+                mInstance.type()->serialize(mInstance.data(), buffer, 1);
+                buffer.writeEndCompound();
+            } else
+            if (mKind == Kind::PyTuple) {
+                buffer.writeBeginCompound(4);
+                for (long i = 0; i < mElements.size(); i++) {
+                    mElements[i]->serialize(context, buffer, i);
+                }
+                buffer.writeEndCompound();
             }
+
             buffer.writeEndCompound();
         }
-
-        buffer.writeEndCompound();
     }
 
     template<class serialization_context_t, class buf_t>
@@ -213,23 +222,32 @@ public:
 
         std::vector<CompilerVisiblePyObj*> vec;
         ::Instance i;
+        uint32_t id = -1;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
-                buffer.readRegisterType(&kind, wireType);
+                id = buffer.readUnsignedVarint();
             } else
             if (fieldNumber == 1) {
-                type = context.deserializeNativeType(buffer, wireType);
+                kind = buffer.readUnsignedVarint();
             } else
             if (fieldNumber == 2) {
-                i = context.deserializeNativeInstance(buffer, wireType);
+                type = context.deserializeNativeType(buffer, wireType);
             } else
             if (fieldNumber == 3) {
+                i = context.deserializeNativeInstance(buffer, wireType);
+            } else
+            if (fieldNumber == 4) {
                 buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
                     vec.push_back(CompilerVisiblePyObj::deserialize(context, buffer, wireType));
                 });
             }
         });
+
+        void* ptr = buffer.lookupCachedPointer(id);
+        if (ptr) {
+            return (CompilerVisiblePyObj*)ptr;
+        }
 
         if (kind == (int)Kind::Type) {
             if (!type) {
