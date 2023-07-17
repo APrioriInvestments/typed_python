@@ -4,6 +4,7 @@ from typed_python import Class, SerializationContext, Held, isForwardDefined, En
 from typed_python._types import typeWalkRecord, recursiveTypeGroupRepr
 
 
+
 def writer():
     @NotCompiled
     def fn(x) -> str:

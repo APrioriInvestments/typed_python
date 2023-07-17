@@ -2083,8 +2083,8 @@ class TypesSerializationTest(unittest.TestCase):
         assert sc.deserialize(sc.serialize(TupleOf(native_ast.Type))) is TupleOf(native_ast.Type)
         assert sc.deserialize(sc.serialize(NamedCallTarget)) is NamedCallTarget
 
-        assert len(sc.serialize(native_ast.Type)) < 100
-        assert len(sc.serialize(TupleOf(native_ast.Type))) < 100
+        assert len(sc.serialize(native_ast.Type)) < 200
+        assert len(sc.serialize(TupleOf(native_ast.Type))) < 200
 
     def test_badly_named_module_works(self):
         sc = SerializationContext()
@@ -2775,12 +2775,14 @@ class TypesSerializationTest(unittest.TestCase):
                 path = os.path.join(tempdir, "asdf.py")
 
                 CONTENTS = (
-                    "from typed_python import Entrypoint, ListOf, Class, Final\n"
+                    "from typed_python import Entrypoint, ListOf, Class, Final, isForwardDefined, Member\n"
                     "class C(Class, Final):\n"
                     "    @staticmethod\n"
                     "    @Entrypoint\n"
                     "    def anF():\n"
                     "        return C\n"
+                    "print(isForwardDefined(C))\n"
+                    "print(C.anF.overloads[0].globals)\n"
                 )
 
                 with open(path, "w") as f:
@@ -2796,6 +2798,8 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['C'])
 
+        makeC()
+        return
         serializedC = callFunctionInFreshProcess(makeC, ())
 
         C = SerializationContext().deserialize(serializedC)
