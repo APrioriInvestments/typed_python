@@ -292,13 +292,49 @@ public:
                 visitor.visitTopo(
                     t->forwardResolvesTo()
                 );
-            } else {
             }
         } else if (t) {
             visitor.visitTopo(t);
         } else {
             visitor.visitTopo(obj);
         }
+    }
+
+    FunctionGlobal withConstantsInternalized(
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        if (!(isGlobalInDict() || isGlobalInCell())) {
+            return *this;
+        }
+
+        Type* t = getValueAsType();
+        if (t) {
+            auto it = groupMap.find(t);
+            if (it != groupMap.end()) {
+                return FunctionGlobal::Constant(
+                    CompilerVisiblePyObj::Type(it->second)
+                );
+            } else {
+                return FunctionGlobal::Constant(
+                    CompilerVisiblePyObj::Type(t)
+                );
+            }
+        }
+
+        PyObject* value = getValueAsPyobj();
+
+        if (!value) {
+            return FunctionGlobal::Unbound();
+        }
+
+        return FunctionGlobal::Constant(
+            CompilerVisiblePyObj::internalizePyObj(
+                value,
+                constantMapCache,
+                groupMap
+            )
+        );
     }
 
     FunctionGlobal withUpdatedInternalTypePointers(const std::map<Type*, Type*>& groupMap) {

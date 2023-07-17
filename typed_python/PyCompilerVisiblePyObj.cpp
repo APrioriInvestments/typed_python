@@ -87,7 +87,11 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
             }
 
             if (obj->isPyTuple()) {
-                return PyUnicode_FromString("Py2Tuple");
+                return PyUnicode_FromString("PyTuple");
+            }
+
+            if (obj->isArbitraryPyObject()) {
+                return PyUnicode_FromString("ArbitraryPyObject");
             }
 
             throw std::runtime_error("Unknown CompilerVisiblePyObj Kind");

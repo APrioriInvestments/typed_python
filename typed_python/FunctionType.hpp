@@ -158,6 +158,17 @@ public:
         return new Function();
     }
 
+    // replace any direct references to PyObject we're holding internally
+    // with CompilerVisiblePyObj references instead
+    void internalizeConstants(
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        for (auto& o: mOverloads) {
+            o.internalizeConstants(constantMapCache, groupMap);
+        }
+    }
+
     void updateInternalTypePointersConcrete(const std::map<Type*, Type*>& groupMap) {
         updateTypeRefFromGroupMap(mClosureType, groupMap);
 

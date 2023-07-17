@@ -351,7 +351,7 @@ class Runtime:
                     overloadIx,
                     fp.fp,
                     callTarget.output_type.typeRepresentation if callTarget.output_type is not None else type(None),
-                    [i.typeRepresentation for i in callTarget.input_types]
+                    tuple([i.typeRepresentation for i in callTarget.input_types])
                 )
 
                 self.converter.flushDelayedVMIs()

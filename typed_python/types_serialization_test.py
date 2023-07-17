@@ -2518,6 +2518,10 @@ class TypesSerializationTest(unittest.TestCase):
 
             return B
 
+        B1 = deserializeAndCall(1)
+        print(B1.f.overloads[0].globals['x'])
+        return;
+
         assert callFunctionInFreshProcess(deserializeAndCall, (1,)) is deserializeAndCall(1)
         assert callFunctionInFreshProcess(deserializeAndCall, (1,)) is not deserializeAndCall(2)
         assert callFunctionInFreshProcess(deserializeAndCall, (2,)) is deserializeAndCall(2)

@@ -32,15 +32,27 @@ and singletonish
 
 class CompilerVisiblePyObj {
     enum class Kind {
+        // this should never be visible in a running program
         Uninitialized = 0,
+        // we're pointing back into a fully resolved Type
         Type = 1,
+        // we're pointing into a TP instannce that doesn't reach 
+        // a more complex object. It can have Type leaves in it 
         Instance = 2,
+        // this is a python tuple object
         PyTuple = 3,
+        // the bailout pathway for cases we don't handle well. We should
+        // assume that the compiler will treat this object as a plain
+        // PyObject without looking inside of it, and the details of this
+        // object are insufficient to differentiate two different Function
+        // types that both refer to different ArbitraryPyObject instances.
+        ArbitraryPyObject = 4
     };
 
     CompilerVisiblePyObj() :
         mKind(Kind::Uninitialized),
-        mType(nullptr)
+        mType(nullptr),
+        mPyObject(nullptr)
     {
     }
 
@@ -59,6 +71,10 @@ public:
 
     bool isPyTuple() const {
         return mKind == Kind::PyTuple;
+    }
+
+    bool isArbitraryPyObject() const {
+        return mKind == Kind::ArbitraryPyObject;
     }
 
     static CompilerVisiblePyObj* Type(Type* t) {
@@ -87,6 +103,15 @@ public:
         return res;
     }
 
+    static CompilerVisiblePyObj* ArbitraryPyObject(PyObject* val) {
+        CompilerVisiblePyObj* res = new CompilerVisiblePyObj();
+
+        res->mKind = Kind::ArbitraryPyObject;
+        res->mPyObject = incref(val);
+
+        return res;
+    }
+
     static CompilerVisiblePyObj* PyTuple(const std::vector<CompilerVisiblePyObj*>& elts) {
         CompilerVisiblePyObj* res = new CompilerVisiblePyObj();
 
@@ -94,6 +119,153 @@ public:
         res->mElements = elts;
 
         return res;
+    }
+
+    // return a CVPO for 'val', stashing it in 'constantMapCache' 
+    // in case we hit a recursion.
+    static CompilerVisiblePyObj* internalizePyObj(
+        PyObject* val,
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        const std::map<::Type*, ::Type*>& groupMap
+    ) {
+        auto it = constantMapCache.find(val);
+        
+        if (it != constantMapCache.end()) {
+            return it->second;
+        }
+
+        constantMapCache[val] = new CompilerVisiblePyObj();
+
+        constantMapCache[val]->becomeInternalizedOf(val, constantMapCache, groupMap);
+
+        return constantMapCache[val];
+    }
+
+    void becomeInternalizedOf(
+        PyObject* val,
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        const std::map<::Type*, ::Type*>& groupMap
+    ) {
+        ::Type* t = PyInstance::extractTypeFrom(val);
+
+        if (t) {
+            if (groupMap.find(t) != groupMap.end()) {
+                t = groupMap.find(t)->second;
+            } else {
+                if (t->isForwardDefined()) {
+                    if (t->isResolved()) {
+                        t = t->forwardResolvesTo();
+                    }
+                }
+            }
+
+            mKind = Kind::Type;
+            mType = t;
+            return;
+        }
+
+        if (PyTuple_Check(val)) {
+            mKind = Kind::PyTuple;
+            for (long i = 0; i < PyTuple_Size(val); i++) {
+                mElements.push_back(
+                    CompilerVisiblePyObj::internalizePyObj(
+                        PyTuple_GetItem(val, i),
+                        constantMapCache,
+                        groupMap
+                    )
+                );
+            }
+            return;
+        }
+
+        ::Type* instanceType = PyInstance::extractTypeFrom(val->ob_type);
+        if (instanceType) {
+            mKind = Kind::Instance;
+            mInstance = ::Instance::create(
+                instanceType, 
+                ((PyInstance*)val)->dataPtr()
+            );
+            return;
+        }
+
+        if (val == Py_None) {
+            mKind = Kind::Instance;
+            return;
+        }
+
+        if (PyBool_Check(val)) {
+            mKind = Kind::Instance;
+            mInstance = Instance::create(val == Py_True);
+            return;
+        }
+
+        if (PyLong_Check(val)) {
+            mKind = Kind::Instance;
+            
+            try {
+                mInstance = Instance::create((int64_t)PyLong_AsLongLong(val));
+            }
+            catch(...) {
+                mInstance = Instance::create((uint64_t)PyLong_AsUnsignedLongLong(val));
+            }
+
+            return;
+        }
+
+        if (PyFloat_Check(val)) {
+            mKind = Kind::Instance;
+            mInstance = Instance::create(PyFloat_AsDouble(val));
+            return;
+        }
+
+        if (PyBytes_Check(val)) {
+            mKind = Kind::Instance;
+            mInstance = Instance::createAndInitialize(
+                BytesType::Make(),
+                [&](instance_ptr i) {
+                    BytesType::Make()->constructor(
+                        i, 
+                        PyBytes_GET_SIZE(val), 
+                        PyBytes_AsString(val)
+                    );
+                }
+            );
+            return;
+        }
+
+        if (PyUnicode_Check(val)) {
+            mKind = Kind::Instance;
+
+            auto kind = PyUnicode_KIND(val);
+            assert(
+                kind == PyUnicode_1BYTE_KIND ||
+                kind == PyUnicode_2BYTE_KIND ||
+                kind == PyUnicode_4BYTE_KIND
+                );
+            int64_t bytesPerCodepoint =
+                kind == PyUnicode_1BYTE_KIND ? 1 :
+                kind == PyUnicode_2BYTE_KIND ? 2 :
+                                               4 ;
+
+            int64_t count = PyUnicode_GET_LENGTH(val);
+
+            const char* data =
+                kind == PyUnicode_1BYTE_KIND ? (char*)PyUnicode_1BYTE_DATA(val) :
+                kind == PyUnicode_2BYTE_KIND ? (char*)PyUnicode_2BYTE_DATA(val) :
+                                               (char*)PyUnicode_4BYTE_DATA(val);
+
+            mInstance = Instance::createAndInitialize(
+                StringType::Make(),
+                [&](instance_ptr i) {
+                    StringType::Make()->constructor(i, bytesPerCodepoint, count, data);
+                }
+            );
+
+            return;
+        }
+
+        mKind = Kind::ArbitraryPyObject;
+        mPyObject = incref(val);
     }
 
     void append(CompilerVisiblePyObj* elt) {
@@ -140,12 +312,16 @@ public:
 
         if (mKind == Kind::Instance) {
             // TODO: what to do here?
-            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals");
+            visitor.visitInstance(mInstance.type(), mInstance.data());
         }
 
         if (mKind == Kind::PyTuple) {
             // TODO: what to do here?
-            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals");
+            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals PyTuple");
+        }
+
+        if (mKind == Kind::ArbitraryPyObject) {
+            visitor.visitTopo(mPyObject);
         }
     }
 
@@ -154,6 +330,18 @@ public:
     PyObject* getPyObj() {
         if (mKind == Kind::Type) {
             return (PyObject*)PyInstance::typeObj(mType);
+        }
+
+        if (mKind == Kind::ArbitraryPyObject) {
+            return mPyObject;
+        }
+
+        if (mKind == Kind::Instance) {
+            if (!mPyObject) {
+                mPyObject = PyInstance::extractPythonObject(mInstance);
+            }
+
+            return mPyObject;
         }
 
         throw std::runtime_error("Can't make a python object representation for this pyobj");
@@ -172,10 +360,13 @@ public:
             return "CompilerVisiblePyObj.PyTuple()";
         }
 
+        if (mKind == Kind::ArbitraryPyObject) {
+            return std::string("CompilerVisiblePyObj.ArbitraryPyObject(type=")
+                + mPyObject->ob_type->tp_name + ")";
+        }
+
         throw std::runtime_error("Unknown CompilerVisiblePyObj Kind.");
     }
-
-
 
     template<class serialization_context_t, class buf_t>
     void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
@@ -208,6 +399,9 @@ public:
                     mElements[i]->serialize(context, buffer, i);
                 }
                 buffer.writeEndCompound();
+            } else
+            if (mKind == Kind::ArbitraryPyObject) {
+                context.serializePythonObject(mPyObject, buffer, 5);
             }
 
             buffer.writeEndCompound();
@@ -223,6 +417,7 @@ public:
         std::vector<CompilerVisiblePyObj*> vec;
         ::Instance i;
         uint32_t id = -1;
+        PyObjectHolder pyobj;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -241,6 +436,9 @@ public:
                 buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
                     vec.push_back(CompilerVisiblePyObj::deserialize(context, buffer, wireType));
                 });
+            } else
+            if (fieldNumber == 5) {
+                pyobj.steal(context.deserializePythonObject(buffer, wireType));
             }
         });
 
@@ -268,6 +466,10 @@ public:
             return new CompilerVisiblePyObj();
         }
 
+        if (kind == (int)Kind::ArbitraryPyObject) {
+            return CompilerVisiblePyObj::ArbitraryPyObject(pyobj);
+        }
+
         throw std::runtime_error("Corrupt CompilerVisiblePyObj - invalid kind");
     }
 
@@ -276,6 +478,10 @@ private:
 
     ::Type* mType;
     ::Instance mInstance;
+
+    // if we are an ArbitraryPythonObject this is always populated
+    // otherwise, it will be a cache for a constructed instance
+    PyObject* mPyObject;
 
     std::vector<CompilerVisiblePyObj*> mElements;
 };

@@ -474,6 +474,18 @@ void Type::attemptToResolve() {
         typeAndSource.first->updateInternalTypePointers(resolutionMapping);
     }
 
+    // allow each Function type to build CompilerVisiblePythonObjects for its globals
+    // after this, any FunctionGlobals will refer to Constants not cells
+    std::unordered_map<PyObject*, CompilerVisiblePyObj*> compilerVisiblePyObjMap;
+    for (auto typeAndSource: resolutionSource) {
+        if (typeAndSource.first->isFunction()) {
+            ((Function*)typeAndSource.first)->internalizeConstants(
+                compilerVisiblePyObjMap,
+                resolutionMapping
+            );
+        }
+    }
+
     // cause each type to recompute its name. We have to do this in a single pass
     // without any types being aware of their final name before we run the post initialize
     // step. Otherwise, it's possible for the names to depend on the order of initialization

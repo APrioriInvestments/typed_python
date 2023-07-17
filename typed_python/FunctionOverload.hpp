@@ -267,6 +267,18 @@ public:
         }
     }
 
+    void internalizeConstants(
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        const std::map<Type*, Type*>& groupMap
+    ) {
+        for (auto& nameAndGlobal: mGlobals) {
+            nameAndGlobal.second = nameAndGlobal.second.withConstantsInternalized(
+                constantMapCache,
+                groupMap
+            );
+        }
+    }
+
     void updateInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
         if (mReturnType) {
             Type::updateTypeRefFromGroupMap(mReturnType, groupMap);

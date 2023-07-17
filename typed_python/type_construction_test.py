@@ -51,6 +51,19 @@ def test_reference_to_builtin_is_resolvable():
     assert A.f.overloads[0].globals['str'].name == 'str'
 
 
+def test_function_cell_bindings_are_resolved_to_constants():
+    def CofX(x):
+        class C(Class):
+            def f(self):
+                return x
+
+        return C
+
+    assert CofX(1).f.overloads[0].globals['x'].kind == 'Constant'
+    assert CofX(1).f.overloads[0].globals['x'].getValue() is 1
+    assert CofX(2).f.overloads[0].globals['x'].getValue() is 2
+
+
 def test_reference_to_builtin_doesnt_prevent_autoresolve():
     A = Alternative("A", X={}, f=lambda self: str(self))
 
