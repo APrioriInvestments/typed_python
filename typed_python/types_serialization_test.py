@@ -2775,13 +2775,15 @@ class TypesSerializationTest(unittest.TestCase):
                 path = os.path.join(tempdir, "asdf.py")
 
                 CONTENTS = (
-                    "from typed_python import Entrypoint, ListOf, Class, Final, isForwardDefined, Member\n"
+                    "from typed_python import Entrypoint, ListOf, Class, Final, isForwardDefined, Member, forwardDefinitionsFor\n"
                     "class C(Class, Final):\n"
                     "    @staticmethod\n"
                     "    @Entrypoint\n"
                     "    def anF():\n"
                     "        return C\n"
                     "print(isForwardDefined(C))\n"
+                    "print(forwardDefinitionsFor(C)[0].anF.overloads[0].globals)\n"
+                    "print(isForwardDefined(forwardDefinitionsFor(C)[0]))\n"
                     "print(C.anF.overloads[0].globals)\n"
                 )
 

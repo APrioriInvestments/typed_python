@@ -2705,24 +2705,40 @@ PyObject *assertTypeResolvable(PyObject* nullValue, PyObject* args, PyObject* kw
     });
 }
 
+PyObject *forwardDefinitionsFor(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "forwardDefinitionsFor takes 1 positional argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'forwardDefinitionsFor' must be a type object");
+        return NULL;
+    }
+
+    return ::translateExceptionToPyObject([&]() {
+        PyObject* res = PyList_New(0);
+
+        for (auto fwd: t->getForwardDefinitions()) {
+            PyList_Append(
+                res,
+                (PyObject*)PyInstance::typeObj(fwd)
+            );
+        }
+
+        return res;
+    });
+}
+
 PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "resolveForwardDefinedType takes 1 positional argument");
         return NULL;
     }
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    // Type* typeOfArg = PyInstance::extractTypeFrom(((PyObject*)a1)->ob_type, false);
-
-    // if (typeOfArg && typeOfArg->isFunction()) {
-    //     return ::translateExceptionToPyObject([&]() {
-    //         Type* newType = typeOfArg->forwardResolvesTo();
-
-    //         return PyInstance::initialize(newType, [&](instance_ptr data) {
-    //             ((Function*)newType)->getClosureType()->copy_constructor(data, ((PyInstance*)(PyObject*)a1)->dataPtr());
-    //         });
-    //     });
-    // }
 
     Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
 
@@ -3669,6 +3685,7 @@ static PyMethodDef module_methods[] = {
     {"isForwardDefined", (PyCFunction)isForwardDefined, METH_VARARGS, NULL},
     {"isResolved", (PyCFunction)isResolved, METH_VARARGS, NULL},
     {"_enableTypeAutoresolution", (PyCFunction)enableTypeAutoresolution, METH_VARARGS, NULL},
+    {"forwardDefinitionsFor", (PyCFunction)forwardDefinitionsFor, METH_VARARGS, NULL},
     {"resolveForwardDefinedType", (PyCFunction)resolveForwardDefinedType, METH_VARARGS, NULL},
     {"typeLooksResolvable", (PyCFunction)typeLooksResolvable, METH_VARARGS | METH_KEYWORDS, NULL},
     {"assertTypeResolvable", (PyCFunction)assertTypeResolvable, METH_VARARGS | METH_KEYWORDS, NULL},

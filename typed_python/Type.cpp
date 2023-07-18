@@ -583,6 +583,12 @@ void Type::attemptToResolve() {
     if (!m_forward_resolves_to) {
         throw std::runtime_error("Somehow, we didn't resolve???");
     }
+
+    for (auto typeAndTarget: resolutionMapping) {
+        if (typeAndTarget.first->isForwardDefined()) {
+            typeAndTarget.second->addForwardDefinition(typeAndTarget.first);
+        }
+    }
 }
 
 void Type::internalize() {

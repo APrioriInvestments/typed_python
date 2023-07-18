@@ -3,7 +3,8 @@ import pytest
 from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
-    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled
+    Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled,
+    forwardDefinitionsFor
 )
 
 from typed_python.test_util import CodeEvaluator
@@ -30,6 +31,52 @@ def test_identity_hash_of_alternative_stable():
     """, m)
 
     assert m['h1'] == m['h2']
+
+
+def test_can_see_original_class_that_defined_a_forward():
+    class C(Class):
+        x = Member(lambda: B)
+
+    CFwd = (C,)
+
+    assert isForwardDefined(C)
+
+    # this is insufficient to trigger an autoresolve because
+    # we didn't create a new Type instance.
+    B = int
+
+    C = resolveForwardDefinedType(C)
+
+    assert not isForwardDefined(C)
+
+    assert forwardDefinitionsFor(C) == [CFwd[0]]
+
+
+def test_forward_class_exposes_functions():
+    class C(Class):
+        x = Member(lambda: B)
+
+        def f(self):
+            return C
+
+    B = int
+
+    CResolved = resolveForwardDefinedType(C)
+
+    assert C.HeldClass.Class is C
+    assert CResolved.HeldClass.Class is CResolved
+
+    assert not C.IsFinal
+    assert not CResolved.IsFinal
+
+    assert C.MRO == (C,)
+    assert CResolved.MRO == (CResolved,)
+    
+    assert CResolved.MemberNames == ('x',)
+    
+    assert C.MemberNames == ('x',)
+
+    assert C.f.overloads[0].globals['C'].kind == 'GlobalInCell'
 
 
 def test_function_global_resolving_to_builtin():

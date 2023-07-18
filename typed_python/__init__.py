@@ -55,7 +55,8 @@ from typed_python._types import (
     isForwardDefined,
     typeLooksResolvable,
     resolveForwardDefinedType,
-    identityHash
+    identityHash,
+    forwardDefinitionsFor
 )
 import typed_python._types as _types
 import threading

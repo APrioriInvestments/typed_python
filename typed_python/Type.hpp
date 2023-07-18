@@ -927,6 +927,10 @@ public:
     void typeFinishedBeingDeserializedPhase1();
     void typeFinishedBeingDeserializedPhase2();
 
+    const std::vector<Type*>& getForwardDefinitions() const {
+        return mForwardDefinitions;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -963,6 +967,9 @@ protected:
     Type* m_base;
 
     std::vector<PyObject*> mAutoresolveFrameOwners;
+
+    // the original forwards that defined this Type
+    std::vector<Type*> mForwardDefinitions;
 
     // a sha-hash that uniquely identifies this type. If this value is
     // the same for two types, then they should be indistinguishable except
@@ -1039,6 +1046,18 @@ protected:
     static std::map<ShaHash, Type*> mInternalizedIdentityHashToType;
 
 public:
+    void addForwardDefinition(Type* t) {
+        if (!t->isForwardDefined()) {
+            throw std::runtime_error("Can't add a non-forward defined type as a reverse Forward link");
+        }
+
+        if (isForwardDefined()) {
+            throw std::runtime_error("Can't add a forward definition to a forward type - it should be resolved!");
+        }
+
+        mForwardDefinitions.push_back(t);
+    }
+
     void recomputeName() {
         TypeStack stack;
         m_name = computeRecursiveName(stack);

@@ -658,43 +658,64 @@ PyObject* PyClassInstance::tpGetattrGeneric(
     return ret;
 }
 
+
+PyObject* convertPyTupleEltToPyObj(std::string s) {
+    return PyUnicode_FromString(s.c_str());
+}
+
+PyObject* convertPyTupleEltToPyObj(PyObject* o) {
+    return o;
+}
+
+PyObject* convertPyTupleEltToPyObj(Type* t) {
+    return incref(PyInstance::typePtrToPyTypeRepresentation(t));
+}
+
+template<class container_type, class func_type>
+PyObject* newPyTuple(const container_type& container, const func_type& objCreator) {
+    PyObject* tup = PyTuple_New(container.size());
+    long ix = 0;
+    for (auto containerElt: container) {
+        PyTuple_SetItem(tup, ix, convertPyTupleEltToPyObj(objCreator(containerElt)));
+    }
+    return tup;
+}
+
 /* initialize the type object's dict.
 
 if 'asHeldClass', then this is the held class's dict we're initializing.
 */
 void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType, bool asHeldClass) {
-    PyObjectStealer bases(PyTuple_New(classT->getHeldClass()->getBases().size()));
+    PyObjectStealer bases(
+        newPyTuple(
+            classT->getHeldClass()->getBases(),
+            [&](HeldClass* t) { return t->getClassType(); }
+        )
+    );
 
-    for (long k = 0; k < classT->getHeldClass()->getBases().size(); k++) {
-        PyTuple_SetItem(
-            bases,
-            k,
-            incref(typePtrToPyTypeRepresentation(classT->getHeldClass()->getBases()[k]->getClassType()))
-        );
-    }
+    PyObjectStealer mro(
+        newPyTuple(
+            classT->getHeldClass()->getMro(),
+            [&](HeldClass* t) { 
+                return t->getClassType();
+            }
+        )
+    );
 
-    PyObjectStealer mro(PyTuple_New(classT->getHeldClass()->getMro().size()));
+    PyObjectStealer memberTypes(
+        newPyTuple(
+            classT->isForwardDefined() ? classT->getOwnMembers() : classT->getMembers(),
+            [&](const MemberDefinition& member) { return member.getType(); }
+        )
+    );
 
-    for (long k = 0; k < classT->getHeldClass()->getMro().size(); k++) {
-        PyTuple_SetItem(
-            mro,
-            k,
-            incref(typePtrToPyTypeRepresentation(classT->getHeldClass()->getMro()[k]->getClassType()))
-        );
-    }
-
-    PyObjectStealer types(PyTuple_New(classT->getMembers().size()));
-
-    for (long k = 0; k < classT->getMembers().size(); k++) {
-        PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(classT->getMembers()[k].getType())));
-    }
-
-    PyObjectStealer names(PyTuple_New(classT->getMembers().size()));
-    for (long k = 0; k < classT->getMembers().size(); k++) {
-        PyObject* namePtr = PyUnicode_FromString(classT->getMembers()[k].getName().c_str());
-        PyTuple_SetItem(names, k, namePtr);
-    }
-
+    PyObjectStealer names(
+        newPyTuple(
+            classT->isForwardDefined() ? classT->getOwnMembers() : classT->getMembers(),
+            [&](const MemberDefinition& member) { return member.getName(); }
+        )
+    );
+    
     PyObjectStealer defaults(PyDict_New());
 
     for (long k = 0; k < classT->getMembers().size(); k++) {
@@ -710,29 +731,38 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
                 defaults,
                 classT->getHeldClass()->getMemberName(k).c_str(),
                 defaultVal
-                );
+            );
         }
     }
 
     PyObjectStealer memberFunctions(PyDict_New());
 
-    for (auto p: classT->getMemberFunctions()) {
+    for (auto p: classT->isForwardDefined() ? classT->getOwnMemberFunctions() : classT->getMemberFunctions()) {
         PyDict_SetItemString(memberFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
 
-        // TODO: find a predefined function that does this method search
-        PyMethodDef* defined = pyType->tp_methods;
-        while (defined && defined->ml_name && !!strcmp(defined->ml_name, p.first.c_str()))
-            defined++;
+        if (!classT->isForwardDefined()) {
+            // TODO: clean this up. I'm not sure what we are guarding against - is it
+            // the case that sometimes we overwrite something already in the dict?
+            PyMethodDef* defined = pyType->tp_methods;
+            while (defined && defined->ml_name && !!strcmp(defined->ml_name, p.first.c_str()))
+                defined++;
 
-        if (!defined || !defined->ml_name) {
-            if (p.second->getClosureType()->bytecount()) {
-                std::cout << "WARNING: invalid class member " << classT->name() << p.first << " had a nonempty closure.\n";
-            } else {
-                if (p.second->bytecount()) {
-                    throw std::runtime_error("Somehow, a Class got a function with a closure type.");
+            if (!defined || !defined->ml_name) {
+                if (p.second->getClosureType()->bytecount()) {
+                    std::cout << "WARNING: invalid class member " << classT->name() << p.first << " had a nonempty closure.\n";
+                } else {
+                    if (p.second->bytecount()) {
+                        throw std::runtime_error("Somehow, a Class got a function with a closure type.");
+                    }
+                    PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
                 }
-                PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), PyInstance::initialize(p.second, [&](instance_ptr) {}));
             }
+        } else {
+            PyDict_SetItemString(
+                pyType->tp_dict, 
+                p.first.c_str(),
+                typePtrToPyTypeRepresentation(p.second)
+            );
         }
     }
 
@@ -749,7 +779,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
         PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
     }
 
-    PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
+    PyDict_SetItemString(pyType->tp_dict, "MemberTypes", memberTypes);
     PyDict_SetItemString(pyType->tp_dict, "BaseClasses", bases);
     PyDict_SetItemString(pyType->tp_dict, "IsFinal", classT->isFinal() ? Py_True : Py_False);
     PyDict_SetItemString(pyType->tp_dict, "MRO", mro);
@@ -777,25 +807,37 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
 
     PyObjectStealer staticMemberFunctions(PyDict_New());
     PyDict_SetItemString(pyType->tp_dict, "StaticMemberFunctions", staticMemberFunctions);
-    for (auto nameAndObj: classT->getStaticFunctions()) {
-        PyDict_SetItemString(staticMemberFunctions, nameAndObj.first.c_str(), typePtrToPyTypeRepresentation(nameAndObj.second));
+    for (auto nameAndObj: classT->isForwardDefined() ? 
+            classT->getOwnStaticFunctions() : classT->getStaticFunctions()) {
+        PyDict_SetItemString(
+            staticMemberFunctions, 
+            nameAndObj.first.c_str(), typePtrToPyTypeRepresentation(nameAndObj.second)
+        );
 
-        if (nameAndObj.second->getClosureType()->bytecount()) {
-            throw std::runtime_error(
-                "Somehow, " + classT->name() + "."
-                + nameAndObj.first + " has a populated closure."
+        if (!classT->isForwardDefined()) {
+            if (nameAndObj.second->getClosureType()->bytecount()) {
+                throw std::runtime_error(
+                    "Somehow, " + classT->name() + "."
+                    + nameAndObj.first + " has a populated closure."
+                );
+            }
+
+            PyDict_SetItemString(
+                pyType->tp_dict,
+                nameAndObj.first.c_str(),
+                PyStaticMethod_New(
+                    PyInstance::initialize(nameAndObj.second, [&](instance_ptr data){
+                        //nothing to do - functions like this are just types.
+                    })
+                )
+            );
+        } else {
+            PyDict_SetItemString(
+                pyType->tp_dict, 
+                nameAndObj.first.c_str(),
+                typePtrToPyTypeRepresentation(nameAndObj.second)
             );
         }
-
-        PyDict_SetItemString(
-            pyType->tp_dict,
-            nameAndObj.first.c_str(),
-            PyStaticMethod_New(
-                PyInstance::initialize(nameAndObj.second, [&](instance_ptr data){
-                    //nothing to do - functions like this are just types.
-                })
-            )
-        );
     }
 
     PyObjectStealer classMemberFunctions(PyDict_New());
