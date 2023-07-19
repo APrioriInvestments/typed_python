@@ -772,8 +772,6 @@ public:
             );
 
             outGlobals[ref.first] = ref.second;
-
-            std::cout << "have " << ref.first << " = " << ref.second.toString() << "\n";
         }
     }
 

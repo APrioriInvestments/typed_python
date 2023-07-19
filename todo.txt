@@ -1,0 +1,115 @@
+- ensure classes get a Python reference to their held functions
+	- all Forward defined types need to expose as much of their internals as possible
+		- not bytecounts or anything like that
+	- expose code to allow us to get the _first_ forward that defined a given class
+- dotted globals?
+	- if we do this, how do we resolve the dotted global value?
+		- this is different for identity hashing than it is for serialization?
+		- what were we doing in the existing system? This is very squirrely and difficult.  
+- fix the way we walk things in MRTG - should be unified
+- ensure that TypeFunction works as intended now. Some of the weird issues should be resolved now
+- fix the ModuleRepresentation stuff
+- redocument everything
+- finish serialization
+	- should be able to serialize forward defined types
+	- ensure we are not leaking CompilerVisiblePyObj values
+		- really CompilerVisiblePyObj is the wrong name - i think it's more like 'TypeVisiblePyObj'
+			which reflects the reality that some objects are visible to the typing system and some
+			are not
+	- can we get rid of the whole serialize-mrtg thing? at this point, memos should just work right?
+		- this might leak which would be a problem
+- ensure that we don't try to MRTG something that's a forward defined type
+- fix the compiler to deal with the new globals thing now that we have it well defined
+- figure out how to properly internalize python classes
+	- the CompilerVisiblePyObj thing needs to actually work
+	- we need to make sure we can actually destroy these if we're not going to keep them
+- get rid of PyObject throughout Function
+	- should be like a FunctionGlobal
+
+
+def f(x):
+	class C(Class):
+		def g(self):
+			return x
+
+f(1) vs f(2)
+
+what kind of global should 'x' be?
+- we could leave it a GlobalInCell but it's really not - its a constant and shouldn't be allowed to change
+	- part of the resolution process needs to get rid of the 'cellness' of this
+	- fully resolved functions should only have constants, NamedModuleMember instances, and Unbound
+
+
+def f(x):
+	@Entrypoint
+	def g():
+		return x
+	return g
+
+in this case, 'x' is held in the function's closure, so it's not really 'typelike'
+
+
+how should this work:
+* we build a graph of unresolved forward types
+	* these can see each other through cells, module members, and TypeFunction calls that yield Forwards.
+* we trigger 'forward resolution'
+* we build a complete model of all the python objects and types that are visible to the graph
+	* named module members are special - we stop the walk when we hit such an object and its not part of our 'resolvability' criteria even if the object is unresolved at that point.
+		* this is because any references that are through an actual module instead of through explicit
+			forwards cannot affect our identity, only our compilation
+	* everything else gets mapped to an explicit 'constant'
+* 
+
+
+# core ideas:
+# 1. it's typelike IFF it can't change during program execution
+# 2. module members, class definitions, etc, don't change during program execution once set
+# 3. an @Function / @Entrypoint should define an 'untyped' function to whatever degree possible
+#    since the user isn't providing types
+# 4. at the moment we cross Entrypoint boundaries we can look at a function's type graph and
+#    determine how we want to handle it
+# 5. we could have the idea of a 'StatefulClass' holding a class that references some state
+#    that's independent of its type. This could get passed to its instances
+# 6. a Function's default arguments, if stateful, should be part of its data not its type
+# 7. if we have an anonymous module, and that module is defined in RF, then that module's identity
+#    is it's "incoming state"
+
+
+# this is just a regular TP function. nothing funny going on
+@Function
+def f():
+	pass
+
+
+# this should hold 'x' as a NamedModuleMember if this is defined inside of a module
+# this is part of the type
+@Function
+def f():
+	return x
+
+
+# if the module is not named, then the module info is not part of the type.
+# instead it's part of the Function's closure. 'x' should go through the closure
+# and hit the dict indirectly.  If the function gets passed to a Class then we'll
+# pull all of that apart and re-use it. If it just becomes a free function then
+# when we interpret it, it's fine, and when we compile it we get a chance to look carefully
+# at it and decide what to do.
+__module__ = 'some random module we can't find
+@Function
+def f():
+	return x
+
+
+def makeF(x):
+	@Function
+	def f():
+
+
+
+
+
+
+
+
+
+
