@@ -5,7 +5,7 @@
 - dotted globals?
 	- if we do this, how do we resolve the dotted global value?
 		- this is different for identity hashing than it is for serialization?
-		- what were we doing in the existing system? This is very squirrely and difficult.  
+		- what were we doing in the existing system? This is very squirrely and difficult.
 - fix the way we walk things in MRTG - should be unified
 - ensure that TypeFunction works as intended now. Some of the weird issues should be resolved now
 - fix the ModuleRepresentation stuff
@@ -58,7 +58,7 @@ how should this work:
 		* this is because any references that are through an actual module instead of through explicit
 			forwards cannot affect our identity, only our compilation
 	* everything else gets mapped to an explicit 'constant'
-* 
+*
 
 
 # core ideas:
@@ -107,6 +107,11 @@ def makeF(x):
 
 
 
+execution plan:
+1. if a function's globals dict is not globally visible, then make it part of the _closure_
+	* need to allow the function to be recreated correctly given this case
+2. allow forward function types to be instantiated if their closures are not forward. This is a forward function instance.
+3. allow forward function types to be resolved just like regular function types
 
 
 

@@ -536,6 +536,11 @@ PythonObjectOfType* PythonObjectOfType::AnyPyObject() {
     return Make((PyTypeObject*)t);
 }
 
+PythonObjectOfType* PythonObjectOfType::AnyPyDict() {
+    static PythonObjectOfType* t = Make((PyTypeObject*)&PyDict_Type);
+    return t;
+}
+
 PythonObjectOfType* PythonObjectOfType::AnyPyType() {
     PyTypeObject* t = (PyTypeObject*)staticPythonInstance(
         "typed_python.internals", "type"

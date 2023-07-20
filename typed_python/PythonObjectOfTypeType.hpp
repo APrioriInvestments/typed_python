@@ -228,6 +228,8 @@ public:
 
     static PythonObjectOfType* AnyPyObject();
 
+    static PythonObjectOfType* AnyPyDict();
+
     static PythonObjectOfType* AnyPyType();
 
     PyTypeObject* pyType() const {
