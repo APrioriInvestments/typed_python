@@ -2781,10 +2781,6 @@ class TypesSerializationTest(unittest.TestCase):
                     "    @Entrypoint\n"
                     "    def anF():\n"
                     "        return C\n"
-                    "print(isForwardDefined(C))\n"
-                    "print(forwardDefinitionsFor(C)[0].anF.overloads[0].globals)\n"
-                    "print(isForwardDefined(forwardDefinitionsFor(C)[0]))\n"
-                    "print(C.anF.overloads[0].globals)\n"
                 )
 
                 with open(path, "w") as f:
@@ -2800,8 +2796,6 @@ class TypesSerializationTest(unittest.TestCase):
                 s = SerializationContext()
                 return s.serialize(globals['C'])
 
-        makeC()
-        return
         serializedC = callFunctionInFreshProcess(makeC, ())
 
         C = SerializationContext().deserialize(serializedC)

@@ -10,6 +10,25 @@ from typed_python import (
 from typed_python.test_util import CodeEvaluator
 
 
+def test_function_in_anonymous_module_callable():
+    c = CodeEvaluator()
+    m = {}
+
+    c.evaluateInto("""
+        from typed_python import Function
+
+        y = 1
+
+        @Function
+        def f(x):
+            return x + y
+    """, m)
+    f = m['f']
+
+    assert f(10) == 11
+    assert f.ClosureType.ElementTypes[0].ElementNames[0] == ' _globals'
+
+
 def test_identity_hash_of_alternative_stable():
     e = CodeEvaluator()
     m = {}
@@ -71,9 +90,9 @@ def test_forward_class_exposes_functions():
 
     assert C.MRO == (C,)
     assert CResolved.MRO == (CResolved,)
-    
+
     assert CResolved.MemberNames == ('x',)
-    
+
     assert C.MemberNames == ('x',)
 
     assert C.f.overloads[0].globals['C'].kind == 'GlobalInCell'

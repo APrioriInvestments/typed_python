@@ -9,6 +9,20 @@ Instance ClosureVariableBinding::extractValueOrContainingClosure(Type* closureTy
             closureType = (Type*)step.getFunction();
         } else
         if (step.isNamedField()) {
+            if (closureType->isPythonObjectOfType() && closureType == PythonObjectOfType::AnyPyDict()) {
+                PyObject* dict = PythonObjectOfType::getPyObj(data);
+                if (!dict || !PyDict_Check(dict)) {
+                    throw std::runtime_error("Invalid closure: expected a populated PyDict");
+                }
+                PyObject* entry = PyDict_GetItemString(dict, step.getNamedField().c_str());
+                if (!entry) {
+                    // TODO: this is wrong. Really we need a pattern that lets us communicate
+                    // the fact that this entry is empty and that we should throw a name error.
+                    throw std::runtime_error("Invalid closure: expected " + step.getNamedField() + " of a Dict to be populated.");
+                }
+
+                return Instance::create(entry);
+            } else
             if (closureType->isNamedTuple()) {
                 NamedTuple* tupType = (NamedTuple*)closureType;
                 auto it = tupType->getNameToIndex().find(step.getNamedField());

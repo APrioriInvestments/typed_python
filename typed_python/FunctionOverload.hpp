@@ -36,6 +36,7 @@ public:
         PyObject* pyFuncAnnotations,
         const std::map<std::string, FunctionGlobal>& inGlobals,
         const std::vector<std::string>& pyFuncClosureVarnames,
+        const std::vector<std::string>& globalsInClosureVarnames,
         const std::map<std::string, ClosureVariableBinding> closureBindings,
         Type* returnType,
         PyObject* pySignatureFunction,
@@ -47,6 +48,7 @@ public:
             mFunctionAnnotations(pyFuncAnnotations),
             mGlobals(inGlobals),
             mFunctionClosureVarnames(pyFuncClosureVarnames),
+            mFunctionGlobalsInClosureVarnames(globalsInClosureVarnames),
             mReturnType(returnType),
             mSignatureFunction(pySignatureFunction),
             mArgs(args),
@@ -94,6 +96,7 @@ public:
         mMethodOf = other.mMethodOf;
 
         mFunctionClosureVarnames = other.mFunctionClosureVarnames;
+        mFunctionGlobalsInClosureVarnames = other.mFunctionGlobalsInClosureVarnames;
 
         mClosureBindings = other.mClosureBindings;
         mReturnType = other.mReturnType;
@@ -124,6 +127,7 @@ public:
             mFunctionAnnotations,
             mGlobals,
             mFunctionClosureVarnames,
+            mFunctionGlobalsInClosureVarnames,
             bindings,
             mReturnType,
             mSignatureFunction,
@@ -139,6 +143,7 @@ public:
             mFunctionAnnotations,
             mGlobals,
             mFunctionClosureVarnames,
+            mFunctionGlobalsInClosureVarnames,
             mClosureBindings,
             mReturnType,
             mSignatureFunction,
@@ -154,6 +159,7 @@ public:
             mFunctionAnnotations,
             mGlobals,
             mFunctionClosureVarnames,
+            mFunctionGlobalsInClosureVarnames,
             bindings,
             mReturnType,
             mSignatureFunction,
@@ -229,6 +235,10 @@ public:
 
     const std::vector<std::string>& getFunctionClosureVarnames() const {
         return mFunctionClosureVarnames;
+    }
+
+    const std::vector<std::string>& getFunctionGlobalsInClosureVarnames() const {
+        return mFunctionGlobalsInClosureVarnames;
     }
 
     const std::vector<FunctionArg>& getArgs() const {
@@ -624,10 +634,8 @@ public:
         });
     }
 
-    // get a list of all "global dot accesses" contained in 'code'.  This will pull out every
-    // case where we have a sequence of opcodes that access a global variable by name and then
-    // sequentially access members. So if you write 'x.y.z' and 'x' is a reference that will
-    // be looked up using a 'LOAD_GLOBAL' then we will include 'x.y.z' in outAccesses.
+    // get a list of all "global accesses" contained in 'code'.  This will pull out every
+    // case where we have an opcodes that access a global variable by name
     static void extractGlobalAccessesFromCode(PyCodeObject* code, std::set<std::string>& outAccesses) {
         uint8_t* bytes;
         Py_ssize_t bytecount;
@@ -792,6 +800,7 @@ public:
         mMethodOf = other.mMethodOf;
 
         mFunctionClosureVarnames = other.mFunctionClosureVarnames;
+        mFunctionGlobalsInClosureVarnames = other.mFunctionGlobalsInClosureVarnames;
 
         mClosureBindings = other.mClosureBindings;
         mReturnType = other.mReturnType;
@@ -825,6 +834,13 @@ public:
         buffer.writeBeginCompound(4);
             int stringIx = 0;
             for (auto varname: mFunctionClosureVarnames) {
+                buffer.writeStringObject(stringIx++, varname);
+            }
+        buffer.writeEndCompound();
+
+        buffer.writeBeginCompound(11);
+            stringIx = 0;
+            for (auto varname: mFunctionGlobalsInClosureVarnames) {
                 buffer.writeStringObject(stringIx++, varname);
             }
         buffer.writeEndCompound();
@@ -876,6 +892,7 @@ public:
         PyObjectHolder functionDefaults;
         PyObjectHolder functionSignature;
         std::vector<std::string> closureVarnames;
+        std::vector<std::string> functionGlobalsInClosureVarnames;
         std::map<std::string, FunctionGlobal> functionGlobals;
         std::map<std::string, ClosureVariableBinding> closureBindings;
         Type* returnType = nullptr;
@@ -896,6 +913,12 @@ public:
                 buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
                     assertWireTypesEqual(wireType, WireType::BYTES);
                     closureVarnames.push_back(buffer.readStringObject());
+                });
+            }
+            else if (fieldNumber == 11) {
+                buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+                    assertWireTypesEqual(wireType, WireType::BYTES);
+                    functionGlobalsInClosureVarnames.push_back(buffer.readStringObject());
                 });
             }
             else if (fieldNumber == 5) {
@@ -946,6 +969,7 @@ public:
             functionAnnotations,
             functionGlobals,
             closureVarnames,
+            functionGlobalsInClosureVarnames,
             closureBindings,
             returnType,
             functionSignature,
@@ -977,6 +1001,11 @@ private:
     // the order (by name) of the variables in the __closure__ of the original
     // function. This is the order that the python code will expect.
     std::vector<std::string> mFunctionClosureVarnames;
+
+    // a list of variables which are globals, but which we are reading from the
+    // closure because the 'globals' dictionary is in fact a free python object
+    // that can't be pinned down in the type
+    std::vector<std::string> mFunctionGlobalsInClosureVarnames;
 
     PyObject* mFunctionDefaults;
 

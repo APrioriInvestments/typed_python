@@ -230,6 +230,7 @@ public:
                             copyObj(o.getFunctionAnnotations()),
                             o.getGlobals(),
                             o.getFunctionClosureVarnames(),
+                            o.getFunctionGlobalsInClosureVarnames(),
                             o.getClosureVariableBindings(),
                             copyType(o.getReturnType()),
                             o.getSignatureFunction(),

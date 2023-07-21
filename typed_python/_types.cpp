@@ -1099,6 +1099,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             std::vector<FunctionOverload> overloads;
 
             std::vector<std::string> closureVarnames;
+            std::vector<std::string> closureTupleVarnames;
+            std::vector<std::string> globalsInClosureVarnames;
             std::vector<Type*> closureVarTypes;
             std::map<std::string, ClosureVariableBinding> closureBindings;
             std::map<std::string, FunctionGlobal> globals;
@@ -1129,6 +1131,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                         throw PythonExceptionSet();
                     }
                     closureVarnames.push_back(std::string(PyUnicode_AsUTF8(varname)));
+                    closureTupleVarnames.push_back(std::string(PyUnicode_AsUTF8(varname)));
                 }
 
                 if (assumeClosureGlobal) {
@@ -1152,11 +1155,41 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 }
             }
 
-            FunctionOverload::buildInitialGlobalsDict(
-                globals,
-                PyFunction_GetGlobals(funcObj),
-                (PyCodeObject*)PyFunction_GetCode(funcObj)
-            );
+            if (!assumeClosureGlobal
+                && !CompilerVisibleObjectVisitor::isPyObjectGloballyIdentifiableModuleDict(
+                    PyFunction_GetGlobals(funcObj)
+                    ).size()
+            ) {
+                // this function has non-identifiable globals, so we're actually going to place the
+                // globals dict into the closure so that its part of the 'data' rather than the type
+                // of the class
+                closureVarTypes.push_back(PythonObjectOfType::AnyPyDict());
+                // using a space in the name prevents this from colliding with an actual
+                // variable name
+                closureTupleVarnames.push_back(" _globals");
+
+                // ensure that every global lookup is now routed through the function overload
+                std::set<std::string> allNamesString;
+                FunctionOverload::extractGlobalAccessesFromCode(
+                    (PyCodeObject*)PyFunction_GetCode(funcObj),
+                    allNamesString
+                );
+
+                for (auto name: allNamesString) {
+                    globalsInClosureVarnames.push_back(name);
+                    closureBindings[name] =
+                        ClosureVariableBinding()
+                        + 0
+                        + ClosureVariableBindingStep(" _globals")
+                        + ClosureVariableBindingStep(name);
+                }
+            } else {
+                FunctionOverload::buildInitialGlobalsDict(
+                    globals,
+                    PyFunction_GetGlobals(funcObj),
+                    (PyCodeObject*)PyFunction_GetCode(funcObj)
+                );
+            }
 
             overloads.push_back(
                 FunctionOverload(
@@ -1165,6 +1198,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                     ((PyFunctionObject*)(PyObject*)funcObj)->func_annotations,
                     globals,
                     closureVarnames,
+                    globalsInClosureVarnames,
                     closureBindings,
                     rType,
                     rSignature,
@@ -1181,7 +1215,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 Tuple::Make({
                     assumeClosureGlobal ?
                         NamedTuple::Make({}, {}) :
-                        NamedTuple::Make(closureVarTypes, closureVarnames)
+                        NamedTuple::Make(closureVarTypes, closureTupleVarnames)
                     }),
                 false,
                 false

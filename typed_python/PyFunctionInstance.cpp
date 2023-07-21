@@ -1105,36 +1105,82 @@ void PyFunctionInstance::copyConstructFromPythonInstanceConcrete(Function* type,
 
     PyObject* pyClosure = PyFunction_GetClosure(pyRepresentation);
 
-    if (!pyClosure || !PyTuple_Check(pyClosure) || PyTuple_Size(pyClosure) != closureType->getTypes().size()) {
-        throw std::runtime_error("Expected the pyClosure to have " + format(closureType->getTypes().size()) + " cells.");
+    // our closure may or may not have a 'globals' dict at the end of it.
+    long expectedCellCount = closureType->getTypes().size();
+    if (closureType->getTypes().size() && closureType->getTypes().back()->isPythonObjectOfType()) {
+        expectedCellCount -= 1;
+    }
+
+    if (expectedCellCount == 0) {
+        if (pyClosure && !PyTuple_Check(pyClosure)) {
+            throw std::runtime_error("This PyFunction closure is not a tuple");
+        }
+
+        if (pyClosure && PyTuple_Size(pyClosure)) {
+            throw std::runtime_error(
+                "Our closure of type "
+                + closureType->name()
+                + " means we expect the python function's closure to have "
+                + format(expectedCellCount)
+                + " variables but it has " + format(PyTuple_Size(pyClosure))
+            );
+        }
+    } else {
+        if (!pyClosure || !PyTuple_Check(pyClosure) || PyTuple_Size(pyClosure) != expectedCellCount) {
+            throw std::runtime_error(
+                "Our closure of type "
+                + closureType->name()
+                + " means we expect the python function's closure to have "
+                + format(expectedCellCount)
+                + " variables but it has " + format(PyTuple_Size(pyClosure))
+            );
+        }
     }
 
     closureType->constructor(tgt, [&](instance_ptr tgtCell, int index) {
         Type* closureTypeInst = closureType->getTypes()[index];
 
-        PyObject* cell = PyTuple_GetItem(pyClosure, index);
-        if (!cell) {
-            throw PythonExceptionSet();
-        }
+        if (index < expectedCellCount) {
+            PyObject* cell = PyTuple_GetItem(pyClosure, index);
+            if (!cell) {
+                throw PythonExceptionSet();
+            }
 
-        if (!PyCell_Check(cell)) {
-            throw std::runtime_error("Expected function closure to be made up of cells.");
-        }
+            if (!PyCell_Check(cell)) {
+                throw std::runtime_error("Expected function closure to be made up of cells.");
+            }
 
-        if (closureTypeInst->getTypeCategory() == Type::TypeCategory::catPyCell) {
-            // our representation in the closure is itself a PyCell, so we just reference
-            // the actual cell object.
-            static PyCellType* pct = PyCellType::Make();
-            pct->initializeFromPyObject(tgtCell, cell);
+            if (closureTypeInst->getTypeCategory() == Type::TypeCategory::catPyCell) {
+                // our representation in the closure is itself a PyCell, so we just reference
+                // the actual cell object.
+                static PyCellType* pct = PyCellType::Make();
+                pct->initializeFromPyObject(tgtCell, cell);
+            } else {
+                if (!PyCell_GET(cell)) {
+                    throw std::runtime_error("Cell for " + closureType->getNames()[index] + " was empty.");
+                }
+
+                PyInstance::copyConstructFromPythonInstance(
+                    closureType->getTypes()[index],
+                    tgtCell,
+                    PyCell_GET(cell),
+                    ConversionLevel::Implicit
+                );
+            }
         } else {
-            if (!PyCell_GET(cell)) {
-                throw std::runtime_error("Cell for " + closureType->getNames()[index] + " was empty.");
+            PyObject* functionGlobals = PyFunction_GetGlobals(pyRepresentation);
+            if (!functionGlobals) {
+                throw std::runtime_error("Somehow this function didn't have globals?");
+            }
+
+            if (closureTypeInst != PythonObjectOfType::AnyPyDict()) {
+                throw std::runtime_error("Somehow the function closure type is improperly formed");
             }
 
             PyInstance::copyConstructFromPythonInstance(
                 closureType->getTypes()[index],
                 tgtCell,
-                PyCell_GET(cell),
+                functionGlobals,
                 ConversionLevel::Implicit
             );
         }

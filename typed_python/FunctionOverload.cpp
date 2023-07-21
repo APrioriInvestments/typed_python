@@ -28,6 +28,39 @@ PyObject* FunctionOverload::buildFunctionObj(Type* closureType, instance_ptr clo
         }
     }
 
+    if (mFunctionGlobalsInClosureVarnames.size()) {
+        if (mGlobals.size() || globalsInCells.size()) {
+            throw std::runtime_error(
+                "Invalid FunctionOverload. We can't convert this to a python function. "
+                "We are supposed to have our globals either encoded in the globals dict "
+                "assuming that they are resolvable in a way that can place them in the type "
+                "or they are supposed to be in our closure. We're not supposed to mix them."
+            );
+        }
+
+        if (!closureType->isTuple()
+            || ((Tuple*)closureType)->getTypes().size() != 1
+            || !((Tuple*)closureType)->getTypes()[0]->isNamedTuple()
+        ) {
+            throw std::runtime_error("Invalid closure-enclosing-globals");
+        }
+
+        NamedTuple* interior = (NamedTuple*)((Tuple*)closureType)->getTypes()[0];
+        if (!interior->getTypes().size() || interior->getNames().back() != " _globals") {
+            throw std::runtime_error("Invalid closure-enclosing-globals");
+        }
+
+        Instance i = (
+            ClosureVariableBinding() + 0 + ClosureVariableBindingStep(" _globals")
+        ).extractValueOrContainingClosure(closureType, closureData);
+
+        if (i.type() != PythonObjectOfType::AnyPyDict()) {
+            throw std::runtime_error("Invalid closure-enclosing-globals");
+        }
+
+        funcGlobals.set(PythonObjectOfType::getPyObj(i.data()));
+    }
+
     PyObject* res = PyFunction_New(mFunctionCode, (PyObject*)funcGlobals);
 
     if (!res) {

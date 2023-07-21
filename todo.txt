@@ -109,12 +109,11 @@ def makeF(x):
 
 execution plan:
 1. if a function's globals dict is not globally visible, then make it part of the _closure_
+	* FunctionGlobal can point to the closure, just like the ClosureVariables
+		* this is always considered 'resolved' in the sense that such an object is untyped and therefore fully resolved
 	* need to allow the function to be recreated correctly given this case
 2. allow forward function types to be instantiated if their closures are not forward. This is a forward function instance.
+	* forward function instances can't be executed but they can be created. They are placeholder objects ready to be resolved
+		just like forward types, or to be passed into a Class definition
 3. allow forward function types to be resolved just like regular function types
-
-
-
-
-
-
+	* forward function instances also participate in instance resolution
