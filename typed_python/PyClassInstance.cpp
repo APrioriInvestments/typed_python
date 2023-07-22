@@ -676,7 +676,7 @@ PyObject* newPyTuple(const container_type& container, const func_type& objCreato
     PyObject* tup = PyTuple_New(container.size());
     long ix = 0;
     for (auto containerElt: container) {
-        PyTuple_SetItem(tup, ix, convertPyTupleEltToPyObj(objCreator(containerElt)));
+        PyTuple_SetItem(tup, ix++, convertPyTupleEltToPyObj(objCreator(containerElt)));
     }
     return tup;
 }

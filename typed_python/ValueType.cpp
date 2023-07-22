@@ -25,20 +25,13 @@ Value::Value() :
 }
 
 
-Value::Value(const Instance& instance) :
+Value::Value(const Instance& instance, PyObject* valueAsPyobj) :
     Type(TypeCategory::catValue),
     mInstance(instance),
-    mValueAsPyobj(nullptr)
+    mValueAsPyobj(incref(valueAsPyobj))
 {
     m_size = 0;
     m_is_default_constructible = true;
-
-    mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
-
-    if (!mValueAsPyobj) {
-        PyErr_Clear();
-        throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");
-    }
 
     m_is_forward_defined = true;
     recomputeName();
@@ -66,9 +59,9 @@ Type* Value::Make(Instance i) {
             }
 
             if (t->isForwardDefined()) {
-                typeMemo[t] = new Value(i);
+                typeMemo[t] = new Value(i, obj);
             } else {
-                typeMemo[t] = (Value*)(new Value(i))->forwardResolvesTo();
+                typeMemo[t] = (Value*)(new Value(i, obj))->forwardResolvesTo();
             }
 
             return typeMemo[t];
@@ -80,7 +73,13 @@ Type* Value::Make(Instance i) {
     auto it = instanceMemo.find(i);
 
     if (it == instanceMemo.end()) {
-        Value* resolved = (Value*)((new Value(i))->forwardResolvesTo());
+        PyObject* obj = PyInstance::extractPythonObject(i);
+
+        if (!obj) {
+            throw std::runtime_error("Failed to convert an instance of type " + i.type()->name() + " to a PyObject!");
+        }
+        
+        Value* resolved = (Value*)((new Value(i, obj))->forwardResolvesTo());
         it = instanceMemo.insert(std::make_pair(i, resolved)).first;
     }
 
@@ -131,7 +130,9 @@ void Value::updateInternalTypePointersConcrete(
         mInstance = Instance::create(
             (PyObject*)PyInstance::typeObj(it->second)
         );
+        
         mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
+        
         if (!mValueAsPyobj) {
             PyErr_Clear();
             throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");

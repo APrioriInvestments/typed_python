@@ -25,7 +25,12 @@
 	- we need to make sure we can actually destroy these if we're not going to keep them
 - get rid of PyObject throughout Function
 	- should be like a FunctionGlobal
-
+- Value should be holding a CompilerVisiblePyObj, not an instance
+- We're using the TP compiler hash in the compiler, which makes sense. Need to ensure that
+	the CVOV obyes the same rules for dotted accesses that the original compiler does.
+- We need to ensure that Globals retain their source information if its available
+	- this means that they need to allow themselves to be constants
+	- the whole 'globalsRaw' thing is trying to do this but its a crappy way of doing it
 
 def f(x):
 	class C(Class):

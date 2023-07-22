@@ -134,28 +134,24 @@ class PythonToNativeConverter:
     def createConversionContext(
         self,
         identity,
-        funcName,
-        funcCode,
-        funcGlobals,
-        funcGlobalsRaw,
-        closureVars,
+        overload,
         input_types,
         output_type,
         conversionType
     ):
         ConverterType = conversionType or FunctionConversionContext
 
-        pyast = self._code_to_ast(funcCode)
+        pyast = self._code_to_ast(overload.functionCode)
 
         return ConverterType(
             self,
-            funcName,
+            overload.name,
             identity,
             input_types,
             output_type,
-            closureVars,
-            funcGlobals,
-            funcGlobalsRaw,
+            overload.closureVarLookups,
+            overload.realizedGlobals,
+            overload.globals,
             pyast.args,
             pyast,
         )
@@ -591,103 +587,27 @@ class PythonToNativeConverter:
             returnType = None
 
         return self.convert(
-            overload.name,
-            overload.functionCode,
-            overload.realizedGlobals,
-            overload.globals,
-            {},
-            list(overload.closureVarLookups),
+            overload,
             realizedInputWrappers,
             returnType,
             assertIsRoot=assertIsRoot
         )
 
-    def hashObjectToIdentity(self, hashable, isModuleVal=False):
-        if isinstance(hashable, Hash):
-            return hashable
-
-        if isinstance(hashable, int):
-            return Hash.from_integer(hashable)
-
-        if isinstance(hashable, str):
-            return Hash.from_string(hashable)
-
-        if hashable is None:
-            return Hash.from_integer(1) + Hash.from_integer(0)
-
-        if isinstance(hashable, (dict, list)) and isModuleVal:
-            # don't look into dicts and lists at module level
-            return Hash.from_integer(2)
-
-        if isinstance(hashable, (tuple, list)):
-            res = Hash.from_integer(len(hashable))
-            for t in hashable:
-                res += self.hashObjectToIdentity(t, isModuleVal)
-            return res
-
-        if isinstance(hashable, Wrapper):
-            return hashable.compilerHash()
-
-        return Hash(_types.compilerHash(hashable))
-
-    def hashGlobals(self, funcGlobals, code, funcGlobalsFromCells):
-        """Hash a given piece of code's accesses to funcGlobals.
-
-        We're trying to make sure that if we have a reference to module 'x'
-        in our globals, but we only ever use 'x' by writing 'x.f' or 'x.g', then
-        we shouldn't depend on the entirety of the definition of 'x'.
-        """
-
-        res = Hash.from_integer(0)
-
-        for dotSeq in _types.getCodeGlobalDotAccesses(code):
-            res += self.hashDotSeq(dotSeq, funcGlobals)
-
-        for globalName in funcGlobalsFromCells:
-            res += self.hashDotSeq([globalName], funcGlobals)
-
-        return res
-
-    def hashDotSeq(self, dotSeq, funcGlobals):
-        if not dotSeq or dotSeq[0] not in funcGlobals:
-            return Hash.from_integer(0)
-
-        item = funcGlobals[dotSeq[0]]
-
-        if not isinstance(item, ModuleType) or len(dotSeq) == 1:
-            return Hash.from_string(dotSeq[0]) + self.hashObjectToIdentity(item, True)
-
-        if not hasattr(item, dotSeq[1]):
-            return Hash.from_integer(0)
-
-        return Hash.from_string(dotSeq[0] + "." + dotSeq[1]) + self.hashObjectToIdentity(getattr(item, dotSeq[1]), True)
-
     def convert(
         self,
-        funcName,
-        funcCode,
-        funcGlobals,
-        funcGlobalsRaw,
-        funcGlobalsFromCells,
-        closureVars,
+        overload,
         input_types,
         output_type,
         assertIsRoot=False,
         conversionType=None
     ):
-        """Convert a single pure python function using args of 'input_types'.
+        """Convert a single PyFunctionOverload using args of 'input_types'.
 
         It will return no more than 'output_type'. if output_type is None we produce
         the tightest output type possible.
 
         Args:
-            funcName - the name of the function
-            funcCode - a Code object representing the code to compile
-            funcGlobals - the globals object from the relevant function
-            funcGlobalsRaw - the original globals object (with no merging or filtering done)
-                which we use to figure out the location of global variables that are not in cells.
-            funcGlobalsFromCells - a list of the names that are globals that are actually accessed
-                as cells.
+            overload - a PyFunctionOverload instance we want to compile
             input_types - a type for each free variable in the function closure, and
                 then again for each input argument
             output_type - the output type of the function, if known. if this is None,
@@ -698,23 +618,14 @@ class PythonToNativeConverter:
             conversionType - if None, this is a normal function conversion. Otherwise,
                 this must be a subclass of FunctionConversionContext
         """
-        assert isinstance(funcName, str)
-        assert isinstance(funcCode, types.CodeType)
-        assert isinstance(funcGlobals, dict)
+        funcName = overload.name
 
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         compilerHash = (
             Hash.from_integer(1)
-            + self.hashObjectToIdentity((
-                funcCode,
-                funcName,
-                input_types,
-                output_type,
-                closureVars,
-                conversionType
-            )) +
-            self.hashGlobals(funcGlobals, funcCode, funcGlobalsFromCells)
+            + Hash.from_integer(overload.index)
+            + Hash(_types.compilerHash(overload.functionTypeObject))
         )
 
         assert not compilerHash.isPoison()
@@ -729,7 +640,11 @@ class PythonToNativeConverter:
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
-                funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType
+                overload.functionTypeObject, 
+                overload.index, 
+                input_types, 
+                output_type, 
+                conversionType
             )
 
         isRoot = len(self._inflight_function_conversions) == 0
@@ -759,11 +674,7 @@ class PythonToNativeConverter:
         if identity not in self._inflight_function_conversions:
             functionConverter = self.createConversionContext(
                 identity,
-                funcName,
-                funcCode,
-                funcGlobals,
-                funcGlobalsRaw,
-                closureVars,
+                overload,
                 input_types,
                 output_type,
                 conversionType
@@ -820,19 +731,17 @@ class PythonToNativeConverter:
 
             if identifier in self._identifier_to_pyfunc:
                 for v in self._visitors:
-                    funcName, funcCode, funcGlobals, closureVars, input_types, output_type, conversionType = (
+                    functionTypeObject, overloadIx, input_types, output_type, conversionType = (
                         self._identifier_to_pyfunc[identifier]
                     )
-
+                    overload = functionTypeObject.overloads[overloadIx]
+                    
                     try:
                         v.onNewFunction(
                             identifier,
                             functionConverter,
                             nativeFunction,
-                            funcName,
-                            funcCode,
-                            funcGlobals,
-                            closureVars,
+                            overload,
                             input_types,
                             functionConverter._varname_to_type.get(FunctionOutput),
                             functionConverter._varname_to_type.get(FunctionYield),

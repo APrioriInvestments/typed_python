@@ -24,7 +24,7 @@ PyDoc_STRVAR(Value_doc,
 
 class Value : public Type {
 public:
-    Value(const Instance& instance);
+    Value(const Instance& instance, PyObject* valueAsPyobj);
 
     // this is the clone-pathway
     Value();

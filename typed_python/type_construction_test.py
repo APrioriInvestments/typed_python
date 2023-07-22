@@ -4,7 +4,7 @@ from typed_python import (
     TupleOf, ListOf, OneOf, Forward, isForwardDefined, bytecount, resolveForwardDefinedType,
     Tuple, NamedTuple, PointerTo, RefTo, Dict, Set, Alternative, Function, identityHash, Value,
     Class, Member, ConstDict, TypedCell, typeLooksResolvable, Held, NotCompiled,
-    forwardDefinitionsFor
+    forwardDefinitionsFor, Entrypoint
 )
 
 from typed_python.test_util import CodeEvaluator
@@ -27,6 +27,18 @@ def test_function_in_anonymous_module_callable():
 
     assert f(10) == 11
     assert f.ClosureType.ElementTypes[0].ElementNames[0] == ' _globals'
+
+
+def test_entrypoint_basic():
+    @Entrypoint
+    def f(x: int):
+        return x + 1
+
+    @Entrypoint
+    def g():
+        return f(2)
+
+    assert g() == 3
 
 
 def test_identity_hash_of_alternative_stable():

@@ -135,6 +135,18 @@ void PyFunctionOverload::initFields() {
         PyDict_SetItemString(pyClosureVarsDict, nameAndClosureVar.first.c_str(), bindingObj);
     }
 
+    PyObjectStealer pyClosureVarnames(
+        PyTuple_New(overload.getFunctionClosureVarnames().size())
+    );
+
+    for (long k = 0; k < overload.getFunctionClosureVarnames().size(); k++) {
+        PyTuple_SetItem(
+            pyClosureVarnames,
+            k,
+            PyUnicode_FromString(overload.getFunctionClosureVarnames()[k].c_str())
+        );
+    }
+
     PyObjectStealer emptyTup(PyTuple_New(0));
     PyObjectStealer emptyDict(PyDict_New());
 
@@ -162,6 +174,7 @@ void PyFunctionOverload::initFields() {
     PyDict_SetItemString(mDict, "index", (PyObject*)PyLong_FromLong(mOverloadIx));
 
     PyDict_SetItemString(mDict, "closureVarLookups", (PyObject*)pyClosureVarsDict);
+    PyDict_SetItemString(mDict, "closureVars", (PyObject*)pyClosureVarnames);
     PyDict_SetItemString(mDict, "functionCode", (PyObject*)overload.getFunctionCode());
     PyDict_SetItemString(mDict, "globals", (PyObject*)pyFunctionGlobals);
     PyDict_SetItemString(mDict, "returnType", overload.getReturnType() ? (PyObject*)PyInstance::typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None);

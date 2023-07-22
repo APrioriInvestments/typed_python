@@ -408,7 +408,7 @@ public:
     }
 
     PyObject* buildFinalResult() {
-        Function* outType = (Function*)mResolvedFunctionTypes[Path()];
+        Function* outType = (Function*)mResolvedFunctionTypes[Path()]->forwardResolvesTo();
 
         if (!outType) {
             throw std::runtime_error("Somehow, we don't have a function at the root of the closure converter");

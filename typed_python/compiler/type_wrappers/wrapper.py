@@ -79,6 +79,9 @@ class Wrapper:
     # is this wrapping a OneOf object
     is_oneof_wrapper = False
 
+    def __reduce__(self):
+        return (typeWrapper, (self.typeRepresentation,))
+
     def __repr__(self):
         return "Wrapper(%s)" % str(self)
 

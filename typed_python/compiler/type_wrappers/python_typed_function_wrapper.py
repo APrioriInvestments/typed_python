@@ -347,12 +347,7 @@ class PythonTypedFunctionWrapper(Wrapper):
         # there's definitely a better way to organize this code.
 
         singleConvertedOverload = context.functionContext.converter.convert(
-            overload.name,
-            overload.functionCode,
-            overload.realizedGlobals,
-            overload.functionGlobals,
-            list(overload.funcGlobalsInCells),
-            list(overload.closureVarLookups),
+            overload,
             [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()],
             None,
             conversionType=ConvertionContextType
@@ -512,12 +507,7 @@ class PythonTypedFunctionWrapper(Wrapper):
             # just one overload will do. We can just instantiate this particular function
             # with a signature that comes from the method overload signature itself.
             singleConvertedOverload = context.functionContext.converter.convert(
-                overload.name,
-                overload.functionCode,
-                overload.realizedGlobals,
-                overload.functionGlobals,
-                list(overload.funcGlobalsInCells),
-                list(overload.closureVarLookups),
+                overload,
                 [typeWrapper(self.closurePathToCellType(path, closureType)) for path in overload.closureVarLookups.values()]
                 + [a.expr_type for a in argsToPass],
                 returnType
@@ -734,12 +724,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                         )
 
                         callTarget = converter.convert(
-                            o.name,
-                            o.functionCode,
-                            o.realizedGlobals,
-                            o.functionGlobals,
-                            list(o.funcGlobalsInCells),
-                            list(o.closureVarLookups),
+                            o,
                             [typeWrapper(PythonTypedFunctionWrapper.closurePathToCellType(path, func.ClosureType))
                              for path in o.closureVarLookups.values()] + actualArgTypes,
                             None

@@ -1437,6 +1437,17 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(f(), f2())
 
+    def test_serialize_function_types(self):
+        @Function
+        def f(x: int):
+            return x
+
+        sc = SerializationContext()
+
+        fType = sc.deserialize(sc.serialize(type(f)))
+
+        assert fType is type(f)
+
     def test_serialize_typed_classes(self):
         sc = SerializationContext()
 

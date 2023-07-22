@@ -2768,20 +2768,21 @@ PyObject *forwardDefinitionsFor(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "resolveForwardDefinedType takes 1 positional argument");
-        return NULL;
-    }
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
-    Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'resolveForwardDefinedType' must be a type object");
-        return NULL;
-    }
-
     return ::translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            throw std::runtime_error("resolveForwardDefinedType takes 1 positional argument");
+        }
+        
+        PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+        Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+        if (!t) {
+            throw std::runtime_error(
+                "first argument to 'resolveForwardDefinedType' must be a type object"
+            );
+        }
+
         return incref(
             (PyObject*)
             PyInstance::typeObj(
