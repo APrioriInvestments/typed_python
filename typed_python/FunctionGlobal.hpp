@@ -272,6 +272,13 @@ public:
         if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
             PyObject* obj = extractGlobalRefFromDictOrCell();
 
+            if (isNamedModuleMember() && mModuleName == "typed_python.compiler.native_compiler.native_ast" && mName == "Expression") {
+                std::cout << "Visiting it! " << (obj ? "not empty":"empty") << "\n";
+                if (!obj) {
+                    asm("int3");
+                }
+            }
+
             if (obj) {
                 _visitCompilerVisibleInternalsInPyobj(obj, visitor);
             }

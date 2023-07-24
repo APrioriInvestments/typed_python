@@ -1468,21 +1468,20 @@ class TypesSerializationTest(unittest.TestCase):
         assert F1.__name__ == F1_copy.__name__
         assert F2.__name__ == F2_copy.__name__
 
+        assert isForwardDefined(F1_copy)
+        assert isForwardDefined(F1_copy.get())
+        assert isForwardDefined(F1_copy.get().ElementType)
+
         F2.define(OneOf(None, F1))
         F2_copy.define(OneOf(None, F1_copy))
 
-        print(F2.resolve())
-        print(F2_copy.resolve())
         F2r = F2_copy.resolve()
 
-        print(F2r.Types[1].ElementType.__typed_python_category__)
-
         assert F2_copy.get().Types[1].get().ElementType is F2_copy
-        assert F2r.Types[1].ElementType is F2_copy
-        assert isForwardDefined(F2r.Types[1])
+        assert F2r.Types[1].ElementType is F2r
 
-        # assert F1.resolve() is F1_copy.resolve()
-        # assert F2.resolve() is F2_copy.resolve()
+        assert F1.resolve() is F1_copy.resolve()
+        assert F2.resolve() is F2_copy.resolve()
 
     def test_serialize_typed_classes(self):
         sc = SerializationContext()
@@ -2307,6 +2306,9 @@ class TypesSerializationTest(unittest.TestCase):
             # recall that regular classes ignore their annotations
             def f(self) -> Cls:
                 return "HI"
+
+        with open("a.dat", "wb") as f:
+            f.write(SerializationContext().serialize((Cls, ())))
 
         assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
 

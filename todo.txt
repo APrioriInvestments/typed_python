@@ -1,3 +1,6 @@
+- fully internalized types shouldn't be able to have an unstable identity at all
+	- NamedModuleMember should identity hash the same way regardless anyways
+	- we should force these Globals to resolve to something specific at resolution time
 - all Forward defined types need to expose as much of their internals as are known
 	- not bytecounts - this should be explicitly disallowed
 	- expose code to allow us to get the _first_ forward that defined a given class

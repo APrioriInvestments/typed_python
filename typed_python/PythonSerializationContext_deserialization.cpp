@@ -574,7 +574,7 @@ PyObject* prepareBlankInstanceOfType(MutuallyRecursiveTypeGroup* outGroup, PyTyp
 }
 
 /* static */
-Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::TypeCategory typeCat) {
+Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::TypeCategory typeCat, bool isForwardDefined) {
     Type* result = nullptr;
 
     if (typeCat == Type::TypeCategory::catValue) {
@@ -645,7 +645,7 @@ Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::Typ
     }
 
     if (result) {
-        result->markActivelyBeingDeserialized();
+        result->markActivelyBeingDeserialized(isForwardDefined);
         return result;
     }
 
@@ -1316,7 +1316,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         if (kind == 5 && fieldNumber == 1) {
             assertWireTypesEqual(wireType, WireType::VARINT);
             memo = b.readUnsignedVarint();
-            forwardType = (Type*)b.lookupCachedPointer(memo);            
+            forwardType = (Type*)b.lookupCachedPointer(memo);
         } else
         if (kind == 5 && fieldNumber == 2) {
             assertWireTypesEqual(wireType, WireType::VARINT);
@@ -1336,7 +1336,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             if (forwardType) {
                 throw std::runtime_error("Invalid forward type serialization: type is double-defined");
             }
-            forwardType = constructBlankSubclassOfTypeCategory(Type::TypeCategory(category));
+            forwardType = constructBlankSubclassOfTypeCategory(Type::TypeCategory(category), true);
             b.addCachedPointer(memo, (void*)forwardType, nullptr);
             deserializeNativeTypeIntoBlank(b, wireType, forwardType, name);
 
@@ -1774,9 +1774,9 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
         if (!blankShell->isForward()) {
             throw std::runtime_error("Shell is not a Forward");
         }
-            
+
         ((Forward*)blankShell)->setName(names[0]);
-        
+
         if (obj) {
             ((Forward*)blankShell)->setCellOrDict(obj);
         }

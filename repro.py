@@ -1,18 +1,28 @@
 import sys
 
-from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final, Function, ListOf, NotCompiled
+from typed_python import Class, SerializationContext, Held, isForwardDefined, Entrypoint, Forward, Final, Function, ListOf, NotCompiled, Member
 from typed_python._types import typeWalkRecord, recursiveTypeGroupRepr
 
+import typed_python.compiler.native_compiler.native_ast as n
 
+
+from typed_python import _types
+assert not _types.checkForHashInstability()
+
+print(n.Type.zero)
+print(n.Type.zero.overloads)
 
 def writer():
-    @NotCompiled
-    def fn(x) -> str:
-        return str(x)
+    Cls = Forward("Cls")
 
-    print(fn.overloads[0].globals)
+    @Cls.define
+    class Cls(Class):
+        m = Member(str)
 
-    bytesToWrite = SerializationContext().serialize(fn)
+        def f(self) -> Cls:
+            return Cls(m='HI')
+
+    bytesToWrite = SerializationContext().serialize((Cls, ()))
 
     with open("a.dat", "wb") as f:
         f.write(bytesToWrite)
@@ -20,11 +30,10 @@ def writer():
 
 def reader():
     with open("a.dat", "rb") as f:
-        x = SerializationContext().deserialize(f.read())
+        Cls, args = SerializationContext().deserialize(f.read())
 
-    print(x.__name__)
-    print(x.f.overloads[0].globals)
-    print(x().f().f())
+    # print(x.__name__)
+    print(Cls(*args).f().m)
 
 
 if sys.argv[1:] == ['r']:

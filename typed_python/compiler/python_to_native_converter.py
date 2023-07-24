@@ -89,6 +89,34 @@ class PythonToNativeConverter:
     def removeVisitor(self, visitor):
         self._visitors.remove(visitor)
 
+    def hashObjectToIdentity(self, hashable, isModuleVal=False):
+        if isinstance(hashable, Hash):
+            return hashable
+
+        if isinstance(hashable, int):
+            return Hash.from_integer(hashable)
+
+        if isinstance(hashable, str):
+            return Hash.from_string(hashable)
+
+        if hashable is None:
+            return Hash.from_integer(1) + Hash.from_integer(0)
+
+        if isinstance(hashable, (dict, list)) and isModuleVal:
+            # don't look into dicts and lists at module level
+            return Hash.from_integer(2)
+
+        if isinstance(hashable, (tuple, list)):
+            res = Hash.from_integer(len(hashable))
+            for t in hashable:
+                res += self.hashObjectToIdentity(t, isModuleVal)
+            return res
+
+        if isinstance(hashable, Wrapper):
+            return hashable.compilerHash()
+
+        return Hash(_types.compilerHash(hashable))
+
     def identityToName(self, identity):
         """Convert a function identity to the link-time name for the function.
 
@@ -640,10 +668,10 @@ class PythonToNativeConverter:
 
         if identity not in self._identifier_to_pyfunc:
             self._identifier_to_pyfunc[identity] = (
-                overload.functionTypeObject, 
-                overload.index, 
-                input_types, 
-                output_type, 
+                overload.functionTypeObject,
+                overload.index,
+                input_types,
+                output_type,
                 conversionType
             )
 
@@ -735,7 +763,7 @@ class PythonToNativeConverter:
                         self._identifier_to_pyfunc[identifier]
                     )
                     overload = functionTypeObject.overloads[overloadIx]
-                    
+
                     try:
                         v.onNewFunction(
                             identifier,

@@ -916,8 +916,9 @@ public:
 
     void attemptAutoresolveWrite();
 
-    void markActivelyBeingDeserialized() {
+    void markActivelyBeingDeserialized(bool isForwardDefined) {
         m_is_being_deserialized = true;
+        m_is_forward_defined = isForwardDefined;
     }
 
     bool isActivelyBeingDeserialized() {

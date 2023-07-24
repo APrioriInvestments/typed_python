@@ -110,7 +110,6 @@ Type.define(Alternative(
         else False,
     zeroConstant=typeZeroConstant
 ))
-Type = resolveForwardDefinedType(Type)
 
 
 def const_truth_value(c):
@@ -159,7 +158,6 @@ Constant.define(Alternative(
     truth_value=const_truth_value,
     __str__=const_str
 ))
-Constant = resolveForwardDefinedType(Constant)
 
 UnaryOp = Alternative(
     "UnaryOp",
@@ -663,6 +661,9 @@ Expression.define(Alternative(
 ))
 
 
+NamedCallTarget = resolveForwardDefinedType(NamedCallTarget)
+Type = resolveForwardDefinedType(Type)
+Constant = resolveForwardDefinedType(Constant)
 ExpressionIntermediate = resolveForwardDefinedType(ExpressionIntermediate)
 Expression = resolveForwardDefinedType(Expression)
 Teardown = resolveForwardDefinedType(Teardown)
