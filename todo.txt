@@ -1,12 +1,11 @@
-- ensure classes get a Python reference to their held functions
-	- all Forward defined types need to expose as much of their internals as possible
-		- not bytecounts or anything like that
+- all Forward defined types need to expose as much of their internals as are known
+	- not bytecounts - this should be explicitly disallowed
 	- expose code to allow us to get the _first_ forward that defined a given class
 - dotted globals?
 	- if we do this, how do we resolve the dotted global value?
 		- this is different for identity hashing than it is for serialization?
 		- what were we doing in the existing system? This is very squirrely and difficult.
-- fix the way we walk things in MRTG - should be unified
+- fix the way we walk things in MRTG - should be unified so that we actually can see CVPOs
 - ensure that TypeFunction works as intended now. Some of the weird issues should be resolved now
 - fix the ModuleRepresentation stuff
 - redocument everything
@@ -18,6 +17,20 @@
 			are not
 	- can we get rid of the whole serialize-mrtg thing? at this point, memos should just work right?
 		- this might leak which would be a problem
+		- should CVPOs be shared_ptr? we can still create cycles in them
+- fill out a full CVPO model:
+	- classes
+	- tuples
+	- lists and other py datastructures
+		- hash their original contents. they are not supposed to change
+- function objects
+	- default arguments need to be part of the instance closure if they have state?
+- build a formal model for module objects and their contents
+	- the only reassignment we should allow is for a module member to go from unresolved to resolved
+	- nothing should change after import
+	- this would let us detect module changes
+	- we could serialize/deserialize without hitting the GIL
+	- as part of this, move more of the serialization logic to C++ which would be faster
 - ensure that we don't try to MRTG something that's a forward defined type
 - fix the compiler to deal with the new globals thing now that we have it well defined
 - figure out how to properly internalize python classes
@@ -31,6 +44,9 @@
 - We need to ensure that Globals retain their source information if its available
 	- this means that they need to allow themselves to be constants
 	- the whole 'globalsRaw' thing is trying to do this but its a crappy way of doing it
+- take a look at object identity
+	- we could keep a reverse lookup from all alive python objects to the original instance
+		for things like lists/classes/etc
 
 def f(x):
 	class C(Class):

@@ -51,7 +51,7 @@ from typed_python import (
 from typed_python._types import (
     refcount, isRecursive, compilerHash, buildPyFunctionObject,
     setFunctionClosure, typesAreEquivalent, recursiveTypeGroupDeepRepr,
-    recursiveTypeGroupRepr
+    recursiveTypeGroupRepr, isForwardDefined
 )
 
 module_level_testfun = dummy_test_module.testfunction
@@ -1447,6 +1447,42 @@ class TypesSerializationTest(unittest.TestCase):
         fType = sc.deserialize(sc.serialize(type(f)))
 
         assert fType is type(f)
+
+    def test_serialize_empty_forward(self):
+        F1 = Forward("F1")
+        F2 = Forward("F2")
+        F1.define(ListOf(F2))
+
+        assert F1.get().ElementType is F2
+        assert F2.get() is None
+
+        F1_copy, F2_copy = SerializationContext().deserialize(
+            SerializationContext().serialize((F1, F2))
+        )
+
+        assert F1_copy is not F1
+        assert F2_copy is not F2
+
+        assert F1_copy.get().ElementType is F2_copy
+        assert F2_copy.get() is None
+        assert F1.__name__ == F1_copy.__name__
+        assert F2.__name__ == F2_copy.__name__
+
+        F2.define(OneOf(None, F1))
+        F2_copy.define(OneOf(None, F1_copy))
+
+        print(F2.resolve())
+        print(F2_copy.resolve())
+        F2r = F2_copy.resolve()
+
+        print(F2r.Types[1].ElementType.__typed_python_category__)
+
+        assert F2_copy.get().Types[1].get().ElementType is F2_copy
+        assert F2r.Types[1].ElementType is F2_copy
+        assert isForwardDefined(F2r.Types[1])
+
+        # assert F1.resolve() is F1_copy.resolve()
+        # assert F2.resolve() is F2_copy.resolve()
 
     def test_serialize_typed_classes(self):
         sc = SerializationContext()

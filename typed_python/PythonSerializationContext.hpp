@@ -145,7 +145,7 @@ public:
 
     void serializeNativeType(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
-    void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
+    void serializeNativeTypeInner(Type* nativeType, SerializationBuffer& b, size_t fieldNumber, bool checkIfObjectIsNamed) const;
 
     void serializeClassMembers(const std::vector<MemberDefinition>& members, SerializationBuffer& b, int fieldNumber) const;
 

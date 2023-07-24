@@ -42,22 +42,6 @@ public:
         return Forward_doc;
     }
 
-    std::string moduleNameConcrete() {
-        if (mTarget) {
-            return mTarget->moduleNameConcrete();
-        }
-
-        return "<unresolved>";
-    }
-
-    std::string nameWithModuleConcrete() {
-        if (mTarget) {
-            return mTarget->nameWithModule();
-        }
-
-        return m_name;
-    }
-
     static Forward* Make() {
         return Make("unnamed");
     }
@@ -144,6 +128,22 @@ public:
 
     bool hasLambdaDefinition() {
         return mCellOrDict != nullptr;
+    }
+
+    PyObject* getCellOrDict() {
+        return mCellOrDict;
+    }
+
+    void setName(std::string newName) {
+        m_name = newName;
+        m_stripped_name = "";
+    }
+
+    void setCellOrDict(PyObject* newCellOrDict) {
+        if (mCellOrDict) {
+            decref(mCellOrDict);
+        }
+        mCellOrDict = incref(newCellOrDict);
     }
 
     bool lambdaDefinitionPopulated();

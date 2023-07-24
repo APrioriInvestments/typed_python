@@ -629,7 +629,7 @@ Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::Typ
         result = new Function();
     }
     if (typeCat == Type::TypeCategory::catForward) {
-        throw std::runtime_error("Can't deserialize actual forwards!");
+        result = new Forward("");
     }
     if (typeCat == Type::TypeCategory::catSet) {
         result = new SetType();
@@ -1275,10 +1275,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     MutuallyRecursiveTypeGroup* group = nullptr;
     std::string name;
     PyObjectHolder typeFromRep;
+    int64_t memo = -1;
     int32_t indexInGroup = -1;
     int32_t kind = -1;
     int32_t which = -1;
     int32_t category = -1;
+    Type* forwardType = nullptr;
 
     b.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
         if (fieldNumber == 0) {
@@ -1310,6 +1312,39 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         if (kind == 4 && fieldNumber == 2) {
             assertWireTypesEqual(wireType, WireType::VARINT);
             indexInGroup = b.readUnsignedVarint();
+        } else
+        if (kind == 5 && fieldNumber == 1) {
+            assertWireTypesEqual(wireType, WireType::VARINT);
+            memo = b.readUnsignedVarint();
+            forwardType = (Type*)b.lookupCachedPointer(memo);            
+        } else
+        if (kind == 5 && fieldNumber == 2) {
+            assertWireTypesEqual(wireType, WireType::VARINT);
+            category = b.readUnsignedVarint();
+        } else
+        if (kind == 5 && fieldNumber == 3) {
+            assertWireTypesEqual(wireType, WireType::BYTES);
+            name = b.readStringObject();
+        } else
+        if (kind == 5 && fieldNumber == 4) {
+            if (memo == -1) {
+                throw std::runtime_error("Invalid forward type serialization: expected a memo");
+            }
+            if (category == -1) {
+                throw std::runtime_error("Invalid forward type serialization: expected a category");
+            }
+            if (forwardType) {
+                throw std::runtime_error("Invalid forward type serialization: type is double-defined");
+            }
+            forwardType = constructBlankSubclassOfTypeCategory(Type::TypeCategory(category));
+            b.addCachedPointer(memo, (void*)forwardType, nullptr);
+            deserializeNativeTypeIntoBlank(b, wireType, forwardType, name);
+
+            // at this point, we can finalize the type
+            forwardType->recomputeName();
+            forwardType->finalizeType();
+            forwardType->typeFinishedBeingDeserializedPhase1();
+            forwardType->typeFinishedBeingDeserializedPhase2();
         } else {
             throw std::runtime_error("Invalid nativeType: kind/fieldNumber error.");
         }
@@ -1317,6 +1352,13 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
     if (kind == -1) {
         throw std::runtime_error("Invalid native type: no 'kind' field");
+    }
+
+    if (kind == 5) {
+        if (!forwardType) {
+            throw std::runtime_error("Invalid native type: forward body never given");
+        }
+        return forwardType;
     }
 
     if (kind == 0) {
@@ -1553,17 +1595,23 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
             if (category == -1) {
                 throw std::runtime_error("Corrupt native type found.");
             }
-            if (category == Type::TypeCategory::catForward
-                    || category == Type::TypeCategory::catBoundMethod
-            ) {
+            if (category == Type::TypeCategory::catBoundMethod) {
                 if (fieldNumber == 1) {
                     names.push_back(b.readStringObject());
                 } else if (fieldNumber == 2) {
                     types.push_back(deserializeNativeType(b, wireType));
                 }
             } else
-            if (category == Type::TypeCategory::catAlternativeMatcher
-            ) {
+            if (category == Type::TypeCategory::catForward) {
+                if (fieldNumber == 1) {
+                    names.push_back(b.readStringObject());
+                } else if (fieldNumber == 2) {
+                    types.push_back(deserializeNativeType(b, wireType));
+                } else if (fieldNumber == 3) {
+                    obj.steal(deserializePythonObject(b, wireType));
+                }
+            } else
+            if (category == Type::TypeCategory::catAlternativeMatcher) {
                 if (fieldNumber == 1) {
                     types.push_back(deserializeNativeType(b, wireType));
                 }
@@ -1720,13 +1768,21 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
         );
     }
     else if (category == Type::TypeCategory::catForward) {
-        if (names.size() != 1 || types.size() != 1) {
+        if (names.size() != 1 || types.size() > 1) {
             throw std::runtime_error("Corrupt Forward");
         }
         if (!blankShell->isForward()) {
             throw std::runtime_error("Shell is not a Forward");
         }
-        ((Forward*)blankShell)->define(types[0]);
+            
+        ((Forward*)blankShell)->setName(names[0]);
+        
+        if (obj) {
+            ((Forward*)blankShell)->setCellOrDict(obj);
+        }
+        if (types.size()) {
+            ((Forward*)blankShell)->define(types[0]);
+        }
     }
     else if (category == Type::TypeCategory::catHeldClass) {
         if (names.size() != 1) {

@@ -347,7 +347,32 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     PyEnsureGilAcquired getTheGil;
 
     if (nativeType->isForwardDefined() || nativeType->isForward()) {
-        throw std::runtime_error("Can't serialize Forward or forward-defined types yet");
+        // forward types are neither stateful nor interned. So, we can serialize them
+        // with a memo and not worry about needing to intern them at any point.
+        b.writeBeginCompound(fieldNumber);
+
+        // the 5 indicates that this is a forward native type.
+        b.writeUnsignedVarintObject(0, 5);
+
+        uint32_t id;
+        bool isNew;
+        std::tie(id, isNew) = b.cachePointer(nativeType, nullptr);
+
+        // write the memo first
+        b.writeUnsignedVarintObject(1, id);
+
+        if (isNew) {
+            // then write the actual object if it's the first
+            // time we're writing it. note we write the type category first
+            // so that we can produce a blank instance before proceeding into
+            // the recursion
+            b.writeUnsignedVarintObject(2, nativeType->getTypeCategory());
+            b.writeStringObject(3, nativeType->name());
+            serializeNativeTypeInner(nativeType, b, 4, false);
+        }
+
+        b.writeEndCompound();
+        return;
     }
 
 #   if TP_VERBOSE_SERIALIZE
@@ -717,7 +742,7 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
                     }
                 } else {
                     Type* toSerialize = obj.type();
-                    serializeNativeTypeInner(toSerialize, b, index);
+                    serializeNativeTypeInner(toSerialize, b, index, true);
                 }
             };
 
@@ -820,7 +845,8 @@ void PythonSerializationContext::serializeMutuallyRecursiveTypeGroup(MutuallyRec
 void PythonSerializationContext::serializeNativeTypeInner(
             Type* nativeType,
             SerializationBuffer& b,
-            size_t fieldNumber
+            size_t fieldNumber,
+            bool checkIfObjectIsNamed
             ) const {
     b.writeBeginCompound(fieldNumber);
 
@@ -836,14 +862,16 @@ void PythonSerializationContext::serializeNativeTypeInner(
         << nativeType->name() << " of cat " << nativeType->getTypeCategoryString() << "\n";
 #   endif
 
-    PyEnsureGilAcquired acquireTheGil;
+    if (checkIfObjectIsNamed) {
+        PyEnsureGilAcquired acquireTheGil;
 
-    std::string nameForObject = getNameForPyObj((PyObject*)PyInstance::typeObj(nativeType));
+        std::string nameForObject = getNameForPyObj((PyObject*)PyInstance::typeObj(nativeType));
 
-    if (nameForObject.size()) {
-        b.writeStringObject(0, nameForObject);
-        b.writeEndCompound();
-        return;
+        if (nameForObject.size()) {
+            b.writeStringObject(0, nameForObject);
+            b.writeEndCompound();
+            return;
+        }
     }
 
     b.writeUnsignedVarintObject(0, nativeType->getTypeCategory());
@@ -943,6 +971,9 @@ void PythonSerializationContext::serializeNativeTypeInner(
 
         if (((Forward*)nativeType)->getTarget()) {
             serializeNativeType(((Forward*)nativeType)->getTarget(), b, 2);
+        }
+        if (((Forward*)nativeType)->getCellOrDict()) {
+            serializePythonObject(((Forward*)nativeType)->getCellOrDict(), b, 3);
         }
     } else if (nativeType->isClass()) {
         serializeNativeType(((Class*)nativeType)->getHeldClass(), b, 1);
