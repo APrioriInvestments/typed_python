@@ -2303,7 +2303,8 @@ class TypesSerializationTest(unittest.TestCase):
 
         @Cls.define
         class Cls:
-            # recall that regular classes ignore their annotations
+            # recall that regular classes ignore their annotations. This one will be a
+            # 'Forward' holding Cls.
             def f(self) -> Cls:
                 return "HI"
 

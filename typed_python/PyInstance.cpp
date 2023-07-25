@@ -381,13 +381,21 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
         eltType->assertForwardsResolvedSufficientlyToInstantiate();
 
-        if (eltType->isClass() && ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")
-                != ((Class*)eltType)->getOwnClassMembers().end()) {
-            return PyObject_Call(
-                ((Class*)eltType)->getOwnClassMembers().find("__typed_python_template__")->second,
+        if (eltType->isClass() && ((Class*)eltType)->getOwnStaticFunctions().find("__typed_python_template__")
+                != ((Class*)eltType)->getOwnStaticFunctions().end()) {
+            auto matchedAndResult = PyFunctionInstance::tryToCallAnyOverload(
+                ((Class*)eltType)->getOwnStaticFunctions().find("__typed_python_template__")->second,
+                nullptr,
+                nullptr,
                 args,
                 kwds
             );
+
+            if (!matchedAndResult.first) {
+                throw std::runtime_error("Somehow, __typed_python_template__ didn't dispatch");
+            }
+
+            return matchedAndResult.second;
         }
 
         Instance inst(eltType, [&](instance_ptr tgt) {

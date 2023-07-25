@@ -325,7 +325,9 @@ class ClassMetaclass(type):
                 and issubclass(elt, typed_python._types.Function)
             ):
                 if eltName == '__typed_python_template__':
-                    classMembers[eltName] = elt
+                    staticFunctions[eltName] = makeFunctionType(
+                        eltName, elt, assumeClosuresGlobal=True
+                    )
                 elif eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunctionType(
                         eltName, elt, classname=name, assumeClosuresGlobal=True

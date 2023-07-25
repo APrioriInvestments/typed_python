@@ -894,12 +894,6 @@ private:
 
             PyTypeObject* tp = (PyTypeObject*)obj.pyobj();
 
-            if (tp->tp_name == std::string("typed_python.types_serialization_test.Cls")) {
-                asm("int3");
-            }
-
-            std::cout << tp->tp_name << "\n";
-
             visitor.visitHash(ShaHash(tp->tp_name));
 
             visitor.visitHash(ShaHash(0));

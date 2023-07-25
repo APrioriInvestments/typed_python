@@ -425,8 +425,7 @@ HeldClass* HeldClass::Make(
 
         for (auto nameAndCM: classMembers) {
             auto it = base->getOwnClassMembers().find(nameAndCM.first);
-            if (it != base->getOwnClassMembers().end()
-                && nameAndCM.first != "__typed_python_template__") {
+            if (it != base->getOwnClassMembers().end()) {
                 // check that they're the same object
                 if (it->second != nameAndCM.second && nameAndCM.first != "__qualname__"
                     && nameAndCM.first != "__module__"

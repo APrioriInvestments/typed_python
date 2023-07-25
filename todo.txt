@@ -1,6 +1,8 @@
 - fully internalized types shouldn't be able to have an unstable identity at all
 	- NamedModuleMember should identity hash the same way regardless anyways
 	- we should force these Globals to resolve to something specific at resolution time
+- Class/HeldClass classMembers could still have forwards. These are PyObjects and need to
+	- be converted to Constants
 - all Forward defined types need to expose as much of their internals as are known
 	- not bytecounts - this should be explicitly disallowed
 	- expose code to allow us to get the _first_ forward that defined a given class
@@ -50,6 +52,15 @@
 - take a look at object identity
 	- we could keep a reverse lookup from all alive python objects to the original instance
 		for things like lists/classes/etc
+
+
+question: how should we handle regular python classes defined purely in forwards?
+* they will trigger MutuallyRecursiveTypeGroup and identityHash, which should be fine
+* we've said that Forwards shouldn't participate in MRTG
+* I think we need to actually build the formal graph in CVPO, and this should proceed with standard
+	interning rules. This will allow us to completely remove the 'Forwards' from the object.
+
+
 
 def f(x):
 	class C(Class):

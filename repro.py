@@ -33,7 +33,7 @@ def reader():
         Cls, args = SerializationContext().deserialize(f.read())
 
     # print(x.__name__)
-    print(Cls(*args).f().m)
+    print(Cls(*args).f())
 
 
 if sys.argv[1:] == ['r']:
