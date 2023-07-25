@@ -54,11 +54,33 @@
 		for things like lists/classes/etc
 
 
-question: how should we handle regular python classes defined purely in forwards?
-* they will trigger MutuallyRecursiveTypeGroup and identityHash, which should be fine
-* we've said that Forwards shouldn't participate in MRTG
+question: how should we handle regular python classes defined in forwards?
+* they will trigger MutuallyRecursiveTypeGroup and identityHash, which should be fine.
+* we've said that Forwards shouldn't participate in MRTG.
+	* This means we need to get a representation of the object that is completely external to 'forwards'
+	* we won't allow monkey patching.
 * I think we need to actually build the formal graph in CVPO, and this should proceed with standard
-	interning rules. This will allow us to completely remove the 'Forwards' from the object.
+interning rules. This will allow us to completely remove the 'Forwards' from the object.
+	* when a forward gets defined and pointed at a python object, we'll allow a walk inside
+		* the question 'typeLooksResolvable' will be valid to ask of a Class that has forwards in it
+			* if we ask 'isForwardDefined' we'll have to walk in and see if it references any forwards
+		* this walk can't be cached until we make the model of the python object because the object is mutable
+			* this could be slow but at least it's simple
+* if you think about it what we really have is a graph of regular mutable python objects, of which
+	forward defined types are just a special case. Periodically we walk this graph and check if
+	we can do a forward resolution at which point we make a formal model
+* to do this correctly we need two things:
+	* a full model of python objects including Function and Class, PyList, PyTuple, etc.
+	* a way of associating the model to a python instance
+		* this association should be the one we use for MRTG of python instances that are interned - their shadows
+			should be what we see and talk about, not the instances themselves.
+		* the compiler should be using this, not the original objects
+	* every CVPO should have a 'canonical' instance
+		* every PyObj should have a mapping to the CVPO that represents it if its been forward resolved
+	* you can ask if a python object isForwardDefined
+		* function instances can be forward defined as well
+	* if you choose to resolve (or we autoresolve, or a TypeFunction forces resolution) then we build the CVPO mapping
+		* then CVPO can completely replace TOPO
 
 
 
