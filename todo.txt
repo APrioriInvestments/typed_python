@@ -1,3 +1,11 @@
+- cvpo
+	- be able to re-instantiate objects if they don't exist
+	- be able to hash an MRTG a type/CVPO graph from both the compiler and identity perspective
+	- the 'type' interning system should handle both CVPO and Type now
+		- the act of walking types and CVPO should create the CVPOs as we go
+			- need an object to manage this - we should be able to delete these when done?
+		- when we duplicate the type object we'll produce a copy of the CVPO
+			- we need to be able to produce the actual objects
 - fully internalized types shouldn't be able to have an unstable identity at all
 	- NamedModuleMember should identity hash the same way regardless anyways
 	- we should force these Globals to resolve to something specific at resolution time

@@ -22,12 +22,41 @@ PyDoc_STRVAR(PyCompilerVisiblePyObj_doc,
 );
 
 PyMethodDef PyCompilerVisiblePyObj_methods[] = {
+    {"create", (PyCFunction)PyCompilerVisiblePyObj::create, METH_VARARGS | METH_KEYWORDS | METH_STATIC, NULL},
     {NULL}  /* Sentinel */
 };
+
+
+/* static */
+PyObject* PyCompilerVisiblePyObj::create(PyObject* self, PyObject* args, PyObject* kwargs) {
+    return translateExceptionToPyObject([&]() {
+        PyObject* instance;
+        int linkBack = 1;
+        static const char *kwlist[] = {"instance", "linkBackToOriginalObject", NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p", (char**)kwlist, &instance, &linkBack)) {
+            throw PythonExceptionSet();
+        }
+
+        std::unordered_map<PyObject*, CompilerVisiblePyObj*> constantMapCache;
+        std::map<::Type*, ::Type*> groupMap;
+
+        CompilerVisiblePyObj* object = CompilerVisiblePyObj::internalizePyObj(
+            instance,
+            constantMapCache,
+            groupMap,
+            linkBack
+        );
+
+        return PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(object);
+    });
+}
 
 /* static */
 void PyCompilerVisiblePyObj::dealloc(PyCompilerVisiblePyObj *self)
 {
+    decref(self->mElements);
+    decref(self->mKeys);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -41,6 +70,9 @@ PyObject* PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(CompilerVisiblePyObj
 
     PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)PyType_CompilerVisiblePyObj.tp_alloc(&PyType_CompilerVisiblePyObj, 0);
     self->mPyobj = g;
+    self->mElements = nullptr;
+    self->mKeys = nullptr;
+    self->mByKey = nullptr;
 
     memo[g] = incref((PyObject*)self);
 
@@ -56,6 +88,9 @@ PyObject* PyCompilerVisiblePyObj::new_(PyTypeObject *type, PyObject *args, PyObj
 
     if (self != NULL) {
         self->mPyobj = nullptr;
+        self->mElements = nullptr;
+        self->mKeys = nullptr;
+        self->mByKey = nullptr;
     }
 
     return (PyObject*)self;
@@ -73,47 +108,97 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
 
         CompilerVisiblePyObj* obj = pyCVPO->mPyobj;
 
-        if (attr == "kind") {
-            if (obj->isUninitialized()) {
-                return PyUnicode_FromString("Uninitialized");
-            }
-
-            if (obj->isType()) {
-                return PyUnicode_FromString("Type");
-            }
-
-            if (obj->isInstance()) {
-                return PyUnicode_FromString("Instance");
-            }
-
-            if (obj->isPyTuple()) {
-                return PyUnicode_FromString("PyTuple");
-            }
-
-            if (obj->isArbitraryPyObject()) {
-                return PyUnicode_FromString("ArbitraryPyObject");
-            }
-
-            throw std::runtime_error("Unknown CompilerVisiblePyObj Kind");
+        auto it = obj->namedElements().find(attr);
+        if (it != obj->namedElements().end()) {
+            return PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(it->second);
         }
 
-        if (attr == "type" && obj->isType()) {
-            Type* t = obj->getType();
+        auto it2 = obj->namedInts().find(attr);
+        if (it2 != obj->namedInts().end()) {
+            return PyLong_FromLong(it2->second);
+        }
 
-            if (!t) {
-                throw std::runtime_error("Somehow we don't have a type");
+        if (attr == "pyobj") {
+            PyObject* o = obj->getPyObj();
+            if (!o) {
+                throw std::runtime_error("CVPO of kind " + obj->kindAsString() + " has no pyobj");
             }
+            return incref(o);
+        }
 
-            return incref((PyObject*)PyInstance::typeObj(t));
+        if (attr == "kind") {
+            return PyUnicode_FromString(obj->kindAsString().c_str());
+        }
+
+        if (attr == "type" && obj->getType()) {
+            return incref((PyObject*)PyInstance::typeObj(obj->getType()));
         }
 
         if (attr == "instance" && obj->isInstance()) {
             return PyInstance::fromInstance(obj->getInstance());
         }
 
+        if (attr == "stringValue" && obj->isString()) {
+            return PyUnicode_FromString(obj->getStringValue().c_str());
+        }
+
+        if (attr == "name") {
+            return PyUnicode_FromString(obj->getName().c_str());
+        }
+
+        if (attr == "moduleName") {
+            return PyUnicode_FromString(obj->getModuleName().c_str());
+        }
+
+        if (attr == "elements") {
+            if (!pyCVPO->mElements) {
+                pyCVPO->mElements = PyList_New(0);
+                for (auto p: obj->elements()) {
+                    PyList_Append(pyCVPO->mElements, PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(p));
+                }
+            }
+
+            return incref(pyCVPO->mElements);
+        }
+
+        if (attr == "keys") {
+            if (!pyCVPO->mKeys) {
+                pyCVPO->mKeys = PyList_New(0);
+                for (auto p: obj->keys()) {
+                    PyList_Append(pyCVPO->mKeys, PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(p));
+                }
+            }
+
+            return incref(pyCVPO->mKeys);
+        }
+
+        if (attr == "byKey") {
+            if (!pyCVPO->mByKey) {
+                pyCVPO->mByKey = PyDict_New();
+                for (long k = 0; k < obj->keys().size(); k++) {
+                    PyDict_SetItem(
+                        pyCVPO->mByKey,
+                        obj->keys()[k]->getPyObj(),
+                        PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(obj->elements()[k])
+                    );
+                }
+            }
+
+            return incref(pyCVPO->mByKey);
+        }
+
         return PyObject_GenericGetAttr(selfObj, attrName);
     });
 }
+
+PyObject* PyCompilerVisiblePyObj::tp_repr(PyObject *selfObj) {
+    PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)selfObj;
+
+    return translateExceptionToPyObject([&]() {
+        return PyUnicode_FromString(self->mPyobj->toString().c_str());
+    });
+}
+
 
 /* static */
 int PyCompilerVisiblePyObj::init(PyCompilerVisiblePyObj *self, PyObject *args, PyObject *kwargs)
@@ -121,6 +206,7 @@ int PyCompilerVisiblePyObj::init(PyCompilerVisiblePyObj *self, PyObject *args, P
     PyErr_Format(PyExc_RuntimeError, "CompilerVisiblePyObj cannot be initialized directly");
     return -1;
 }
+
 
 PyTypeObject PyType_CompilerVisiblePyObj = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -136,7 +222,7 @@ PyTypeObject PyType_CompilerVisiblePyObj = {
     .tp_getattr = 0,
     .tp_setattr = 0,
     .tp_as_async = 0,
-    .tp_repr = 0,
+    .tp_repr = PyCompilerVisiblePyObj::tp_repr,
     .tp_as_number = 0,
     .tp_as_sequence = 0,
     .tp_as_mapping = 0,

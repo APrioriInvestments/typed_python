@@ -23,6 +23,13 @@ public:
     PyObject_HEAD
 
     CompilerVisiblePyObj* mPyobj;
+    PyObject* mElements;
+    PyObject* mKeys;
+    PyObject* mByKey;
+
+    static PyObject* tp_repr(PyObject *selfObj);
+
+    static PyObject* create(PyObject* self, PyObject* args, PyObject* kwargs);
 
     static PyObject* tp_getattro(PyObject* selfObj, PyObject* attr);
 

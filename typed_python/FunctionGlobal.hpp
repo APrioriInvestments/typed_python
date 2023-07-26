@@ -160,11 +160,26 @@ public:
     }
 
     Type* getValueAsType() {
-        PyObject* obj = getValueAsPyobj();
-        if (obj) {
-            return PyInstance::extractTypeFrom(obj);
+        if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
+            PyObject* ref = extractGlobalRefFromDictOrCell();
+            if (!ref) {
+                return nullptr;
+            }
+            return PyInstance::extractTypeFrom(ref);
         }
-        return nullptr;
+
+        if (isUnbound()) {
+            return nullptr;
+        }
+
+        if (isConstant()) {
+            if (mConstant->isType()) {
+                return mConstant->getType();
+            }
+            return nullptr;
+        }
+
+        throw std::runtime_error("Unknown global kind.");
     }
 
     PyObject* getValueAsPyobj() {
@@ -320,11 +335,11 @@ public:
             auto it = groupMap.find(t);
             if (it != groupMap.end()) {
                 return FunctionGlobal::Constant(
-                    CompilerVisiblePyObj::Type(it->second)
+                    CompilerVisiblePyObj::ForType(it->second)
                 );
             } else {
                 return FunctionGlobal::Constant(
-                    CompilerVisiblePyObj::Type(t)
+                    CompilerVisiblePyObj::ForType(t)
                 );
             }
         }
@@ -356,7 +371,7 @@ public:
         if (it != groupMap.end()) {
             // we're actually a constant!
             return FunctionGlobal::Constant(
-                CompilerVisiblePyObj::Type(it->second)
+                CompilerVisiblePyObj::ForType(it->second)
             );
         }
 
