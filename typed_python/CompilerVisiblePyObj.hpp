@@ -310,7 +310,7 @@ public:
     static PyTypeObject* createAVanillaType() {
         PyObjectStealer emptyBases(PyTuple_New(0));
         PyObjectStealer emptyDict(PyDict_New());
-        
+
         return (PyTypeObject*)PyObject_CallFunction(
             (PyObject*)&PyType_Type,
             "sOO",
@@ -472,7 +472,7 @@ public:
                     if (clsType->tp_dict == val) {
                         if (isVanillaClassType(clsType)) {
                             mKind = Kind::PyClassDict;
-                            
+
                             mNamedElements["class_dict_of"] = internalize(
                                 (PyObject*)clsType
                             );
@@ -481,7 +481,7 @@ public:
                             Py_ssize_t pos = 0;
 
                             while (val && PyDict_Next(val, &pos, &key, &value)) {
-                                if (PyUnicode_Check(key) 
+                                if (PyUnicode_Check(key)
                                     && PyUnicode_AsUTF8(key) != std::string("__dict__")
                                     && PyUnicode_AsUTF8(key) != std::string("__weakref__")
                                 ) {
@@ -706,7 +706,7 @@ public:
             } else {
                 mKind = Kind::PyClassMethod;
             }
-            
+
             PyObjectStealer funcObj(PyObject_GetAttrString(val, "__func__"));
 
             mNamedElements["meth_func"] = internalize(funcObj);
@@ -716,21 +716,34 @@ public:
 
         if (val->ob_type == &PyProperty_Type) {
             mKind = Kind::PyProperty;
-            
-            PyObjectStealer fget(PyObject_GetAttrString(val, "fget"));
-            PyObjectStealer fset(PyObject_GetAttrString(val, "fset"));
-            PyObjectStealer fdel(PyObject_GetAttrString(val, "fdel"));
 
-            mNamedElements["prop_fget"] = internalize(fget);
-            mNamedElements["prop_fset"] = internalize(fdel);
-            mNamedElements["prop_fdel"] = internalize(fset);
+            JustLikeAPropertyObject* prop = (JustLikeAPropertyObject*)mPyObject;
+
+            if (prop->prop_get) {
+                mNamedElements["prop_get"] = internalize(prop->prop_get);
+            }
+            if (prop->prop_set) {
+                mNamedElements["prop_set"] = internalize(prop->prop_set);
+            }
+            if (prop->prop_del) {
+                mNamedElements["prop_del"] = internalize(prop->prop_del);
+            }
+            if (prop->prop_doc) {
+                mNamedElements["prop_doc"] = internalize(prop->prop_doc);
+            }
+
+            #if PY_MINOR_VERSION >= 10
+            if (prop->prop_name) {
+                mNamedElements["prop_name"] = internalize(prop->prop_name);
+            }
+            #endif
 
             return;
         }
 
         if (val->ob_type == &PyMethod_Type) {
             mKind = Kind::PyBoundMethod;
-            
+
             PyObjectStealer fself(PyObject_GetAttrString(val, "__self__"));
             PyObjectStealer ffunc(PyObject_GetAttrString(val, "__func__"));
 
@@ -848,9 +861,9 @@ public:
         }
 
         std::unordered_set<CompilerVisiblePyObj*> needsResolution;
-        
+
         PyObject* res = getPyObj(needsResolution);
-        
+
         for (auto n: needsResolution) {
             n->finalizeGetPyObj();
         }
@@ -889,7 +902,7 @@ public:
         if (mKind == Kind::PyDict || mKind == Kind::PyClassDict) {
             for (long k = 0; k < mElements.size() && k < mKeys.size(); k++) {
                 PyDict_SetItem(
-                    mPyObject, 
+                    mPyObject,
                     mKeys[k]->getPyObj(),
                     mElements[k]->getPyObj()
                 );
@@ -906,13 +919,37 @@ public:
     }
 
     PyObject* getPyObj(std::unordered_set<CompilerVisiblePyObj*>& needsResolution) {
+        PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
+
         if (!mPyObject) {
-            if (mKind == Kind::Type) {
+            if (mKind == Kind::ArbitraryPyObject) {
+                throw std::runtime_error("Corrupt CompilerVisiblePyObj.ArbitraryPyObject: missing mPyObject");
+            } else if (mKind == Kind::Type) {
                 mPyObject = (PyObject*)PyInstance::typeObj(mType);
             } else if (mKind == Kind::String) {
                 mPyObject = PyUnicode_FromString(mStringValue.c_str());
             } else if (mKind == Kind::Instance) {
                 mPyObject = PyInstance::extractPythonObject(mInstance);
+            } else if (mKind == Kind::NamedPyObject) {
+                PyObjectStealer nameAsStr(PyUnicode_FromString(mModuleName.c_str()));
+                PyObjectStealer moduleObject(
+                    PyObject_GetItem(sysModuleModules, nameAsStr)
+                );
+
+                if (!moduleObject) {
+                    PyErr_Clear();
+                    // TODO: should we be importing here? that seems dangerous...
+                    throw std::runtime_error("Somehow module " + mModuleName + " is not loaded!");
+                }
+                PyObjectStealer inst(PyObject_GetAttrString(moduleObject, mName.c_str()));
+                if (!inst) {
+                    PyErr_Clear();
+
+                    // TODO: should we be importing here? that seems dangerous...
+                    throw std::runtime_error("Somehow module " + mModuleName + " is missing member " + mName);
+                }
+
+                mPyObject = incref(inst);
             } else if (mKind == Kind::PyDict || mKind == Kind::PyClassDict) {
                 mPyObject = PyDict_New();
                 needsResolution.insert(this);
@@ -946,19 +983,18 @@ public:
                 PyTuple_SetItem(argTup, 0, PyUnicode_FromString(mName.c_str()));
                 PyTuple_SetItem(argTup, 1, incref(getNamedElementPyobj("cls_bases", needsResolution)));
                 PyTuple_SetItem(argTup, 2, incref(getNamedElementPyobj("cls_dict", needsResolution)));
-                
+
                 mPyObject = PyType_Type.tp_new(&PyType_Type, argTup, nullptr);
 
                 if (!mPyObject) {
                     throw PythonExceptionSet();
                 }
             } else if (mKind == Kind::PyModule) {
-                PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
                 PyObjectStealer nameAsStr(PyUnicode_FromString(mName.c_str()));
                 PyObjectStealer moduleObject(
                     PyObject_GetItem(sysModuleModules, nameAsStr)
                 );
-                
+
                 if (!moduleObject) {
                     PyErr_Clear();
                     // TODO: should we be importing here? that seems dangerous...
@@ -998,21 +1034,21 @@ public:
                 if (mNamedElements.find("func_closure") != mNamedElements.end()) {
                     PyFunction_SetClosure(
                         mPyObject,
-                        getNamedElementPyobj("func_closure", needsResolution) 
+                        getNamedElementPyobj("func_closure", needsResolution)
                     );
                 }
 
                 if (mNamedElements.find("func_annotations") != mNamedElements.end()) {
                     PyFunction_SetAnnotations(
                         mPyObject,
-                        getNamedElementPyobj("func_annotations", needsResolution) 
+                        getNamedElementPyobj("func_annotations", needsResolution)
                     );
                 }
 
                 if (mNamedElements.find("func_defaults") != mNamedElements.end()) {
                     PyFunction_SetAnnotations(
                         mPyObject,
-                        getNamedElementPyobj("func_defaults", needsResolution) 
+                        getNamedElementPyobj("func_defaults", needsResolution)
                     );
                 }
 
@@ -1020,7 +1056,7 @@ public:
                     PyObject_SetAttrString(
                         mPyObject,
                         "__qualname__",
-                        getNamedElementPyobj("func_qualname", needsResolution) 
+                        getNamedElementPyobj("func_qualname", needsResolution)
                     );
                 }
 
@@ -1028,7 +1064,7 @@ public:
                     PyObject_SetAttrString(
                         mPyObject,
                         "__kwdefaults__",
-                        getNamedElementPyobj("func_kwdefaults", needsResolution) 
+                        getNamedElementPyobj("func_kwdefaults", needsResolution)
                     );
                 }
 
@@ -1036,7 +1072,7 @@ public:
                     PyObject_SetAttrString(
                         mPyObject,
                         "__name__",
-                        getNamedElementPyobj("func_name", needsResolution) 
+                        getNamedElementPyobj("func_name", needsResolution)
                     );
                 }
             } else if (mKind == Kind::PyCodeObject) {
@@ -1071,6 +1107,53 @@ public:
                     needsResolution
                     )
                 );
+            } else if (mKind == Kind::PyStaticMethod) {
+                mPyObject = PyStaticMethod_New(Py_None);
+
+                JustLikeAClassOrStaticmethod* method = (JustLikeAClassOrStaticmethod*)mPyObject;
+                decref(method->cm_callable);
+                method->cm_callable = incref(getNamedElementPyobj("meth_func", needsResolution));
+            } else if (mKind == Kind::PyClassMethod) {
+                static PyObject* nones = PyTuple_Pack(3, Py_None, Py_None, Py_None);
+
+                mPyObject = PyObject_CallObject((PyObject*)&PyProperty_Type, nones);
+
+                JustLikeAPropertyObject* dest = (JustLikeAPropertyObject*)mPyObject;
+
+                decref(dest->prop_get);
+                decref(dest->prop_set);
+                decref(dest->prop_del);
+                decref(dest->prop_doc);
+
+                dest->prop_get = nullptr;
+                dest->prop_set = nullptr;
+                dest->prop_del = nullptr;
+                dest->prop_doc = nullptr;
+
+                #if PY_MINOR_VERSION >= 10
+                decref(dest->prop_name);
+                dest->prop_name = nullptr;
+                #endif
+
+                dest->prop_get = incref(getNamedElementPyobj("prop_get", needsResolution, true));
+                dest->prop_set = incref(getNamedElementPyobj("prop_set", needsResolution, true));
+                dest->prop_del = incref(getNamedElementPyobj("prop_del", needsResolution, true));
+                dest->prop_doc = incref(getNamedElementPyobj("prop_doc", needsResolution, true));
+
+                #if PY_MINOR_VERSION >= 10
+                decref(dest->prop_name);
+                dest->prop_name = incref(getNamedElementPyobj("prop_name", needsResolution, true));
+                #endif
+            } else if (mKind == Kind::PyBoundMethod) {
+                mPyObject = PyMethod_New(Py_None, Py_None);
+                PyMethodObject* method = (PyMethodObject*)mPyObject;
+                decref(method->im_func);
+                decref(method->im_self);
+                method->im_func = nullptr;
+                method->im_self = nullptr;
+
+                method->im_func = incref(getNamedElementPyobj("meth_func", needsResolution));
+                method->im_self = incref(getNamedElementPyobj("meth_self", needsResolution));
             } else {
                 throw std::runtime_error(
                     "Can't make a python object representation for a CVPO of kind " + kindAsString()
@@ -1083,10 +1166,14 @@ public:
 
     PyObject* getNamedElementPyobj(
         std::string name,
-        std::unordered_set<CompilerVisiblePyObj*>& needsResolution
+        std::unordered_set<CompilerVisiblePyObj*>& needsResolution,
+        bool allowEmpty=false
     ) {
         auto it = mNamedElements.find(name);
         if (it == mNamedElements.end()) {
+            if (allowEmpty) {
+                return nullptr;
+            }
             throw std::runtime_error(
                 "Corrupt CompilerVisiblePyObj." + kindAsString() + ". missing " + name
             );

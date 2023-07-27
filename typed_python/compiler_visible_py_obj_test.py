@@ -28,7 +28,7 @@ def test_make_cvpo_basic():
 
     assert CompilerVisiblePyObj.create(ListOf(int)((1, 2, 3))).kind == 'Instance'
     assert CompilerVisiblePyObj.create(ListOf(int)((1, 2, 3))).instance[1] == 2
-    
+
 
 def test_cvpo_function():
     y = 10
@@ -68,7 +68,7 @@ def test_cvpo_function():
     assert cvpo.func_code.co_cellvars.pyobj == f.__code__.co_cellvars
     assert cvpo.func_code.co_name.pyobj == f.__code__.co_name
     assert cvpo.func_code.co_filename.pyobj == f.__code__.co_filename
-    
+
 
 def test_cvpo_numpy_internals():
     assert CompilerVisiblePyObj.create(numpy.array).kind == 'NamedPyObject'
@@ -110,11 +110,11 @@ def test_cvpo_class():
 
         @staticmethod
         def staticMeth():
-            return 10 
+            return 10
 
         @classmethod
         def clsMeth(cls):
-            return 10 
+            return 10
 
     gInst = G()
     gMeth = gInst.f
@@ -144,8 +144,8 @@ def test_cvpo_class():
     GPO = gInstPO.inst_type
     assert GPO.kind == 'PyClass'
     assert GPO.cls_bases.pyobj == (C,)
-    
-    # we can't actually tell that this is a class dict because 
+
+    # we can't actually tell that this is a class dict because
     # its not the base class
     assert GPO.cls_dict.kind == 'PyDict'
 
@@ -184,5 +184,7 @@ def test_cvpo_rehydration():
     assert C2.__module__ == C.__module__
     assert C2.f is not C.f
     c2Inst = C2cvpo.cls_dict.byKey['f'].func_closure.elements[0].cell_contents.pyobj
-    
+
     assert C2().f() is c2Inst
+
+    assert CompilerVisiblePyObj.create(print, False).pyobj is print
