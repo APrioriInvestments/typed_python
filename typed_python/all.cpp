@@ -78,7 +78,9 @@ compile the entire group all at once.
 #include "PyTemporaryReferenceTracer.cpp"
 #include "PyFunctionOverload.cpp"
 #include "PyFunctionGlobal.cpp"
+#include "PyObjSnapshot.cpp"
 #include "PyPyObjSnapshot.cpp"
+#include "PyPyObjGraphSnapshot.cpp"
 
 #include "lz4.c"
 #include "lz4frame.c"

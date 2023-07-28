@@ -38,6 +38,7 @@
 #include "PyFunctionOverload.hpp"
 #include "PyFunctionGlobal.hpp"
 #include "PyPyObjSnapshot.hpp"
+#include "PyPyObjGraphSnapshot.hpp"
 #include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
 #include "CompilerVisibleObjectVisitor.hpp"
@@ -3863,8 +3864,13 @@ PyInit__types(void)
         return NULL;
     }
 
+    if (PyType_Ready(&PyType_PyObjGraphSnapshot) < 0) {
+        return NULL;
+    }
+
     PyModule_AddObject(module, "FunctionOverload", (PyObject*)incref(&PyType_FunctionOverload));
     PyModule_AddObject(module, "PyObjSnapshot", (PyObject*)incref(&PyType_PyObjSnapshot));
+    PyModule_AddObject(module, "PyObjGraphSnapshot", (PyObject*)incref(&PyType_PyObjGraphSnapshot));
     PyModule_AddObject(module, "FunctionGlobal", (PyObject*)incref(&PyType_FunctionGlobal));
     PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
     PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(&PyType_ModuleRepresentation));

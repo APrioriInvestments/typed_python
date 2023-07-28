@@ -17,34 +17,24 @@
 #pragma once
 
 #include "PyInstance.hpp"
+#include "PyObjGraphSnapshot.hpp"
 
-class PyPyObjSnapshot {
+class PyPyObjGraphSnapshot {
 public:
     PyObject_HEAD
 
-    PyObjSnapshot* mPyobj;
-
-    // a graph object we're keeping alive
-    PyObject* mGraph;
-
-    // caches of our 'elements/keys/byKey' members, which we produce on demand
-    PyObject* mElements;
-    PyObject* mKeys;
-    PyObject* mByKey;
+    PyObjGraphSnapshot* mGraphSnapshot;
+    bool mOwnsSnapshot;
 
     static PyObject* tp_repr(PyObject *selfObj);
 
-    static PyObject* create(PyObject* self, PyObject* args, PyObject* kwargs);
-
-    static PyObject* tp_getattro(PyObject* selfObj, PyObject* attr);
-
-    static void dealloc(PyPyObjSnapshot *self);
+    static void dealloc(PyPyObjGraphSnapshot *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
 
-    static PyObject* newPyObjSnapshot(PyObjSnapshot* o, PyObject* pyGraphPtr=nullptr);
+    static PyObject* newPyObjGraphSnapshot(PyObjGraphSnapshot* o, bool ownsIt);
 
-    static int init(PyPyObjSnapshot *self, PyObject *args, PyObject *kwargs);
+    static int init(PyPyObjGraphSnapshot *self, PyObject *args, PyObject *kwargs);
 };
 
-extern PyTypeObject PyType_PyObjSnapshot;
+extern PyTypeObject PyType_PyObjGraphSnapshot;

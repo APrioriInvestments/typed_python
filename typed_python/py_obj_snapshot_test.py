@@ -4,7 +4,7 @@ from typed_python import ListOf
 from typed_python._types import PyObjSnapshot
 
 
-def test_make_cvpo_basic():
+def test_make_snapshot_basic():
     assert PyObjSnapshot.create(int).kind == 'Type'
 
     assert PyObjSnapshot.create((1, 2, 3)).kind == 'PyTuple'
@@ -30,47 +30,47 @@ def test_make_cvpo_basic():
     assert PyObjSnapshot.create(ListOf(int)((1, 2, 3))).instance[1] == 2
 
 
-def test_cvpo_function():
+def test_snapshot_function():
     y = 10
 
     def f(x: int, z=20):
         return 10 + y
 
-    cvpo = PyObjSnapshot.create(f)
+    snapshot = PyObjSnapshot.create(f)
 
-    assert cvpo.kind == 'PyFunction'
-    assert cvpo.name == 'f'
-    assert cvpo.moduleName == 'typed_python.py_obj_snapshot_test'
-    assert cvpo.func_name.kind == 'String'
-    assert cvpo.func_module.kind == 'String'
-    assert cvpo.func_closure.kind == 'PyTuple'
-    assert cvpo.func_closure.elements[0].kind == 'PyCell'
-    assert cvpo.func_closure.elements[0].cell_contents.pyobj == 10
-    assert cvpo.func_globals.kind == "PyModuleDict"
-    assert cvpo.func_globals.name == 'typed_python.py_obj_snapshot_test'
-    assert cvpo.func_annotations.pyobj['x'] is int
-    assert cvpo.func_defaults.pyobj == (20,)
-    assert not hasattr(cvpo, 'func_kwdefaults')
+    assert snapshot.kind == 'PyFunction'
+    assert snapshot.name == 'f'
+    assert snapshot.moduleName == 'typed_python.py_obj_snapshot_test'
+    assert snapshot.func_name.kind == 'String'
+    assert snapshot.func_module.kind == 'String'
+    assert snapshot.func_closure.kind == 'PyTuple'
+    assert snapshot.func_closure.elements[0].kind == 'PyCell'
+    assert snapshot.func_closure.elements[0].cell_contents.pyobj == 10
+    assert snapshot.func_globals.kind == "PyModuleDict"
+    assert snapshot.func_globals.name == 'typed_python.py_obj_snapshot_test'
+    assert snapshot.func_annotations.pyobj['x'] is int
+    assert snapshot.func_defaults.pyobj == (20,)
+    assert not hasattr(snapshot, 'func_kwdefaults')
 
-    assert cvpo.func_code.kind == 'PyCodeObject'
-    assert cvpo.func_code.co_argcount == 2
-    assert cvpo.func_code.co_kwonlyargcount == 0
-    assert cvpo.func_code.co_flags == f.__code__.co_flags
-    assert cvpo.func_code.co_posonlyargcount == f.__code__.co_posonlyargcount
-    assert cvpo.func_code.co_nlocals == f.__code__.co_nlocals
-    assert cvpo.func_code.co_stacksize == f.__code__.co_stacksize
-    assert cvpo.func_code.co_firstlineno == f.__code__.co_firstlineno
-    assert cvpo.func_code.co_code.pyobj == f.__code__.co_code
-    assert cvpo.func_code.co_consts.pyobj == f.__code__.co_consts
-    assert cvpo.func_code.co_names.pyobj == f.__code__.co_names
-    assert cvpo.func_code.co_varnames.pyobj == f.__code__.co_varnames
-    assert cvpo.func_code.co_freevars.pyobj == f.__code__.co_freevars
-    assert cvpo.func_code.co_cellvars.pyobj == f.__code__.co_cellvars
-    assert cvpo.func_code.co_name.pyobj == f.__code__.co_name
-    assert cvpo.func_code.co_filename.pyobj == f.__code__.co_filename
+    assert snapshot.func_code.kind == 'PyCodeObject'
+    assert snapshot.func_code.co_argcount == 2
+    assert snapshot.func_code.co_kwonlyargcount == 0
+    assert snapshot.func_code.co_flags == f.__code__.co_flags
+    assert snapshot.func_code.co_posonlyargcount == f.__code__.co_posonlyargcount
+    assert snapshot.func_code.co_nlocals == f.__code__.co_nlocals
+    assert snapshot.func_code.co_stacksize == f.__code__.co_stacksize
+    assert snapshot.func_code.co_firstlineno == f.__code__.co_firstlineno
+    assert snapshot.func_code.co_code.pyobj == f.__code__.co_code
+    assert snapshot.func_code.co_consts.pyobj == f.__code__.co_consts
+    assert snapshot.func_code.co_names.pyobj == f.__code__.co_names
+    assert snapshot.func_code.co_varnames.pyobj == f.__code__.co_varnames
+    assert snapshot.func_code.co_freevars.pyobj == f.__code__.co_freevars
+    assert snapshot.func_code.co_cellvars.pyobj == f.__code__.co_cellvars
+    assert snapshot.func_code.co_name.pyobj == f.__code__.co_name
+    assert snapshot.func_code.co_filename.pyobj == f.__code__.co_filename
 
 
-def test_cvpo_numpy_internals():
+def test_snapshot_numpy_internals():
     assert PyObjSnapshot.create(numpy.array).kind == 'NamedPyObject'
 
     # in theory, we could do better than this by using the reduce pathway.
@@ -83,7 +83,7 @@ def test_cvpo_numpy_internals():
     assert PyObjSnapshot.create(numpy.array([1])).kind == 'ArbitraryPyObject'
 
 
-def test_cvpo_builtins():
+def test_snapshot_builtins():
     assert PyObjSnapshot.create(__builtins__).kind == 'PyModuleDict'
     assert PyObjSnapshot.create(__builtins__).module_dict_of.kind == 'PyModule'
     assert PyObjSnapshot.create(set).kind == 'NamedPyObject'
@@ -92,7 +92,7 @@ def test_cvpo_builtins():
     assert PyObjSnapshot.create(range).kind == 'NamedPyObject'
 
 
-def test_cvpo_class():
+def test_snapshot_class():
     class C:
         def f(self):
             return gInst
@@ -119,24 +119,24 @@ def test_cvpo_class():
     gInst = G()
     gMeth = gInst.f
 
-    cvpo = PyObjSnapshot.create(C)
+    snapshot = PyObjSnapshot.create(C)
 
-    assert cvpo.kind == 'PyClass'
-    assert cvpo.name == 'C'
-    assert cvpo.moduleName == 'typed_python.py_obj_snapshot_test'
-    assert cvpo.cls_dict.kind == 'PyClassDict'
+    assert snapshot.kind == 'PyClass'
+    assert snapshot.name == 'C'
+    assert snapshot.moduleName == 'typed_python.py_obj_snapshot_test'
+    assert snapshot.cls_dict.kind == 'PyClassDict'
 
-    assert cvpo.cls_dict.byKey['aProp'].kind == 'PyProperty'
-    assert cvpo.cls_dict.byKey['aProp'].prop_get.kind == 'PyFunction'
+    assert snapshot.cls_dict.byKey['aProp'].kind == 'PyProperty'
+    assert snapshot.cls_dict.byKey['aProp'].prop_get.kind == 'PyFunction'
 
-    assert cvpo.cls_dict.byKey['f'].kind == 'PyFunction'
+    assert snapshot.cls_dict.byKey['f'].kind == 'PyFunction'
 
-    gMethPO = cvpo.cls_dict.byKey['fMeth'].func_closure.elements[0].cell_contents
+    gMethPO = snapshot.cls_dict.byKey['fMeth'].func_closure.elements[0].cell_contents
     assert gMethPO.kind == 'PyBoundMethod'
     assert gMethPO.meth_self.pyobj is gInst
     assert gMethPO.meth_func.kind == 'PyFunction'
 
-    gInstPO = cvpo.cls_dict.byKey['f'].func_closure.elements[0].cell_contents
+    gInstPO = snapshot.cls_dict.byKey['f'].func_closure.elements[0].cell_contents
     assert gInstPO.pyobj is gInst
     assert gInstPO.inst_dict.kind == 'PyDict'
     gInstPO.inst_dict.byKey['y'].kind == 'Instance'
@@ -156,7 +156,7 @@ def test_cvpo_class():
     assert GPO.cls_dict.byKey['clsMeth'].meth_func.kind == 'PyFunction'
 
 
-def test_cvpo_rehydration():
+def test_snapshot_rehydration():
     assert PyObjSnapshot.create(1, False).pyobj == 1
     assert PyObjSnapshot.create('1', False).pyobj == '1'
     assert PyObjSnapshot.create(b'1', False).pyobj == b'1'
@@ -193,17 +193,30 @@ def test_cvpo_rehydration():
     cInst = C()
     cInstMeth = cInst.getCInstMeth
 
-    C2cvpo = PyObjSnapshot.create(C, False)
-    C2 = C2cvpo.pyobj
+    C2snapshot = PyObjSnapshot.create(C, False)
+    C2 = C2snapshot.pyobj
 
     assert C2 is not C
     assert C2.__name__ == C.__name__
     assert C2.__module__ == C.__module__
     assert C2.getCInst is not C.getCInst
 
-    c2Inst = C2cvpo.cls_dict.byKey['getCInst'].func_closure.elements[0].cell_contents.pyobj
-    c2InstMeth = C2cvpo.cls_dict.byKey['getCInstMeth'].func_closure.elements[0].cell_contents.pyobj
+    c2Inst = C2snapshot.cls_dict.byKey['getCInst'].func_closure.elements[0].cell_contents.pyobj
+    c2InstMeth = C2snapshot.cls_dict.byKey['getCInstMeth'].func_closure.elements[0].cell_contents.pyobj
 
     assert C2().getCInst() is c2Inst
     assert C2().getCInstMeth() is c2InstMeth
     assert c2InstMeth() is c2InstMeth
+
+
+def test_snapshot_graph():
+    def f():
+        return f
+
+    s1 = PyObjSnapshot.create(f)
+    s2 = PyObjSnapshot.create(f)
+
+    assert s1.graph is not s2.graph
+    assert s1.kind == 'PyFunction'
+    assert s1.func_closure.graph is s1.graph
+    assert s1.func_closure.graph is not s2.func_closure.graph

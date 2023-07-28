@@ -21,6 +21,8 @@
 #include "Instance.hpp"
 #include "PythonTypeInternals.hpp"
 
+class PyObjGraphSnapshot;
+
 
 /*********************************
 PyObjSnapshot
@@ -39,6 +41,7 @@ changing underneath us.
 **********************************/
 
 class PyObjSnapshot {
+private:
     enum class Kind {
         // this should never be visible in a running program
         Uninitialized = 0,
@@ -92,19 +95,28 @@ class PyObjSnapshot {
         ArbitraryPyObject
     };
 
-    PyObjSnapshot() :
+    PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
         mKind(Kind::Uninitialized),
         mType(nullptr),
-        mPyObject(nullptr)
+        mPyObject(nullptr),
+        mGraph(inGraph)
     {
     }
 
 public:
+    ~PyObjSnapshot() {
+        decref(mPyObject);
+    }
+
     static PyObjSnapshot* ForType(Type* t) {
         PyObjSnapshot* res = new PyObjSnapshot();
         res->mKind = Kind::Type;
         res->mType = t;
         return res;
+    }
+
+    PyObjGraphSnapshot* getGraph() const {
+        return mGraph;
     }
 
     bool isUninitialized() const {
@@ -284,28 +296,13 @@ public:
         return PyUnicode_AsUTF8(o);
     }
 
-    // return a CVPO for 'val', stashing it in 'constantMapCache'
-    // in case we hit a recursion.
     static PyObjSnapshot* internalizePyObj(
         PyObject* val,
         std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<::Type*, ::Type*>& groupMap,
-        bool linkBackToOriginalObject = true
-    ) {
-        auto it = constantMapCache.find(val);
-
-        if (it != constantMapCache.end()) {
-            return it->second;
-        }
-
-        constantMapCache[val] = new PyObjSnapshot();
-
-        constantMapCache[val]->becomeInternalizedOf(
-            val, constantMapCache, groupMap, linkBackToOriginalObject
-        );
-
-        return constantMapCache[val];
-    }
+        bool linkBackToOriginalObject=true,
+        PyObjGraphSnapshot* graph=nullptr
+    );
 
     static PyTypeObject* createAVanillaType() {
         PyObjectStealer emptyBases(PyTuple_New(0));
@@ -370,7 +367,8 @@ public:
         PyObject* val,
         std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<::Type*, ::Type*>& groupMap,
-        bool linkBackToOriginalObject
+        bool linkBackToOriginalObject,
+        PyObjGraphSnapshot* graph
     ) {
         // we're always the internalized version of this object
         if (linkBackToOriginalObject) {
@@ -379,7 +377,7 @@ public:
 
         auto internalize = [&](PyObject* o) {
             return PyObjSnapshot::internalizePyObj(
-                o, constantMapCache, groupMap, linkBackToOriginalObject
+                o, constantMapCache, groupMap, linkBackToOriginalObject, graph
             );
         };
 
@@ -1309,7 +1307,9 @@ private:
             }
         }
     }
+
     Kind mKind;
+    PyObjGraphSnapshot* mGraph;
 
     ::Type* mType;
     ::Instance mInstance;

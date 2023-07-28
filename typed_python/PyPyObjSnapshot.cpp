@@ -15,10 +15,11 @@
 ******************************************************************************/
 
 #include "PyPyObjSnapshot.hpp"
-
+#include "PyPyObjGraphSnapshot.hpp"
+#include "PyObjGraphSnapshot.hpp"
 
 PyDoc_STRVAR(PyPyObjSnapshot_doc,
-    "A single overload of a Function type object.\n\n"
+    "A single object in a snapshot graph.\n\n"
 );
 
 PyMethodDef PyPyObjSnapshot_methods[] = {
@@ -41,14 +42,18 @@ PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwar
         std::unordered_map<PyObject*, PyObjSnapshot*> constantMapCache;
         std::map<::Type*, ::Type*> groupMap;
 
+        PyObjGraphSnapshot* graph = new PyObjGraphSnapshot();
+
         PyObjSnapshot* object = PyObjSnapshot::internalizePyObj(
             instance,
             constantMapCache,
             groupMap,
-            linkBack
+            linkBack,
+            graph
         );
 
-        return PyPyObjSnapshot::newPyObjSnapshot(object);
+        PyObjectStealer graphObj(PyPyObjGraphSnapshot::newPyObjGraphSnapshot(graph, true));
+        return PyPyObjSnapshot::newPyObjSnapshot(object, graphObj);
     });
 }
 
@@ -57,24 +62,19 @@ void PyPyObjSnapshot::dealloc(PyPyObjSnapshot *self)
 {
     decref(self->mElements);
     decref(self->mKeys);
+    decref(self->mGraph);
+    decref(self->mByKey);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-PyObject* PyPyObjSnapshot::newPyObjSnapshot(PyObjSnapshot* g) {
-    static std::unordered_map<PyObjSnapshot*, PyObject*> memo;
-
-    auto it = memo.find(g);
-    if (it != memo.end()) {
-        return incref(it->second);
-    }
-
+PyObject* PyPyObjSnapshot::newPyObjSnapshot(PyObjSnapshot* g, PyObject* pyGraphPtr) {
     PyPyObjSnapshot* self = (PyPyObjSnapshot*)PyType_PyObjSnapshot.tp_alloc(&PyType_PyObjSnapshot, 0);
+
     self->mPyobj = g;
+    self->mGraph = incref(pyGraphPtr);
     self->mElements = nullptr;
     self->mKeys = nullptr;
     self->mByKey = nullptr;
-
-    memo[g] = incref((PyObject*)self);
 
     return (PyObject*)self;
 }
@@ -90,6 +90,7 @@ PyObject* PyPyObjSnapshot::new_(PyTypeObject *type, PyObject *args, PyObject *kw
         self->mPyobj = nullptr;
         self->mElements = nullptr;
         self->mKeys = nullptr;
+        self->mGraph = nullptr;
         self->mByKey = nullptr;
     }
 
@@ -110,7 +111,10 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
 
         auto it = obj->namedElements().find(attr);
         if (it != obj->namedElements().end()) {
-            return PyPyObjSnapshot::newPyObjSnapshot(it->second);
+            return PyPyObjSnapshot::newPyObjSnapshot(
+                it->second,
+                it->second->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+            );
         }
 
         auto it2 = obj->namedInts().find(attr);
@@ -128,6 +132,10 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
 
         if (attr == "kind") {
             return PyUnicode_FromString(obj->kindAsString().c_str());
+        }
+
+        if (attr == "graph") {
+            return incref(pyCVPO->mGraph ? pyCVPO->mGraph : Py_None);
         }
 
         if (attr == "type" && obj->getType()) {
@@ -154,7 +162,13 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
             if (!pyCVPO->mElements) {
                 pyCVPO->mElements = PyList_New(0);
                 for (auto p: obj->elements()) {
-                    PyList_Append(pyCVPO->mElements, PyPyObjSnapshot::newPyObjSnapshot(p));
+                    PyList_Append(
+                        pyCVPO->mElements,
+                        PyPyObjSnapshot::newPyObjSnapshot(
+                            p,
+                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                        )
+                    );
                 }
             }
 
@@ -165,7 +179,13 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
             if (!pyCVPO->mKeys) {
                 pyCVPO->mKeys = PyList_New(0);
                 for (auto p: obj->keys()) {
-                    PyList_Append(pyCVPO->mKeys, PyPyObjSnapshot::newPyObjSnapshot(p));
+                    PyList_Append(
+                        pyCVPO->mKeys,
+                        PyPyObjSnapshot::newPyObjSnapshot(
+                            p,
+                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                        )
+                    );
                 }
             }
 
@@ -176,10 +196,15 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
             if (!pyCVPO->mByKey) {
                 pyCVPO->mByKey = PyDict_New();
                 for (long k = 0; k < obj->keys().size(); k++) {
+                    PyObjSnapshot* p = obj->elements()[k];
+
                     PyDict_SetItem(
                         pyCVPO->mByKey,
                         obj->keys()[k]->getPyObj(),
-                        PyPyObjSnapshot::newPyObjSnapshot(obj->elements()[k])
+                        PyPyObjSnapshot::newPyObjSnapshot(
+                            p,
+                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                        )
                     );
                 }
             }
