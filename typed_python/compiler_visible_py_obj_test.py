@@ -16,9 +16,9 @@ def test_make_cvpo_basic():
     assert CompilerVisiblePyObj.create([1, 2, 3]).kind == 'PyList'
     assert CompilerVisiblePyObj.create([1, 2, 3]).elements[0].kind == 'Instance'
 
-    assert CompilerVisiblePyObj.create({1:2}).kind == 'PyDict'
-    assert CompilerVisiblePyObj.create({'1':2}).elements[0].kind == 'Instance'
-    assert CompilerVisiblePyObj.create({'1':2}).keys[0].kind == 'String'
+    assert CompilerVisiblePyObj.create({1: 2}).kind == 'PyDict'
+    assert CompilerVisiblePyObj.create({'1': 2}).elements[0].kind == 'Instance'
+    assert CompilerVisiblePyObj.create({'1': 2}).keys[0].kind == 'String'
 
     assert CompilerVisiblePyObj.create(1).kind == 'Instance'
     assert CompilerVisiblePyObj.create(1).instance == 1
@@ -127,7 +127,7 @@ def test_cvpo_class():
     assert cvpo.cls_dict.kind == 'PyClassDict'
 
     assert cvpo.cls_dict.byKey['aProp'].kind == 'PyProperty'
-    assert cvpo.cls_dict.byKey['aProp'].prop_fget.kind == 'PyFunction'
+    assert cvpo.cls_dict.byKey['aProp'].prop_get.kind == 'PyFunction'
 
     assert cvpo.cls_dict.byKey['f'].kind == 'PyFunction'
 
@@ -163,7 +163,8 @@ def test_cvpo_rehydration():
     assert CompilerVisiblePyObj.create([1, 2, 'hi'], False).pyobj == [1, 2, 'hi']
     assert CompilerVisiblePyObj.create((1, 2, 'hi'), False).pyobj == (1, 2, 'hi')
     assert CompilerVisiblePyObj.create({1, 2}, False).pyobj == {1, 2}
-    assert CompilerVisiblePyObj.create({1: 2,'3': 4}, False).pyobj == {1: 2, '3': 4}
+    assert CompilerVisiblePyObj.create({1: 2, '3': 4}, False).pyobj == {1: 2, '3': 4}
+    assert CompilerVisiblePyObj.create(print, False).pyobj is print
 
     def f():
         return 1
@@ -171,20 +172,38 @@ def test_cvpo_rehydration():
     assert CompilerVisiblePyObj.create(f, False).pyobj() == 1
 
     class C:
-        def f(self):
+        @property
+        def aProp(self):
+            return 10
+
+        @staticmethod
+        def aSM(x):
+            return x + 1
+
+        @classmethod
+        def aCM(x):
+            return x + 1
+
+        def getCInst(self):
             return cInst
 
+        def getCInstMeth(self):
+            return cInstMeth
+
     cInst = C()
+    cInstMeth = cInst.getCInstMeth
 
     C2cvpo = CompilerVisiblePyObj.create(C, False)
     C2 = C2cvpo.pyobj
 
-    assert C2  is not C
+    assert C2 is not C
     assert C2.__name__ == C.__name__
     assert C2.__module__ == C.__module__
-    assert C2.f is not C.f
-    c2Inst = C2cvpo.cls_dict.byKey['f'].func_closure.elements[0].cell_contents.pyobj
+    assert C2.getCInst is not C.getCInst
 
-    assert C2().f() is c2Inst
+    c2Inst = C2cvpo.cls_dict.byKey['getCInst'].func_closure.elements[0].cell_contents.pyobj
+    c2InstMeth = C2cvpo.cls_dict.byKey['getCInstMeth'].func_closure.elements[0].cell_contents.pyobj
 
-    assert CompilerVisiblePyObj.create(print, False).pyobj is print
+    assert C2().getCInst() is c2Inst
+    assert C2().getCInstMeth() is c2InstMeth
+    assert c2InstMeth() is c2InstMeth

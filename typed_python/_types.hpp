@@ -17,6 +17,7 @@
 #pragma once
 
 #include <Python.h>
+#include "PythonTypeInternals.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple);
 PyObject *MakePointerToType(PyObject* nullValue, PyObject* args);
@@ -53,23 +54,3 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args);
 PyObject *MakeSubclassOfType(PyObject* nullValue, PyObject* args);
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
 PyObject *MakeForwardType(PyObject* nullValue, PyObject* args, PyObject* kwargs);
-
-typedef struct {
-    PyObject_HEAD
-    PyObject *prop_get;
-    PyObject *prop_set;
-    PyObject *prop_del;
-    PyObject *prop_doc;
-
-    #if PY_MINOR_VERSION >= 10
-    PyObject *prop_name;
-    #endif
-
-    int getter_doc;
-} JustLikeAPropertyObject;
-
-typedef struct {
-    PyObject_HEAD
-    PyObject *cm_callable;
-    PyObject *cm_dict;
-} JustLikeAClassOrStaticmethod;

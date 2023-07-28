@@ -19,6 +19,7 @@
 #include <vector>
 #include "Type.hpp"
 #include "Instance.hpp"
+#include "PythonTypeInternals.hpp"
 
 
 /*********************************
@@ -717,7 +718,7 @@ public:
         if (val->ob_type == &PyProperty_Type) {
             mKind = Kind::PyProperty;
 
-            JustLikeAPropertyObject* prop = (JustLikeAPropertyObject*)mPyObject;
+            JustLikeAPropertyObject* prop = (JustLikeAPropertyObject*)val;
 
             if (prop->prop_get) {
                 mNamedElements["prop_get"] = internalize(prop->prop_get);
@@ -1114,6 +1115,12 @@ public:
                 decref(method->cm_callable);
                 method->cm_callable = incref(getNamedElementPyobj("meth_func", needsResolution));
             } else if (mKind == Kind::PyClassMethod) {
+                mPyObject = PyClassMethod_New(Py_None);
+
+                JustLikeAClassOrStaticmethod* method = (JustLikeAClassOrStaticmethod*)mPyObject;
+                decref(method->cm_callable);
+                method->cm_callable = incref(getNamedElementPyobj("meth_func", needsResolution));
+            } else if (mKind == Kind::PyProperty) {
                 static PyObject* nones = PyTuple_Pack(3, Py_None, Py_None, Py_None);
 
                 mPyObject = PyObject_CallObject((PyObject*)&PyProperty_Type, nones);
