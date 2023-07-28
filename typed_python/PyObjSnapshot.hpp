@@ -23,14 +23,13 @@
 
 
 /*********************************
-CompilerVisiblePyObject
+PyObjSnapshot
 
-a representation of a python object that's owned by TypedPython.  We hold these by
-pointer and leak them indiscriminately - like Type objects they're considered to be permanent
-and singletonish.
-
-They are intended to be a 'snapshot' of the state of a collection of python objects and
-contain enough information for the compiler to use them to build compiled code.
+A representation of a python object that's owned by TypedPython. They are intended to be a
+'snapshot' of the state of a collection of python objects and contain enough information
+for the compiler to use them to build compiled code, and for us to rebuild the object
+entirely from the snapshot. This gives us a scaffolding to describe objects and object
+graphs independent of the state of the python interpreter.
 
 To the extent that they visit 'mutable' objects like a list (which might be contained within
 a default argument), they will encode the state of the object when it was first seen. This
@@ -39,7 +38,7 @@ gives us a self-consistent view of the world to compile against so we don't have
 changing underneath us.
 **********************************/
 
-class CompilerVisiblePyObj {
+class PyObjSnapshot {
     enum class Kind {
         // this should never be visible in a running program
         Uninitialized = 0,
@@ -93,7 +92,7 @@ class CompilerVisiblePyObj {
         ArbitraryPyObject
     };
 
-    CompilerVisiblePyObj() :
+    PyObjSnapshot() :
         mKind(Kind::Uninitialized),
         mType(nullptr),
         mPyObject(nullptr)
@@ -101,8 +100,8 @@ class CompilerVisiblePyObj {
     }
 
 public:
-    static CompilerVisiblePyObj* ForType(Type* t) {
-        CompilerVisiblePyObj* res = new CompilerVisiblePyObj();
+    static PyObjSnapshot* ForType(Type* t) {
+        PyObjSnapshot* res = new PyObjSnapshot();
         res->mKind = Kind::Type;
         res->mType = t;
         return res;
@@ -261,7 +260,7 @@ public:
             return "ArbitraryPyObject";
         }
 
-        throw std::runtime_error("Unknown CompilerVisiblePyObj Kind");
+        throw std::runtime_error("Unknown PyObjSnapshot Kind");
     }
 
     static std::string dictGetStringOrEmpty(PyObject* dict, const char* name) {
@@ -287,9 +286,9 @@ public:
 
     // return a CVPO for 'val', stashing it in 'constantMapCache'
     // in case we hit a recursion.
-    static CompilerVisiblePyObj* internalizePyObj(
+    static PyObjSnapshot* internalizePyObj(
         PyObject* val,
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<::Type*, ::Type*>& groupMap,
         bool linkBackToOriginalObject = true
     ) {
@@ -299,7 +298,7 @@ public:
             return it->second;
         }
 
-        constantMapCache[val] = new CompilerVisiblePyObj();
+        constantMapCache[val] = new PyObjSnapshot();
 
         constantMapCache[val]->becomeInternalizedOf(
             val, constantMapCache, groupMap, linkBackToOriginalObject
@@ -369,7 +368,7 @@ public:
 
     void becomeInternalizedOf(
         PyObject* val,
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<::Type*, ::Type*>& groupMap,
         bool linkBackToOriginalObject
     ) {
@@ -379,7 +378,7 @@ public:
         }
 
         auto internalize = [&](PyObject* o) {
-            return CompilerVisiblePyObj::internalizePyObj(
+            return PyObjSnapshot::internalizePyObj(
                 o, constantMapCache, groupMap, linkBackToOriginalObject
             );
         };
@@ -771,7 +770,7 @@ public:
         mPyObject = incref(val);
     }
 
-    void append(CompilerVisiblePyObj* elt) {
+    void append(PyObjSnapshot* elt) {
         if (mKind != Kind::PyTuple) {
             throw std::runtime_error("Expected a PyTuple");
         }
@@ -779,15 +778,15 @@ public:
         mElements.push_back(elt);
     }
 
-    const std::vector<CompilerVisiblePyObj*>& elements() const {
+    const std::vector<PyObjSnapshot*>& elements() const {
         return mElements;
     }
 
-    const std::vector<CompilerVisiblePyObj*>& keys() const {
+    const std::vector<PyObjSnapshot*>& keys() const {
         return mKeys;
     }
 
-    const std::map<std::string, CompilerVisiblePyObj*>& namedElements() const {
+    const std::map<std::string, PyObjSnapshot*>& namedElements() const {
         return mNamedElements;
     }
 
@@ -844,7 +843,7 @@ public:
 
         if (mKind == Kind::PyTuple) {
             // TODO: what to do here?
-            throw std::runtime_error("TODO: CompilerVisiblePyObj::_visitCompilerVisibleInternals PyTuple");
+            throw std::runtime_error("TODO: PyObjSnapshot::_visitCompilerVisibleInternals PyTuple");
         }
 
         if (mKind == Kind::ArbitraryPyObject) {
@@ -861,7 +860,7 @@ public:
             return mPyObject;
         }
 
-        std::unordered_set<CompilerVisiblePyObj*> needsResolution;
+        std::unordered_set<PyObjSnapshot*> needsResolution;
 
         PyObject* res = getPyObj(needsResolution);
 
@@ -884,7 +883,7 @@ public:
                 throw std::runtime_error("Corrupt PyClass - no cls_dict");
             }
 
-            CompilerVisiblePyObj* clsDictPyObj = mNamedElements["cls_dict"];
+            PyObjSnapshot* clsDictPyObj = mNamedElements["cls_dict"];
 
             for (long k = 0; k < clsDictPyObj->elements().size() && k < clsDictPyObj->keys().size(); k++) {
                 if (clsDictPyObj->keys()[k]->isString()) {
@@ -919,12 +918,12 @@ public:
         }
     }
 
-    PyObject* getPyObj(std::unordered_set<CompilerVisiblePyObj*>& needsResolution) {
+    PyObject* getPyObj(std::unordered_set<PyObjSnapshot*>& needsResolution) {
         PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
 
         if (!mPyObject) {
             if (mKind == Kind::ArbitraryPyObject) {
-                throw std::runtime_error("Corrupt CompilerVisiblePyObj.ArbitraryPyObject: missing mPyObject");
+                throw std::runtime_error("Corrupt PyObjSnapshot.ArbitraryPyObject: missing mPyObject");
             } else if (mKind == Kind::Type) {
                 mPyObject = (PyObject*)PyInstance::typeObj(mType);
             } else if (mKind == Kind::String) {
@@ -1173,7 +1172,7 @@ public:
 
     PyObject* getNamedElementPyobj(
         std::string name,
-        std::unordered_set<CompilerVisiblePyObj*>& needsResolution,
+        std::unordered_set<PyObjSnapshot*>& needsResolution,
         bool allowEmpty=false
     ) {
         auto it = mNamedElements.find(name);
@@ -1182,7 +1181,7 @@ public:
                 return nullptr;
             }
             throw std::runtime_error(
-                "Corrupt CompilerVisiblePyObj." + kindAsString() + ". missing " + name
+                "Corrupt PyObjSnapshot." + kindAsString() + ". missing " + name
             );
         }
 
@@ -1190,7 +1189,7 @@ public:
     }
 
     std::string toString() const {
-        return "CompilerVisiblePyObj." + kindAsString() + "()";
+        return "PyObjSnapshot." + kindAsString() + "()";
     }
 
     template<class serialization_context_t, class buf_t>
@@ -1234,16 +1233,16 @@ public:
     }
 
     template<class serialization_context_t, class buf_t>
-    static CompilerVisiblePyObj* deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
+    static PyObjSnapshot* deserialize(serialization_context_t& context, buf_t& buffer, int wireType) {
         int64_t kind = 0;
 
         ::Type* type = nullptr;
 
-        std::vector<CompilerVisiblePyObj*> vec;
+        std::vector<PyObjSnapshot*> vec;
         ::Instance i;
         uint32_t id = -1;
         PyObjectHolder pyobj;
-        CompilerVisiblePyObj* result = nullptr;
+        PyObjSnapshot* result = nullptr;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -1251,9 +1250,9 @@ public:
 
                 void* ptr = buffer.lookupCachedPointer(id);
                 if (ptr) {
-                    result = (CompilerVisiblePyObj*)result;
+                    result = (PyObjSnapshot*)result;
                 } else {
-                    result = new CompilerVisiblePyObj();
+                    result = new PyObjSnapshot();
                     buffer.addCachedPointer(id, result, nullptr);
                 }
             } else
@@ -1268,7 +1267,7 @@ public:
             } else
             if (fieldNumber == 4) {
                 buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
-                    vec.push_back(CompilerVisiblePyObj::deserialize(context, buffer, wireType));
+                    vec.push_back(PyObjSnapshot::deserialize(context, buffer, wireType));
                 });
             } else
             if (fieldNumber == 5) {
@@ -1277,11 +1276,11 @@ public:
         });
 
         if (!result) {
-            throw std::runtime_error("corrupt CompilerVisiblePyObj - no memo found");
+            throw std::runtime_error("corrupt PyObjSnapshot - no memo found");
         }
 
         if (kind == -1) {
-            throw std::runtime_error("corrupt CompilerVisiblePyObj - invalid kind");
+            throw std::runtime_error("corrupt PyObjSnapshot - invalid kind");
         }
 
         result->mKind = Kind(kind);
@@ -1319,14 +1318,14 @@ private:
     // otherwise, it will be a cache for a constructed instance of the object
     PyObject* mPyObject;
 
-    std::map<std::string, CompilerVisiblePyObj*> mNamedElements;
+    std::map<std::string, PyObjSnapshot*> mNamedElements;
     std::map<std::string, int64_t> mNamedInts;
 
     // if we're a tuple, list, or dict
-    std::vector<CompilerVisiblePyObj*> mElements;
+    std::vector<PyObjSnapshot*> mElements;
 
     // if we're a PyDict
-    std::vector<CompilerVisiblePyObj*> mKeys;
+    std::vector<PyObjSnapshot*> mKeys;
 
     std::string mStringValue;
     std::string mModuleName;

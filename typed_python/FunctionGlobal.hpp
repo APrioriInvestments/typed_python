@@ -17,7 +17,7 @@
 #pragma once
 
 
-#include "CompilerVisiblePyObj.hpp"
+#include "PyObjSnapshot.hpp"
 
 
 class FunctionGlobal {
@@ -34,7 +34,7 @@ class FunctionGlobal {
         PyObject* dictOrCell,
         std::string name,
         std::string moduleName,
-        CompilerVisiblePyObj* constant
+        PyObjSnapshot* constant
     ) :
         mKind(inKind),
         mModuleDictOrCell(incref(dictOrCell)),
@@ -79,7 +79,7 @@ public:
         return FunctionGlobal();
     }
 
-    static FunctionGlobal Constant(CompilerVisiblePyObj* constant) {
+    static FunctionGlobal Constant(PyObjSnapshot* constant) {
         return FunctionGlobal(
             GlobalType::Constant,
             nullptr,
@@ -202,7 +202,7 @@ public:
         return mKind;
     }
 
-    CompilerVisiblePyObj* getConstant() const {
+    PyObjSnapshot* getConstant() const {
         return mConstant;
     }
 
@@ -323,7 +323,7 @@ public:
     }
 
     FunctionGlobal withConstantsInternalized(
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<Type*, Type*>& groupMap
     ) {
         if (!(isGlobalInDict() || isGlobalInCell())) {
@@ -335,11 +335,11 @@ public:
             auto it = groupMap.find(t);
             if (it != groupMap.end()) {
                 return FunctionGlobal::Constant(
-                    CompilerVisiblePyObj::ForType(it->second)
+                    PyObjSnapshot::ForType(it->second)
                 );
             } else {
                 return FunctionGlobal::Constant(
-                    CompilerVisiblePyObj::ForType(t)
+                    PyObjSnapshot::ForType(t)
                 );
             }
         }
@@ -351,7 +351,7 @@ public:
         }
 
         return FunctionGlobal::Constant(
-            CompilerVisiblePyObj::internalizePyObj(
+            PyObjSnapshot::internalizePyObj(
                 value,
                 constantMapCache,
                 groupMap
@@ -371,7 +371,7 @@ public:
         if (it != groupMap.end()) {
             // we're actually a constant!
             return FunctionGlobal::Constant(
-                CompilerVisiblePyObj::ForType(it->second)
+                PyObjSnapshot::ForType(it->second)
             );
         }
 
@@ -477,7 +477,7 @@ public:
         uint64_t kind = 0;
         std::string name, moduleName;
         PyObjectHolder cellOrModule;
-        CompilerVisiblePyObj* constant = nullptr;
+        PyObjSnapshot* constant = nullptr;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -493,7 +493,7 @@ public:
                 moduleName = buffer.readStringObject();
             } else
             if (fieldNumber == 4) {
-                constant = CompilerVisiblePyObj::deserialize(context, buffer, wireType);
+                constant = PyObjSnapshot::deserialize(context, buffer, wireType);
             }
         });
 
@@ -563,7 +563,7 @@ public:
 private:
     GlobalType mKind;
 
-    CompilerVisiblePyObj* mConstant;
+    PyObjSnapshot* mConstant;
 
     std::string mName;
     std::string mModuleName;

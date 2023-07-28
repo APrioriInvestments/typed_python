@@ -1,33 +1,33 @@
 import numpy
 
 from typed_python import ListOf
-from typed_python._types import CompilerVisiblePyObj
+from typed_python._types import PyObjSnapshot
 
 
 def test_make_cvpo_basic():
-    assert CompilerVisiblePyObj.create(int).kind == 'Type'
+    assert PyObjSnapshot.create(int).kind == 'Type'
 
-    assert CompilerVisiblePyObj.create((1, 2, 3)).kind == 'PyTuple'
-    assert CompilerVisiblePyObj.create((1, 2, 3)).elements[0].kind == 'Instance'
+    assert PyObjSnapshot.create((1, 2, 3)).kind == 'PyTuple'
+    assert PyObjSnapshot.create((1, 2, 3)).elements[0].kind == 'Instance'
 
-    assert CompilerVisiblePyObj.create({1, 2, 3}).kind == 'PySet'
-    assert CompilerVisiblePyObj.create({1, 2, 3}).elements[0].kind == 'Instance'
+    assert PyObjSnapshot.create({1, 2, 3}).kind == 'PySet'
+    assert PyObjSnapshot.create({1, 2, 3}).elements[0].kind == 'Instance'
 
-    assert CompilerVisiblePyObj.create([1, 2, 3]).kind == 'PyList'
-    assert CompilerVisiblePyObj.create([1, 2, 3]).elements[0].kind == 'Instance'
+    assert PyObjSnapshot.create([1, 2, 3]).kind == 'PyList'
+    assert PyObjSnapshot.create([1, 2, 3]).elements[0].kind == 'Instance'
 
-    assert CompilerVisiblePyObj.create({1: 2}).kind == 'PyDict'
-    assert CompilerVisiblePyObj.create({'1': 2}).elements[0].kind == 'Instance'
-    assert CompilerVisiblePyObj.create({'1': 2}).keys[0].kind == 'String'
+    assert PyObjSnapshot.create({1: 2}).kind == 'PyDict'
+    assert PyObjSnapshot.create({'1': 2}).elements[0].kind == 'Instance'
+    assert PyObjSnapshot.create({'1': 2}).keys[0].kind == 'String'
 
-    assert CompilerVisiblePyObj.create(1).kind == 'Instance'
-    assert CompilerVisiblePyObj.create(1).instance == 1
+    assert PyObjSnapshot.create(1).kind == 'Instance'
+    assert PyObjSnapshot.create(1).instance == 1
 
-    assert CompilerVisiblePyObj.create('1').kind == 'String'
-    assert CompilerVisiblePyObj.create('1').stringValue == '1'
+    assert PyObjSnapshot.create('1').kind == 'String'
+    assert PyObjSnapshot.create('1').stringValue == '1'
 
-    assert CompilerVisiblePyObj.create(ListOf(int)((1, 2, 3))).kind == 'Instance'
-    assert CompilerVisiblePyObj.create(ListOf(int)((1, 2, 3))).instance[1] == 2
+    assert PyObjSnapshot.create(ListOf(int)((1, 2, 3))).kind == 'Instance'
+    assert PyObjSnapshot.create(ListOf(int)((1, 2, 3))).instance[1] == 2
 
 
 def test_cvpo_function():
@@ -36,18 +36,18 @@ def test_cvpo_function():
     def f(x: int, z=20):
         return 10 + y
 
-    cvpo = CompilerVisiblePyObj.create(f)
+    cvpo = PyObjSnapshot.create(f)
 
     assert cvpo.kind == 'PyFunction'
     assert cvpo.name == 'f'
-    assert cvpo.moduleName == 'typed_python.compiler_visible_py_obj_test'
+    assert cvpo.moduleName == 'typed_python.py_obj_snapshot_test'
     assert cvpo.func_name.kind == 'String'
     assert cvpo.func_module.kind == 'String'
     assert cvpo.func_closure.kind == 'PyTuple'
     assert cvpo.func_closure.elements[0].kind == 'PyCell'
     assert cvpo.func_closure.elements[0].cell_contents.pyobj == 10
     assert cvpo.func_globals.kind == "PyModuleDict"
-    assert cvpo.func_globals.name == 'typed_python.compiler_visible_py_obj_test'
+    assert cvpo.func_globals.name == 'typed_python.py_obj_snapshot_test'
     assert cvpo.func_annotations.pyobj['x'] is int
     assert cvpo.func_defaults.pyobj == (20,)
     assert not hasattr(cvpo, 'func_kwdefaults')
@@ -71,7 +71,7 @@ def test_cvpo_function():
 
 
 def test_cvpo_numpy_internals():
-    assert CompilerVisiblePyObj.create(numpy.array).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(numpy.array).kind == 'NamedPyObject'
 
     # in theory, we could do better than this by using the reduce pathway.
     # however, that would involve calling into arbitrary python code during walk time
@@ -79,17 +79,17 @@ def test_cvpo_numpy_internals():
     # (b) it can release the GIL allowing other threads to run (who might then
     # modify objects) all of which make it impossible to get a good trace of the
     # graph.
-    assert CompilerVisiblePyObj.create(numpy.sin).kind == 'ArbitraryPyObject'
-    assert CompilerVisiblePyObj.create(numpy.array([1])).kind == 'ArbitraryPyObject'
+    assert PyObjSnapshot.create(numpy.sin).kind == 'ArbitraryPyObject'
+    assert PyObjSnapshot.create(numpy.array([1])).kind == 'ArbitraryPyObject'
 
 
 def test_cvpo_builtins():
-    assert CompilerVisiblePyObj.create(__builtins__).kind == 'PyModuleDict'
-    assert CompilerVisiblePyObj.create(__builtins__).module_dict_of.kind == 'PyModule'
-    assert CompilerVisiblePyObj.create(set).kind == 'NamedPyObject'
-    assert CompilerVisiblePyObj.create(print).kind == 'NamedPyObject'
-    assert CompilerVisiblePyObj.create(len).kind == 'NamedPyObject'
-    assert CompilerVisiblePyObj.create(range).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(__builtins__).kind == 'PyModuleDict'
+    assert PyObjSnapshot.create(__builtins__).module_dict_of.kind == 'PyModule'
+    assert PyObjSnapshot.create(set).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(print).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(len).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(range).kind == 'NamedPyObject'
 
 
 def test_cvpo_class():
@@ -119,11 +119,11 @@ def test_cvpo_class():
     gInst = G()
     gMeth = gInst.f
 
-    cvpo = CompilerVisiblePyObj.create(C)
+    cvpo = PyObjSnapshot.create(C)
 
     assert cvpo.kind == 'PyClass'
     assert cvpo.name == 'C'
-    assert cvpo.moduleName == 'typed_python.compiler_visible_py_obj_test'
+    assert cvpo.moduleName == 'typed_python.py_obj_snapshot_test'
     assert cvpo.cls_dict.kind == 'PyClassDict'
 
     assert cvpo.cls_dict.byKey['aProp'].kind == 'PyProperty'
@@ -157,19 +157,19 @@ def test_cvpo_class():
 
 
 def test_cvpo_rehydration():
-    assert CompilerVisiblePyObj.create(1, False).pyobj == 1
-    assert CompilerVisiblePyObj.create('1', False).pyobj == '1'
-    assert CompilerVisiblePyObj.create(b'1', False).pyobj == b'1'
-    assert CompilerVisiblePyObj.create([1, 2, 'hi'], False).pyobj == [1, 2, 'hi']
-    assert CompilerVisiblePyObj.create((1, 2, 'hi'), False).pyobj == (1, 2, 'hi')
-    assert CompilerVisiblePyObj.create({1, 2}, False).pyobj == {1, 2}
-    assert CompilerVisiblePyObj.create({1: 2, '3': 4}, False).pyobj == {1: 2, '3': 4}
-    assert CompilerVisiblePyObj.create(print, False).pyobj is print
+    assert PyObjSnapshot.create(1, False).pyobj == 1
+    assert PyObjSnapshot.create('1', False).pyobj == '1'
+    assert PyObjSnapshot.create(b'1', False).pyobj == b'1'
+    assert PyObjSnapshot.create([1, 2, 'hi'], False).pyobj == [1, 2, 'hi']
+    assert PyObjSnapshot.create((1, 2, 'hi'), False).pyobj == (1, 2, 'hi')
+    assert PyObjSnapshot.create({1, 2}, False).pyobj == {1, 2}
+    assert PyObjSnapshot.create({1: 2, '3': 4}, False).pyobj == {1: 2, '3': 4}
+    assert PyObjSnapshot.create(print, False).pyobj is print
 
     def f():
         return 1
 
-    assert CompilerVisiblePyObj.create(f, False).pyobj() == 1
+    assert PyObjSnapshot.create(f, False).pyobj() == 1
 
     class C:
         @property
@@ -193,7 +193,7 @@ def test_cvpo_rehydration():
     cInst = C()
     cInstMeth = cInst.getCInstMeth
 
-    C2cvpo = CompilerVisiblePyObj.create(C, False)
+    C2cvpo = PyObjSnapshot.create(C, False)
     C2 = C2cvpo.pyobj
 
     assert C2 is not C

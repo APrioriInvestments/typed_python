@@ -14,21 +14,21 @@
    limitations under the License.
 ******************************************************************************/
 
-#include "PyCompilerVisiblePyObj.hpp"
+#include "PyPyObjSnapshot.hpp"
 
 
-PyDoc_STRVAR(PyCompilerVisiblePyObj_doc,
+PyDoc_STRVAR(PyPyObjSnapshot_doc,
     "A single overload of a Function type object.\n\n"
 );
 
-PyMethodDef PyCompilerVisiblePyObj_methods[] = {
-    {"create", (PyCFunction)PyCompilerVisiblePyObj::create, METH_VARARGS | METH_KEYWORDS | METH_STATIC, NULL},
+PyMethodDef PyPyObjSnapshot_methods[] = {
+    {"create", (PyCFunction)PyPyObjSnapshot::create, METH_VARARGS | METH_KEYWORDS | METH_STATIC, NULL},
     {NULL}  /* Sentinel */
 };
 
 
 /* static */
-PyObject* PyCompilerVisiblePyObj::create(PyObject* self, PyObject* args, PyObject* kwargs) {
+PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwargs) {
     return translateExceptionToPyObject([&]() {
         PyObject* instance;
         int linkBack = 1;
@@ -38,37 +38,37 @@ PyObject* PyCompilerVisiblePyObj::create(PyObject* self, PyObject* args, PyObjec
             throw PythonExceptionSet();
         }
 
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*> constantMapCache;
+        std::unordered_map<PyObject*, PyObjSnapshot*> constantMapCache;
         std::map<::Type*, ::Type*> groupMap;
 
-        CompilerVisiblePyObj* object = CompilerVisiblePyObj::internalizePyObj(
+        PyObjSnapshot* object = PyObjSnapshot::internalizePyObj(
             instance,
             constantMapCache,
             groupMap,
             linkBack
         );
 
-        return PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(object);
+        return PyPyObjSnapshot::newPyObjSnapshot(object);
     });
 }
 
 /* static */
-void PyCompilerVisiblePyObj::dealloc(PyCompilerVisiblePyObj *self)
+void PyPyObjSnapshot::dealloc(PyPyObjSnapshot *self)
 {
     decref(self->mElements);
     decref(self->mKeys);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-PyObject* PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(CompilerVisiblePyObj* g) {
-    static std::unordered_map<CompilerVisiblePyObj*, PyObject*> memo;
+PyObject* PyPyObjSnapshot::newPyObjSnapshot(PyObjSnapshot* g) {
+    static std::unordered_map<PyObjSnapshot*, PyObject*> memo;
 
     auto it = memo.find(g);
     if (it != memo.end()) {
         return incref(it->second);
     }
 
-    PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)PyType_CompilerVisiblePyObj.tp_alloc(&PyType_CompilerVisiblePyObj, 0);
+    PyPyObjSnapshot* self = (PyPyObjSnapshot*)PyType_PyObjSnapshot.tp_alloc(&PyType_PyObjSnapshot, 0);
     self->mPyobj = g;
     self->mElements = nullptr;
     self->mKeys = nullptr;
@@ -80,11 +80,11 @@ PyObject* PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(CompilerVisiblePyObj
 }
 
 /* static */
-PyObject* PyCompilerVisiblePyObj::new_(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+PyObject* PyPyObjSnapshot::new_(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
-    PyCompilerVisiblePyObj* self;
+    PyPyObjSnapshot* self;
 
-    self = (PyCompilerVisiblePyObj*)type->tp_alloc(type, 0);
+    self = (PyPyObjSnapshot*)type->tp_alloc(type, 0);
 
     if (self != NULL) {
         self->mPyobj = nullptr;
@@ -96,8 +96,8 @@ PyObject* PyCompilerVisiblePyObj::new_(PyTypeObject *type, PyObject *args, PyObj
     return (PyObject*)self;
 }
 
-PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrName) {
-    PyCompilerVisiblePyObj* pyCVPO = (PyCompilerVisiblePyObj*)selfObj;
+PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
+    PyPyObjSnapshot* pyCVPO = (PyPyObjSnapshot*)selfObj;
 
     return translateExceptionToPyObject([&] {
         if (!PyUnicode_Check(attrName)) {
@@ -106,11 +106,11 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
 
         std::string attr(PyUnicode_AsUTF8(attrName));
 
-        CompilerVisiblePyObj* obj = pyCVPO->mPyobj;
+        PyObjSnapshot* obj = pyCVPO->mPyobj;
 
         auto it = obj->namedElements().find(attr);
         if (it != obj->namedElements().end()) {
-            return PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(it->second);
+            return PyPyObjSnapshot::newPyObjSnapshot(it->second);
         }
 
         auto it2 = obj->namedInts().find(attr);
@@ -154,7 +154,7 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
             if (!pyCVPO->mElements) {
                 pyCVPO->mElements = PyList_New(0);
                 for (auto p: obj->elements()) {
-                    PyList_Append(pyCVPO->mElements, PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(p));
+                    PyList_Append(pyCVPO->mElements, PyPyObjSnapshot::newPyObjSnapshot(p));
                 }
             }
 
@@ -165,7 +165,7 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
             if (!pyCVPO->mKeys) {
                 pyCVPO->mKeys = PyList_New(0);
                 for (auto p: obj->keys()) {
-                    PyList_Append(pyCVPO->mKeys, PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(p));
+                    PyList_Append(pyCVPO->mKeys, PyPyObjSnapshot::newPyObjSnapshot(p));
                 }
             }
 
@@ -179,7 +179,7 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
                     PyDict_SetItem(
                         pyCVPO->mByKey,
                         obj->keys()[k]->getPyObj(),
-                        PyCompilerVisiblePyObj::newPyCompilerVisiblePyObj(obj->elements()[k])
+                        PyPyObjSnapshot::newPyObjSnapshot(obj->elements()[k])
                     );
                 }
             }
@@ -191,8 +191,8 @@ PyObject* PyCompilerVisiblePyObj::tp_getattro(PyObject* selfObj, PyObject* attrN
     });
 }
 
-PyObject* PyCompilerVisiblePyObj::tp_repr(PyObject *selfObj) {
-    PyCompilerVisiblePyObj* self = (PyCompilerVisiblePyObj*)selfObj;
+PyObject* PyPyObjSnapshot::tp_repr(PyObject *selfObj) {
+    PyPyObjSnapshot* self = (PyPyObjSnapshot*)selfObj;
 
     return translateExceptionToPyObject([&]() {
         return PyUnicode_FromString(self->mPyobj->toString().c_str());
@@ -201,19 +201,19 @@ PyObject* PyCompilerVisiblePyObj::tp_repr(PyObject *selfObj) {
 
 
 /* static */
-int PyCompilerVisiblePyObj::init(PyCompilerVisiblePyObj *self, PyObject *args, PyObject *kwargs)
+int PyPyObjSnapshot::init(PyPyObjSnapshot *self, PyObject *args, PyObject *kwargs)
 {
-    PyErr_Format(PyExc_RuntimeError, "CompilerVisiblePyObj cannot be initialized directly");
+    PyErr_Format(PyExc_RuntimeError, "PyObjSnapshot cannot be initialized directly");
     return -1;
 }
 
 
-PyTypeObject PyType_CompilerVisiblePyObj = {
+PyTypeObject PyType_PyObjSnapshot = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "CompilerVisiblePyObj",
-    .tp_basicsize = sizeof(PyCompilerVisiblePyObj),
+    .tp_name = "PyObjSnapshot",
+    .tp_basicsize = sizeof(PyPyObjSnapshot),
     .tp_itemsize = 0,
-    .tp_dealloc = (destructor) PyCompilerVisiblePyObj::dealloc,
+    .tp_dealloc = (destructor) PyPyObjSnapshot::dealloc,
     #if PY_MINOR_VERSION < 8
     .tp_print = 0,
     #else
@@ -222,25 +222,25 @@ PyTypeObject PyType_CompilerVisiblePyObj = {
     .tp_getattr = 0,
     .tp_setattr = 0,
     .tp_as_async = 0,
-    .tp_repr = PyCompilerVisiblePyObj::tp_repr,
+    .tp_repr = PyPyObjSnapshot::tp_repr,
     .tp_as_number = 0,
     .tp_as_sequence = 0,
     .tp_as_mapping = 0,
     .tp_hash = 0,
     .tp_call = 0,
     .tp_str = 0,
-    .tp_getattro = PyCompilerVisiblePyObj::tp_getattro,
+    .tp_getattro = PyPyObjSnapshot::tp_getattro,
     .tp_setattro = 0,
     .tp_as_buffer = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_doc = PyCompilerVisiblePyObj_doc,
+    .tp_doc = PyPyObjSnapshot_doc,
     .tp_traverse = 0,
     .tp_clear = 0,
     .tp_richcompare = 0,
     .tp_weaklistoffset = 0,
     .tp_iter = 0,
     .tp_iternext = 0,
-    .tp_methods = PyCompilerVisiblePyObj_methods,
+    .tp_methods = PyPyObjSnapshot_methods,
     .tp_members = 0,
     .tp_getset = 0,
     .tp_base = 0,
@@ -248,9 +248,9 @@ PyTypeObject PyType_CompilerVisiblePyObj = {
     .tp_descr_get = 0,
     .tp_descr_set = 0,
     .tp_dictoffset = 0,
-    .tp_init = (initproc) PyCompilerVisiblePyObj::init,
+    .tp_init = (initproc) PyPyObjSnapshot::init,
     .tp_alloc = 0,
-    .tp_new = PyCompilerVisiblePyObj::new_,
+    .tp_new = PyPyObjSnapshot::new_,
     .tp_free = 0,
     .tp_is_gc = 0,
     .tp_bases = 0,

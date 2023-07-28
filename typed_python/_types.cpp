@@ -37,7 +37,7 @@
 #include "PySlab.hpp"
 #include "PyFunctionOverload.hpp"
 #include "PyFunctionGlobal.hpp"
-#include "PyCompilerVisiblePyObj.hpp"
+#include "PyPyObjSnapshot.hpp"
 #include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
 #include "CompilerVisibleObjectVisitor.hpp"
@@ -2772,7 +2772,7 @@ PyObject *resolveForwardDefinedType(PyObject* nullValue, PyObject* args) {
         if (PyTuple_Size(args) != 1) {
             throw std::runtime_error("resolveForwardDefinedType takes 1 positional argument");
         }
-        
+
         PyObjectHolder a1(PyTuple_GetItem(args, 0));
 
         Type* t = PyInstance::unwrapTypeArgToTypePtr(a1);
@@ -3859,12 +3859,12 @@ PyInit__types(void)
         return NULL;
     }
 
-    if (PyType_Ready(&PyType_CompilerVisiblePyObj) < 0) {
+    if (PyType_Ready(&PyType_PyObjSnapshot) < 0) {
         return NULL;
     }
 
     PyModule_AddObject(module, "FunctionOverload", (PyObject*)incref(&PyType_FunctionOverload));
-    PyModule_AddObject(module, "CompilerVisiblePyObj", (PyObject*)incref(&PyType_CompilerVisiblePyObj));
+    PyModule_AddObject(module, "PyObjSnapshot", (PyObject*)incref(&PyType_PyObjSnapshot));
     PyModule_AddObject(module, "FunctionGlobal", (PyObject*)incref(&PyType_FunctionGlobal));
     PyModule_AddObject(module, "Slab", (PyObject*)incref(&PyType_Slab));
     PyModule_AddObject(module, "ModuleRepresentation", (PyObject*)incref(&PyType_ModuleRepresentation));

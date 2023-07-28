@@ -159,9 +159,9 @@ public:
     }
 
     // replace any direct references to PyObject we're holding internally
-    // with CompilerVisiblePyObj references instead
+    // with PyObjSnapshot references instead
     void internalizeConstants(
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<Type*, Type*>& groupMap
     ) {
         for (auto& o: mOverloads) {

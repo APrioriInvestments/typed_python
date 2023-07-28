@@ -476,7 +476,7 @@ void Type::attemptToResolve() {
 
     // allow each Function type to build CompilerVisiblePythonObjects for its globals
     // after this, any FunctionGlobals will refer to Constants not cells
-    std::unordered_map<PyObject*, CompilerVisiblePyObj*> compilerVisiblePyObjMap;
+    std::unordered_map<PyObject*, PyObjSnapshot*> compilerVisiblePyObjMap;
     for (auto typeAndSource: resolutionSource) {
         if (typeAndSource.first->isFunction()) {
             ((Function*)typeAndSource.first)->internalizeConstants(

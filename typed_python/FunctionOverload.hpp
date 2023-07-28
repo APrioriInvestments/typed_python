@@ -278,7 +278,7 @@ public:
     }
 
     void internalizeConstants(
-        std::unordered_map<PyObject*, CompilerVisiblePyObj*>& constantMapCache,
+        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
         const std::map<Type*, Type*>& groupMap
     ) {
         for (auto& nameAndGlobal: mGlobals) {

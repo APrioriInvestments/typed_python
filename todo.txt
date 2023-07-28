@@ -24,8 +24,8 @@
 - redocument everything
 - finish serialization
 	- should be able to serialize forward defined types
-	- ensure we are not leaking CompilerVisiblePyObj values
-		- really CompilerVisiblePyObj is the wrong name - i think it's more like 'TypeVisiblePyObj'
+	- ensure we are not leaking PyObjSnapshot values
+		- really PyObjSnapshot is the wrong name - i think it's more like 'TypeVisiblePyObj'
 			which reflects the reality that some objects are visible to the typing system and some
 			are not
 	- can we get rid of the whole serialize-mrtg thing? at this point, memos should just work right?
@@ -47,11 +47,11 @@
 - ensure that we don't try to MRTG something that's a forward defined type
 - fix the compiler to deal with the new globals thing now that we have it well defined
 - figure out how to properly internalize python classes
-	- the CompilerVisiblePyObj thing needs to actually work
+	- the PyObjSnapshot thing needs to actually work
 	- we need to make sure we can actually destroy these if we're not going to keep them
 - get rid of PyObject throughout Function
 	- should be like a FunctionGlobal
-- Value should be holding a CompilerVisiblePyObj, not an instance
+- Value should be holding a PyObjSnapshot, not an instance
 - We're using the TP compiler hash in the compiler, which makes sense. Need to ensure that
 	the CVOV obyes the same rules for dotted accesses that the original compiler does.
 - We need to ensure that Globals retain their source information if its available
@@ -60,6 +60,32 @@
 - take a look at object identity
 	- we could keep a reverse lookup from all alive python objects to the original instance
 		for things like lists/classes/etc
+
+
+strategy:
+	* fully fleshed out CVPO - infrastructure to help us manage all of this:
+		* CVPO is really 'PyObjSnapshot' and represents a frozen graph of python objects
+		* CVPO has an 'owner' which manages its lifetime.
+			* there's an 'internalized' owner which represents CVPO that's owned by the core and that has been internalized by hash
+			* these are leaked
+		* CVPO models instances and Types all the way out
+			* that is, a 'Type' is actually modeled with its pieces, which also have CVPO
+				* the 'Type' and 'mPyObject' are pointers to the real thing
+			* when you cross into a CVPO on another 'owner' then you can stop
+			* instances are the same way, including classes, etc.
+		* we replicate the MRTG hashing functionality on CVPO so that you can hash the items in a CVPO
+			* you're not forced to internalize if you do this
+	* when we freeze a Forward, we walk it to make a CVPO graph and hash it.
+		* we then internalize the new part of the graph
+		* then we walk back over the original objects and mark them as resolving to the new ones
+		* then we autoresolve to update forwards that point to Cells and Modules
+	* serialization
+		* when we serialize a forward type, we just do it normally
+		* but when we serialize a resolved type we serialize its CVPO graph
+			* then when we deserialize it, we can deserialize the graph and then internalize it if we want to
+			* this lets us gracefully handle the 'leak' case
+
+
 
 
 question: how should we handle regular python classes defined in forwards?

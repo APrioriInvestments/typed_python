@@ -18,11 +18,11 @@
 
 #include "PyInstance.hpp"
 
-class PyCompilerVisiblePyObj {
+class PyPyObjSnapshot {
 public:
     PyObject_HEAD
 
-    CompilerVisiblePyObj* mPyobj;
+    PyObjSnapshot* mPyobj;
     PyObject* mElements;
     PyObject* mKeys;
     PyObject* mByKey;
@@ -33,13 +33,13 @@ public:
 
     static PyObject* tp_getattro(PyObject* selfObj, PyObject* attr);
 
-    static void dealloc(PyCompilerVisiblePyObj *self);
+    static void dealloc(PyPyObjSnapshot *self);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
 
-    static PyObject* newPyCompilerVisiblePyObj(CompilerVisiblePyObj* o);
+    static PyObject* newPyObjSnapshot(PyObjSnapshot* o);
 
-    static int init(PyCompilerVisiblePyObj *self, PyObject *args, PyObject *kwargs);
+    static int init(PyPyObjSnapshot *self, PyObject *args, PyObject *kwargs);
 };
 
-extern PyTypeObject PyType_CompilerVisiblePyObj;
+extern PyTypeObject PyType_PyObjSnapshot;
