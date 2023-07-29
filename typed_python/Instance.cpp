@@ -78,6 +78,31 @@ Instance::Instance(const Instance& other) : mLayout(other.mLayout) {
     }
 }
 
+Instance::Instance(const InstanceRef& other) {
+    Type* t = other.type();
+    instance_ptr p = other.data();
+
+    if (t->isNone()) {
+        return;
+    }
+
+    t->assertForwardsResolvedSufficientlyToInstantiate();
+
+    layout* l = (layout*)tp_malloc(sizeof(layout) + t->bytecount());
+
+    try {
+        t->copy_constructor(l->data, p);
+    } catch(...) {
+        tp_free(l);
+        throw;
+    }
+
+    l->refcount = 1;
+    l->type = t;
+
+    mLayout = l;
+}
+
 Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
     if (t->isNone()) {
         return;
@@ -167,7 +192,23 @@ typed_python_hash_type Instance::hash() const {
     return mLayout->type->hash(mLayout->data);
 }
 
+PyObject* Instance::extractPyobj() const {
+    return ref().extractPyobj();
+}
+
 Type* Instance::extractType(bool includePrimitives) const {
+    return ref().extractType(includePrimitives);
+}
+
+PyObject* InstanceRef::extractPyobj() const {
+    if (type()->isPythonObjectOfType()) {
+        return PyObjectHandleTypeBase::getPyObj(data());
+    }
+
+    return nullptr;
+}
+
+Type* InstanceRef::extractType(bool includePrimitives) const {
     if (
         type()->isPythonObjectOfType() &&
         PyType_Check(

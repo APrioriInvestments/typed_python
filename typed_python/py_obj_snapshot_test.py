@@ -5,7 +5,7 @@ from typed_python._types import PyObjSnapshot
 
 
 def test_make_snapshot_basic():
-    assert PyObjSnapshot.create(int).kind == 'Type'
+    assert PyObjSnapshot.create(int).kind == 'PrimitiveType'
 
     assert PyObjSnapshot.create((1, 2, 3)).kind == 'PyTuple'
     assert PyObjSnapshot.create((1, 2, 3)).elements[0].kind == 'Instance'

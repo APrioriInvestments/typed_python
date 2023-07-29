@@ -322,18 +322,16 @@ public:
         }
     }
 
-    FunctionGlobal withConstantsInternalized(
-        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
-        const std::map<Type*, Type*>& groupMap
-    ) {
+    FunctionGlobal withConstantsInternalized(PyObjSnapshotMaker& maker) {
         if (!(isGlobalInDict() || isGlobalInCell())) {
             return *this;
         }
 
         Type* t = getValueAsType();
+
         if (t) {
-            auto it = groupMap.find(t);
-            if (it != groupMap.end()) {
+            auto it = maker.getGroupMap().find(t);
+            if (it != maker.getGroupMap().end()) {
                 return FunctionGlobal::Constant(
                     PyObjSnapshot::ForType(it->second)
                 );
@@ -350,13 +348,7 @@ public:
             return FunctionGlobal::Unbound();
         }
 
-        return FunctionGlobal::Constant(
-            PyObjSnapshot::internalizePyObj(
-                value,
-                constantMapCache,
-                groupMap
-            )
-        );
+        return FunctionGlobal::Constant(maker.internalize(value));
     }
 
     FunctionGlobal withUpdatedInternalTypePointers(const std::map<Type*, Type*>& groupMap) {

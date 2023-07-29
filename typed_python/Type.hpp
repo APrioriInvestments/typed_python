@@ -252,6 +252,10 @@ public:
         );
     }
 
+    bool isEmbeddedMessage() const {
+        return m_typeCategory == catEmbeddedMessage;
+    }
+
     bool isRegister() const {
         return (
             m_typeCategory == catBool

@@ -22,7 +22,9 @@
 #include "PythonTypeInternals.hpp"
 
 class PyObjGraphSnapshot;
-
+class PyObjSnapshot;
+class FunctionGlobal;
+class FunctionOverload;
 
 /*********************************
 PyObjSnapshot
@@ -40,8 +42,74 @@ gives us a self-consistent view of the world to compile against so we don't have
 changing underneath us.
 **********************************/
 
+
+class PyObjSnapshotMaker {
+public:
+    PyObjSnapshotMaker(
+        std::unordered_map<PyObject*, PyObjSnapshot*>& inObjMapCache,
+        std::unordered_map<Type*, PyObjSnapshot*>& inTypeMapCache,
+        std::unordered_map<InstanceRef, PyObjSnapshot*>& inInstanceCache,
+        const std::map<::Type*, ::Type*>& inGroupMap,
+        PyObjGraphSnapshot* inGraph,
+        bool inLinkBackToOriginalObject
+    ) :
+        mObjMapCache(inObjMapCache),
+        mTypeMapCache(inTypeMapCache),
+        mInstanceCache(inInstanceCache),
+        mGroupMap(inGroupMap),
+        mGraph(inGraph),
+        mLinkBackToOriginalObject(inLinkBackToOriginalObject)
+    {
+    }
+
+    PyObjSnapshot* internalize(const std::string& def);
+    PyObjSnapshot* internalize(const MemberDefinition& def);
+    PyObjSnapshot* internalize(const FunctionGlobal& def);
+    PyObjSnapshot* internalize(const FunctionOverload& def);
+    PyObjSnapshot* internalize(const FunctionArg& def);
+    PyObjSnapshot* internalize(const ClosureVariableBinding& def);
+    PyObjSnapshot* internalize(const ClosureVariableBindingStep& def);
+    PyObjSnapshot* internalize(const std::vector<FunctionOverload>& def);
+    PyObjSnapshot* internalize(const std::vector<FunctionArg>& inArgs);
+    PyObjSnapshot* internalize(const std::vector<std::string>& inArgs);
+    PyObjSnapshot* internalize(const std::map<std::string, ClosureVariableBinding>& inBindings);
+    PyObjSnapshot* internalize(const std::map<std::string, FunctionGlobal>& inGlobals);
+    PyObjSnapshot* internalize(const std::map<std::string, Function*>& inMethods);
+    PyObjSnapshot* internalize(const std::map<std::string, PyObject*>& inMethods);
+    PyObjSnapshot* internalize(const std::vector<MemberDefinition>& inMethods);
+    PyObjSnapshot* internalize(PyObject* val);
+    PyObjSnapshot* internalize(Type* val);
+    PyObjSnapshot* internalize(const Instance& val) {
+        return internalize(val.ref());
+    }
+    PyObjSnapshot* internalize(InstanceRef val);
+
+    bool linkBackToOriginalObject() const {
+        return mLinkBackToOriginalObject;
+    }
+
+    PyObjGraphSnapshot* graph() const {
+        return mGraph;
+    }
+
+    const std::map<::Type*, ::Type*>& getGroupMap() const {
+        return mGroupMap;
+    }
+
+private:
+    std::unordered_map<PyObject*, PyObjSnapshot*>& mObjMapCache;
+    std::unordered_map<Type*, PyObjSnapshot*>& mTypeMapCache;
+    std::unordered_map<InstanceRef, PyObjSnapshot*>& mInstanceCache;
+    const std::map<::Type*, ::Type*>& mGroupMap;
+    PyObjGraphSnapshot* mGraph;
+    bool mLinkBackToOriginalObject;
+};
+
+
 class PyObjSnapshot {
 private:
+    friend class PyObjSnapshotMaker;
+
     enum class Kind {
         // this should never be visible in a running program
         Uninitialized = 0,
@@ -54,10 +122,68 @@ private:
         // look inside of it)
         NamedPyObject,
         // we're pointing back into a typed_python Type held in mType.
+        // it must be a 'leaf' type with no internals
         Type,
-        // we're pointing into a TP instance that doesn't reach a more complex object.
-        // It can have Type leaves in it. It will be held in 'mInstance'
+        // we're pointing into a TP leaf instance (a register type, an int, bytes, etc.)
         Instance,
+        // we're a primitive type (like int)
+        PrimitiveType,
+        // a TP ListOf type. The element type will be in element_type
+        ListOfType,
+        // a TP TupleOf type. The element type will be in element_type
+        TupleOfType,
+        // a TP Tuple type. The subtypes will be in mElements
+        TupleType,
+        // a TP NamedTuple type. The subtypes will be in mElements and the names in mNames
+        NamedTupleType,
+        // a TP OneOf type. The subtypes will be in mElements
+        OneOfType,
+        // a TP Value type. The instance will be in value_instance
+        ValueType,
+        // a TP DictType type. Will have key_type and value_type
+        DictType,
+        // a TP ConstDictType type. Will have key_type and value_type
+        ConstDictType,
+        // a TP ConstDictType type. Will have key_type and value_type
+        SetType,
+        // a TP PointerTo type. The element type will be in element_type
+        PointerToType,
+        // a TP RefTo type. The element type will be in element_type
+        RefToType,
+        // a TP Alternative type.
+        AlternativeType,
+        // a TP ConcreteAlternative type.
+        ConcreteAlternativeType,
+        // a TP AlternativeMatcher type.
+        AlternativeMatcherType,
+        // a TP PythonObjectOfType type.
+        PythonObjectOfTypeType,
+        // a TP SubclassOfType type.
+        SubclassOfTypeType,
+        // a TP Class type.
+        ClassType,
+        // a TP HeldClass type.
+        HeldClassType,
+        // a TP FunctionType type.
+        FunctionType,
+        // a TP FunctionOverload.
+        FunctionOverload,
+        // a TP FunctionGlobal.
+        FunctionGlobal,
+        // a TP FunctionArg.
+        FunctionArg,
+        // a TP ClosureVariableBinding.
+        FunctionClosureVariableBinding,
+        // a TP ClosureVariableBinding.Step
+        FunctionClosureVariableBindingStep,
+        // a TP MemberDefinition in a Class.
+        ClassMemberDefinition,
+        // a TP BoundMethod type
+        BoundMethodType,
+        // a TP Forward type
+        ForwardType,
+        // a TP TypedCellType
+        TypedCellType,
         // a python list, with elements in mElements
         PyList,
         // a python Dict, with values in mElements and keys in mKeys
@@ -92,7 +218,10 @@ private:
         // PyObject without looking inside of it, and the details of this
         // object are insufficient to differentiate two different Function
         // types that both refer to different ArbitraryPyObject instances.
-        ArbitraryPyObject
+        ArbitraryPyObject,
+        // a bundle of types that doesn't represent a specific object or type
+        // but holds collections of types.
+        InternalBundle
     };
 
     PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
@@ -188,6 +317,10 @@ public:
             return "Uninitialized";
         }
 
+        if (mKind == Kind::InternalBundle) {
+            return "InternalBundle";
+        }
+
         if (mKind == Kind::String) {
             return "String";
         }
@@ -202,6 +335,106 @@ public:
 
         if (mKind == Kind::Instance) {
             return "Instance";
+        }
+
+        if (mKind == Kind::PrimitiveType) {
+            return "PrimitiveType";
+        }
+
+        if (mKind == Kind::ListOfType) {
+            return "ListOfType";
+        }
+
+        if (mKind == Kind::TupleOfType) {
+            return "TupleOfType";
+        }
+
+        if (mKind == Kind::TupleType) {
+            return "TupleType";
+        }
+
+        if (mKind == Kind::NamedTupleType) {
+            return "NamedTupleType";
+        }
+
+        if (mKind == Kind::OneOfType) {
+            return "OneOfType";
+        }
+
+        if (mKind == Kind::ValueType) {
+            return "ValueType";
+        }
+
+        if (mKind == Kind::DictType) {
+            return "DictType";
+        }
+
+        if (mKind == Kind::ConstDictType) {
+            return "ConstDictType";
+        }
+
+        if (mKind == Kind::SetType) {
+            return "SetType";
+        }
+
+        if (mKind == Kind::PointerToType) {
+            return "PointerToType";
+        }
+
+        if (mKind == Kind::RefToType) {
+            return "RefToType";
+        }
+
+        if (mKind == Kind::AlternativeType) {
+            return "AlternativeType";
+        }
+
+        if (mKind == Kind::ConcreteAlternativeType) {
+            return "ConcreteAlternativeType";
+        }
+
+        if (mKind == Kind::AlternativeMatcherType) {
+            return "AlternativeMatcherType";
+        }
+
+        if (mKind == Kind::PythonObjectOfTypeType) {
+            return "PythonObjectOfTypeType";
+        }
+
+        if (mKind == Kind::SubclassOfTypeType) {
+            return "SubclassOfTypeType";
+        }
+
+        if (mKind == Kind::ClassType) {
+            return "ClassType";
+        }
+
+        if (mKind == Kind::HeldClassType) {
+            return "HeldClassType";
+        }
+
+        if (mKind == Kind::FunctionType) {
+            return "FunctionType";
+        }
+
+        if (mKind == Kind::FunctionOverload) {
+            return "FunctionOverload";
+        }
+
+        if (mKind == Kind::FunctionGlobal) {
+            return "FunctionGlobal";
+        }
+
+        if (mKind == Kind::BoundMethodType) {
+            return "BoundMethodType";
+        }
+
+        if (mKind == Kind::ForwardType) {
+            return "ForwardType";
+        }
+
+        if (mKind == Kind::TypedCellType) {
+            return "TypedCellType";
         }
 
         if (mKind == Kind::PyList) {
@@ -272,7 +505,7 @@ public:
             return "ArbitraryPyObject";
         }
 
-        throw std::runtime_error("Unknown PyObjSnapshot Kind");
+        throw std::runtime_error("Unknown PyObjSnapshot Kind: " + format((int)mKind));
     }
 
     static std::string dictGetStringOrEmpty(PyObject* dict, const char* name) {
@@ -295,14 +528,6 @@ public:
 
         return PyUnicode_AsUTF8(o);
     }
-
-    static PyObjSnapshot* internalizePyObj(
-        PyObject* val,
-        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
-        const std::map<::Type*, ::Type*>& groupMap,
-        bool linkBackToOriginalObject=true,
-        PyObjGraphSnapshot* graph=nullptr
-    );
 
     static PyTypeObject* createAVanillaType() {
         PyObjectStealer emptyBases(PyTuple_New(0));
@@ -364,409 +589,54 @@ public:
     }
 
     void becomeInternalizedOf(
+        const std::string& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const FunctionArg& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const ClosureVariableBinding& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const ClosureVariableBindingStep& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const MemberDefinition& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const FunctionGlobal& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        const FunctionOverload& val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        InstanceRef val,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
+        Type* t,
+        PyObjSnapshotMaker& maker
+    );
+
+    void becomeInternalizedOf(
         PyObject* val,
-        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
-        const std::map<::Type*, ::Type*>& groupMap,
-        bool linkBackToOriginalObject,
-        PyObjGraphSnapshot* graph
-    ) {
-        // we're always the internalized version of this object
-        if (linkBackToOriginalObject) {
-            mPyObject = incref(val);
-        }
-
-        auto internalize = [&](PyObject* o) {
-            return PyObjSnapshot::internalizePyObj(
-                o, constantMapCache, groupMap, linkBackToOriginalObject, graph
-            );
-        };
-
-        ::Type* t = PyInstance::extractTypeFrom(val, true);
-
-        if (t) {
-            if (groupMap.find(t) != groupMap.end()) {
-                t = groupMap.find(t)->second;
-            } else {
-                if (t->isForwardDefined()) {
-                    if (t->isResolved()) {
-                        t = t->forwardResolvesTo();
-                    }
-                }
-            }
-
-            mKind = Kind::Type;
-            mType = t;
-            return;
-        }
-
-        PyObject* environType = staticPythonInstance("os", "_Environ");
-
-        if (val->ob_type == (PyTypeObject*)environType) {
-            mKind = Kind::NamedPyObject;
-            mName = "_Environ";
-            mModuleName = "os";
-            return;
-        }
-
-
-        if (PyUnicode_Check(val)) {
-            mKind = Kind::String;
-            mStringValue = PyUnicode_AsUTF8(val);
-            return;
-        }
-
-        if (PyTuple_Check(val)) {
-            mKind = Kind::PyTuple;
-            for (long i = 0; i < PyTuple_Size(val); i++) {
-                mElements.push_back(internalize(PyTuple_GetItem(val, i)));
-            }
-            return;
-        }
-
-        if (PyList_Check(val)) {
-            mKind = Kind::PyList;
-            for (long i = 0; i < PyList_Size(val); i++) {
-                mElements.push_back(internalize(PyList_GetItem(val, i)));
-            }
-            return;
-        }
-
-        if (PySet_Check(val)) {
-            mKind = Kind::PySet;
-            iterate(val, [&](PyObject* o) {
-                mElements.push_back(internalize(o));
-            });
-            return;
-        }
-
-        if (PyDict_Check(val)) {
-            // see if this is a moduledict
-            PyObject* mname = PyDict_GetItemString(val, "__name__");
-            if (mname && PyUnicode_Check(mname)) {
-                PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
-                PyObjectStealer moduleObj(PyObject_GetItem(sysModuleModules, mname));
-
-                if (moduleObj) {
-                    PyObjectStealer moduleObjDict(PyObject_GenericGetDict(moduleObj, nullptr));
-                    if (!moduleObjDict) {
-                        PyErr_Clear();
-                    } else
-                    if (moduleObjDict == val) {
-                        mKind = Kind::PyModuleDict;
-                        mName = PyUnicode_AsUTF8(mname);
-                        mNamedElements["module_dict_of"] = internalize(moduleObj);
-                        return;
-                    }
-                } else {
-                    PyErr_Clear();
-                }
-            }
-
-            // see if this is a vanilla class dict
-            PyObject* dictAccessor = PyDict_GetItemString(val, "__dict__");
-            if (dictAccessor && dictAccessor->ob_type == &PyGetSetDescr_Type) {
-                PyTypeObject* clsType = PyDescr_TYPE(dictAccessor);
-                if (clsType) {
-                    if (clsType->tp_dict == val) {
-                        if (isVanillaClassType(clsType)) {
-                            mKind = Kind::PyClassDict;
-
-                            mNamedElements["class_dict_of"] = internalize(
-                                (PyObject*)clsType
-                            );
-
-                            PyObject *key, *value;
-                            Py_ssize_t pos = 0;
-
-                            while (val && PyDict_Next(val, &pos, &key, &value)) {
-                                if (PyUnicode_Check(key)
-                                    && PyUnicode_AsUTF8(key) != std::string("__dict__")
-                                    && PyUnicode_AsUTF8(key) != std::string("__weakref__")
-                                ) {
-                                    mElements.push_back(internalize(value));
-                                    mKeys.push_back(internalize(key));
-                                }
-                            }
-
-                            return;
-                        }
-                    }
-                }
-            }
-
-            // this is a vanilla dict
-            mKind = Kind::PyDict;
-
-            PyObject *key, *value;
-            Py_ssize_t pos = 0;
-
-            while (val && PyDict_Next(val, &pos, &key, &value)) {
-                mElements.push_back(internalize(value));
-                mKeys.push_back(internalize(key));
-            }
-            return;
-        }
-
-        if (PyCell_Check(val)) {
-            mKind = Kind::PyCell;
-
-            if (PyCell_Get(val)) {
-                mNamedElements["cell_contents"] = internalize(PyCell_Get(val));
-            }
-
-            return;
-        }
-
-        if (PyType_Check(val)) {
-            PyTypeObject* tp = (PyTypeObject*)val;
-
-            if (isVanillaClassType(tp)) {
-                mKind = Kind::PyClass;
-
-                mName = tp->tp_name;
-                mModuleName = dictGetStringOrEmpty(tp->tp_dict, "__module__");
-
-                if (tp->tp_dict) {
-                    mNamedElements["cls_dict"] = internalize(tp->tp_dict);
-                }
-                if (tp->tp_bases) {
-                    mNamedElements["cls_bases"] = internalize(tp->tp_bases);
-                }
-
-                return;
-            }
-        }
-
-        if (PyFunction_Check(val)) {
-            mKind = Kind::PyFunction;
-
-            PyFunctionObject* f = (PyFunctionObject*)val;
-
-            mName = stringOrEmpty(f->func_name);
-            mModuleName = stringOrEmpty(f->func_module);
-
-            if (f->func_name) {
-                mNamedElements["func_name"] = internalize(f->func_name);
-            }
-            if (f->func_module) {
-                mNamedElements["func_module"] = internalize(f->func_module);
-            }
-            if (f->func_qualname) {
-                mNamedElements["func_qualname"] = internalize(f->func_qualname);
-            }
-            if (PyFunction_GetClosure(val)) {
-                mNamedElements["func_closure"] = internalize(PyFunction_GetClosure(val));
-            }
-            if (PyFunction_GetCode(val)) {
-                mNamedElements["func_code"] = internalize(PyFunction_GetCode(val));
-            }
-            if (PyFunction_GetModule(val)) {
-                mNamedElements["func_module"] = internalize(PyFunction_GetModule(val));
-            }
-            if (PyFunction_GetAnnotations(val)) {
-                mNamedElements["func_annotations"] = internalize(PyFunction_GetAnnotations(val));
-            }
-            if (PyFunction_GetDefaults(val)) {
-                mNamedElements["func_defaults"] = internalize(PyFunction_GetDefaults(val));
-            }
-            if (PyFunction_GetKwDefaults(val)) {
-                mNamedElements["func_kwdefaults"] = internalize(PyFunction_GetKwDefaults(val));
-            }
-            if (PyFunction_GetGlobals(val)) {
-                mNamedElements["func_globals"] = internalize(PyFunction_GetGlobals(val));
-            }
-            return;
-        }
-
-        if (PyCode_Check(val)) {
-            mKind = Kind::PyCodeObject;
-
-            PyCodeObject* co = (PyCodeObject*)val;
-
-            mNamedInts["co_argcount"] = co->co_argcount;
-            mNamedInts["co_kwonlyargcount"] = co->co_kwonlyargcount;
-            mNamedInts["co_nlocals"] = co->co_nlocals;
-            mNamedInts["co_stacksize"] = co->co_stacksize;
-            mNamedInts["co_firstlineno"] = co->co_firstlineno;
-            mNamedInts["co_posonlyargcount"] = co->co_posonlyargcount;
-            mNamedInts["co_flags"] = co->co_flags;
-
-            mNamedElements["co_code"] = internalize(co->co_code);
-            mNamedElements["co_consts"] = internalize(co->co_consts);
-            mNamedElements["co_names"] = internalize(co->co_names);
-            mNamedElements["co_varnames"] = internalize(co->co_varnames);
-            mNamedElements["co_freevars"] = internalize(co->co_freevars);
-            mNamedElements["co_cellvars"] = internalize(co->co_cellvars);
-            mNamedElements["co_name"] = internalize(co->co_name);
-            mNamedElements["co_filename"] = internalize(co->co_filename);
-
-#           if PY_MINOR_VERSION >= 10
-                mNamedElements["co_linetable"] = internalize(co->co_linetable);
-#           else
-                mNamedElements["co_lnotab"] = internalize(co->co_lnotab);
-#           endif
-
-            return;
-        }
-
-        ::Type* instanceType = PyInstance::extractTypeFrom(val->ob_type);
-        if (instanceType) {
-            mKind = Kind::Instance;
-            mInstance = ::Instance::create(
-                instanceType,
-                ((PyInstance*)val)->dataPtr()
-            );
-            return;
-        }
-
-        if (val == Py_None) {
-            mKind = Kind::Instance;
-            return;
-        }
-
-        if (PyBool_Check(val)) {
-            mKind = Kind::Instance;
-            mInstance = Instance::create(val == Py_True);
-            return;
-        }
-
-        if (PyLong_Check(val)) {
-            mKind = Kind::Instance;
-
-            try {
-                mInstance = Instance::create((int64_t)PyLong_AsLongLong(val));
-            }
-            catch(...) {
-                mInstance = Instance::create((uint64_t)PyLong_AsUnsignedLongLong(val));
-            }
-
-            return;
-        }
-
-        if (PyFloat_Check(val)) {
-            mKind = Kind::Instance;
-            mInstance = Instance::create(PyFloat_AsDouble(val));
-            return;
-        }
-
-        if (PyModule_Check(val)) {
-            PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
-
-            PyObjectStealer name(PyObject_GetAttrString(val, "__name__"));
-            if (name) {
-                if (PyUnicode_Check(name)) {
-                    PyObjectStealer moduleObject(PyObject_GetItem(sysModuleModules, name));
-                    if (moduleObject) {
-                        if (moduleObject == val) {
-                            mKind = Kind::PyModule;
-                            mName = PyUnicode_AsUTF8(name);
-                            return;
-                        }
-                    } else {
-                        PyErr_Clear();
-                    }
-                }
-            } else {
-                PyErr_Clear();
-            }
-        }
-
-        if (PyBytes_Check(val)) {
-            mKind = Kind::Instance;
-            mInstance = Instance::createAndInitialize(
-                BytesType::Make(),
-                [&](instance_ptr i) {
-                    BytesType::Make()->constructor(
-                        i,
-                        PyBytes_GET_SIZE(val),
-                        PyBytes_AsString(val)
-                    );
-                }
-            );
-            return;
-        }
-
-        if (isVanillaClassType(val->ob_type)) {
-            mKind = Kind::PyObject;
-
-            mNamedElements["inst_type"] = internalize((PyObject*)val->ob_type);
-
-            PyObjectStealer dict(PyObject_GenericGetDict(val, nullptr));
-            if (dict) {
-                mNamedElements["inst_dict"] = internalize(dict);
-            }
-            return;
-        }
-
-        if (val->ob_type == &PyStaticMethod_Type || val->ob_type == &PyClassMethod_Type) {
-            if (val->ob_type == &PyStaticMethod_Type) {
-                mKind = Kind::PyStaticMethod;
-            } else {
-                mKind = Kind::PyClassMethod;
-            }
-
-            PyObjectStealer funcObj(PyObject_GetAttrString(val, "__func__"));
-
-            mNamedElements["meth_func"] = internalize(funcObj);
-
-            return;
-        }
-
-        if (val->ob_type == &PyProperty_Type) {
-            mKind = Kind::PyProperty;
-
-            JustLikeAPropertyObject* prop = (JustLikeAPropertyObject*)val;
-
-            if (prop->prop_get) {
-                mNamedElements["prop_get"] = internalize(prop->prop_get);
-            }
-            if (prop->prop_set) {
-                mNamedElements["prop_set"] = internalize(prop->prop_set);
-            }
-            if (prop->prop_del) {
-                mNamedElements["prop_del"] = internalize(prop->prop_del);
-            }
-            if (prop->prop_doc) {
-                mNamedElements["prop_doc"] = internalize(prop->prop_doc);
-            }
-
-            #if PY_MINOR_VERSION >= 10
-            if (prop->prop_name) {
-                mNamedElements["prop_name"] = internalize(prop->prop_name);
-            }
-            #endif
-
-            return;
-        }
-
-        if (val->ob_type == &PyMethod_Type) {
-            mKind = Kind::PyBoundMethod;
-
-            PyObjectStealer fself(PyObject_GetAttrString(val, "__self__"));
-            PyObjectStealer ffunc(PyObject_GetAttrString(val, "__func__"));
-
-            mNamedElements["meth_self"] = internalize(fself);
-            mNamedElements["meth_func"] = internalize(ffunc);
-
-            return;
-        }
-
-        if (isPyObjectGloballyIdentifiable(val)) {
-            mKind = Kind::NamedPyObject;
-
-            // no checks are necessary because isPyObjectGloballyIdentifiable
-            // confirms that this is OK.
-            PyObjectStealer moduleName(PyObject_GetAttrString(val, "__module__"));
-            PyObjectStealer clsName(PyObject_GetAttrString(val, "__name__"));
-
-            mModuleName = PyUnicode_AsUTF8(moduleName);
-            mName = PyUnicode_AsUTF8(clsName);
-            return;
-        }
-
-        mKind = Kind::ArbitraryPyObject;
-        mPyObject = incref(val);
-    }
+        PyObjSnapshotMaker& maker
+    );
 
     void append(PyObjSnapshot* elt) {
         if (mKind != Kind::PyTuple) {
@@ -1292,6 +1162,25 @@ public:
         return result;
     }
 
+    template<class T>
+    void becomeBundleOf(const std::map<std::string, T>& namedElements, PyObjSnapshotMaker& maker) {
+        mKind = Kind::InternalBundle;
+
+        for (auto& nameAndElt: namedElements) {
+            mNames.push_back(nameAndElt.first);
+            mElements.push_back(maker.internalize(nameAndElt.second));
+        }
+    }
+
+    template<class T>
+    void becomeBundleOf(const std::vector<T>& elements, PyObjSnapshotMaker& maker) {
+        mKind = Kind::InternalBundle;
+
+        for (auto& elt: elements) {
+            mElements.push_back(maker.internalize(elt));
+        }
+    }
+
 private:
     // ensure we won't crash if we interact with this object.
     void validateAfterDeserialization() {
@@ -1324,10 +1213,13 @@ private:
     // if we're a tuple, list, or dict
     std::vector<PyObjSnapshot*> mElements;
 
+    std::vector<std::string> mNames;
+
     // if we're a PyDict
     std::vector<PyObjSnapshot*> mKeys;
 
     std::string mStringValue;
     std::string mModuleName;
     std::string mName;
+    std::string mQualname;
 };

@@ -40,19 +40,25 @@ PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwar
         }
 
         std::unordered_map<PyObject*, PyObjSnapshot*> constantMapCache;
+        std::unordered_map<Type*, PyObjSnapshot*> constantMapCacheType;
+        std::unordered_map<InstanceRef, PyObjSnapshot*> constantMapCacheInst;
         std::map<::Type*, ::Type*> groupMap;
 
         PyObjGraphSnapshot* graph = new PyObjGraphSnapshot();
 
-        PyObjSnapshot* object = PyObjSnapshot::internalizePyObj(
-            instance,
+        PyObjSnapshotMaker maker(
             constantMapCache,
+            constantMapCacheType,
+            constantMapCacheInst,
             groupMap,
-            linkBack,
-            graph
+            graph,
+            linkBack
         );
 
+        PyObjSnapshot* object = maker.internalize(instance);
+
         PyObjectStealer graphObj(PyPyObjGraphSnapshot::newPyObjGraphSnapshot(graph, true));
+
         return PyPyObjSnapshot::newPyObjSnapshot(object, graphObj);
     });
 }

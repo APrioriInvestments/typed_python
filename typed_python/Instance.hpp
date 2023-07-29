@@ -53,6 +53,23 @@ public:
         return mData;
     }
 
+    bool operator<(const InstanceRef& other) const {
+        if (mType < other.mType) { return true; }
+        if (mType > other.mType) { return false; }
+        if (mData < other.mData) { return true; }
+        return false;
+    }
+
+    bool operator==(const InstanceRef& other) const {
+        return mType == other.mType && mData == other.mData;
+    }
+
+    // if we wrap a Type* as a python object, return it. Otherwise nullptr.
+    Type* extractType(bool includePrimitives=false) const;
+
+    // if we wrap a PyObject return it. Otherwise nullptr.
+    PyObject* extractPyobj() const;
+
 private:
     instance_ptr mData;
     Type* mType;
@@ -90,6 +107,12 @@ public:
     Instance(const Instance& other);
 
     Instance(instance_ptr p, Type* t);
+
+    Instance(const InstanceRef& ref);
+
+    InstanceRef ref() const {
+        return InstanceRef(data(), type());
+    }
 
     template<class initializer_type>
     static Instance createAndInitialize(Type* t, const initializer_type& initFun) {
@@ -145,6 +168,9 @@ public:
     // if we wrap a Type* as a python object, return it. Otherwise nullptr.
     Type* extractType(bool includePrimitives=false) const;
 
+    // if we wrap a PyObject return it. Otherwise nullptr.
+    PyObject* extractPyobj() const;
+
     template<class T>
     T& cast() {
         return *(T*)data();
@@ -170,3 +196,16 @@ private:
     // if the nullptr, then this is the None object.
     layout* mLayout;
 };
+
+namespace std {
+    template<>
+    struct hash<InstanceRef> {
+        typedef InstanceRef argument_type;
+        typedef std::size_t result_type;
+
+        result_type operator()(argument_type const& s) const noexcept {
+            return std::hash<void*>()((void*)s.data()) ^ std::hash<void*>()((void*)s.type());
+        }
+    };
+}
+

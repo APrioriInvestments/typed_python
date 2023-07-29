@@ -277,15 +277,9 @@ public:
         }
     }
 
-    void internalizeConstants(
-        std::unordered_map<PyObject*, PyObjSnapshot*>& constantMapCache,
-        const std::map<Type*, Type*>& groupMap
-    ) {
+    void internalizeConstants(PyObjSnapshotMaker& snapMaker) {
         for (auto& nameAndGlobal: mGlobals) {
-            nameAndGlobal.second = nameAndGlobal.second.withConstantsInternalized(
-                constantMapCache,
-                groupMap
-            );
+            nameAndGlobal.second = nameAndGlobal.second.withConstantsInternalized(snapMaker);
         }
     }
 
