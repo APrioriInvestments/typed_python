@@ -131,7 +131,7 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
         if (attr == "pyobj") {
             PyObject* o = obj->getPyObj();
             if (!o) {
-                throw std::runtime_error("CVPO of kind " + obj->kindAsString() + " has no pyobj");
+                throw std::runtime_error("PyObjSnapshot of kind " + obj->kindAsString() + " has no pyobj");
             }
             return incref(o);
         }

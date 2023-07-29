@@ -79,6 +79,7 @@ compile the entire group all at once.
 #include "PyFunctionOverload.cpp"
 #include "PyFunctionGlobal.cpp"
 #include "PyObjSnapshot.cpp"
+#include "PyObjRehydrator.cpp"
 #include "PyPyObjSnapshot.cpp"
 #include "PyPyObjGraphSnapshot.cpp"
 

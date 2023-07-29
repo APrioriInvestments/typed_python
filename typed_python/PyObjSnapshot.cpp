@@ -2,6 +2,203 @@
 #include "PyObjGraphSnapshot.hpp"
 
 
+std::string PyObjSnapshot::kindAsString() const {
+    if (mKind == Kind::Uninitialized) {
+        return "Uninitialized";
+    }
+
+    if (mKind == Kind::InternalBundle) {
+        return "InternalBundle";
+    }
+
+    if (mKind == Kind::String) {
+        return "String";
+    }
+
+    if (mKind == Kind::NamedPyObject) {
+        return "NamedPyObject";
+    }
+
+    if (mKind == Kind::PrimitiveType) {
+        return "PrimitiveType";
+    }
+
+    if (mKind == Kind::Instance) {
+        return "Instance";
+    }
+
+    if (mKind == Kind::PrimitiveType) {
+        return "PrimitiveType";
+    }
+
+    if (mKind == Kind::ListOfType) {
+        return "ListOfType";
+    }
+
+    if (mKind == Kind::TupleOfType) {
+        return "TupleOfType";
+    }
+
+    if (mKind == Kind::TupleType) {
+        return "TupleType";
+    }
+
+    if (mKind == Kind::NamedTupleType) {
+        return "NamedTupleType";
+    }
+
+    if (mKind == Kind::OneOfType) {
+        return "OneOfType";
+    }
+
+    if (mKind == Kind::ValueType) {
+        return "ValueType";
+    }
+
+    if (mKind == Kind::DictType) {
+        return "DictType";
+    }
+
+    if (mKind == Kind::ConstDictType) {
+        return "ConstDictType";
+    }
+
+    if (mKind == Kind::SetType) {
+        return "SetType";
+    }
+
+    if (mKind == Kind::PointerToType) {
+        return "PointerToType";
+    }
+
+    if (mKind == Kind::RefToType) {
+        return "RefToType";
+    }
+
+    if (mKind == Kind::AlternativeType) {
+        return "AlternativeType";
+    }
+
+    if (mKind == Kind::ConcreteAlternativeType) {
+        return "ConcreteAlternativeType";
+    }
+
+    if (mKind == Kind::AlternativeMatcherType) {
+        return "AlternativeMatcherType";
+    }
+
+    if (mKind == Kind::PythonObjectOfTypeType) {
+        return "PythonObjectOfTypeType";
+    }
+
+    if (mKind == Kind::SubclassOfTypeType) {
+        return "SubclassOfTypeType";
+    }
+
+    if (mKind == Kind::ClassType) {
+        return "ClassType";
+    }
+
+    if (mKind == Kind::HeldClassType) {
+        return "HeldClassType";
+    }
+
+    if (mKind == Kind::FunctionType) {
+        return "FunctionType";
+    }
+
+    if (mKind == Kind::FunctionOverload) {
+        return "FunctionOverload";
+    }
+
+    if (mKind == Kind::FunctionGlobal) {
+        return "FunctionGlobal";
+    }
+
+    if (mKind == Kind::BoundMethodType) {
+        return "BoundMethodType";
+    }
+
+    if (mKind == Kind::ForwardType) {
+        return "ForwardType";
+    }
+
+    if (mKind == Kind::TypedCellType) {
+        return "TypedCellType";
+    }
+
+    if (mKind == Kind::PyList) {
+        return "PyList";
+    }
+
+    if (mKind == Kind::PyDict) {
+        return "PyDict";
+    }
+
+    if (mKind == Kind::PySet) {
+        return "PySet";
+    }
+
+    if (mKind == Kind::PyTuple) {
+        return "PyTuple";
+    }
+
+    if (mKind == Kind::PyClass) {
+        return "PyClass";
+    }
+
+    if (mKind == Kind::PyFunction) {
+        return "PyFunction";
+    }
+
+    if (mKind == Kind::PyObject) {
+        return "PyObject";
+    }
+
+    if (mKind == Kind::PyCell) {
+        return "PyCell";
+    }
+
+    if (mKind == Kind::PyCodeObject) {
+        return "PyCodeObject";
+    }
+
+    if (mKind == Kind::PyModule) {
+        return "PyModule";
+    }
+
+    if (mKind == Kind::PyModuleDict) {
+        return "PyModuleDict";
+    }
+
+    if (mKind == Kind::PyClassDict) {
+        return "PyClassDict";
+    }
+
+    if (mKind == Kind::PyStaticMethod) {
+        return "PyStaticMethod";
+    }
+
+    if (mKind == Kind::PyClassMethod) {
+        return "PyClassMethod";
+    }
+
+    if (mKind == Kind::PyBoundMethod) {
+        return "PyBoundMethod";
+    }
+
+    if (mKind == Kind::PyProperty) {
+        return "PyProperty";
+    }
+
+    if (mKind == Kind::ArbitraryPyObject) {
+        return "ArbitraryPyObject";
+    }
+
+    throw std::runtime_error("Unknown PyObjSnapshot Kind: " + format((int)mKind));
+}
+
+
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::string& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
 
@@ -139,6 +336,17 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, Closu
     return res;
 }
 
+PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, FunctionGlobal>& inMethods) {
+    PyObjSnapshot* res = new PyObjSnapshot(mGraph);
+    if (mGraph) {
+        mGraph->registerSnapshot(res);
+    }
+
+    res->becomeBundleOf(inMethods, *this);
+
+    return res;
+}
+
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, PyObject*>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
     if (mGraph) {
@@ -262,6 +470,13 @@ void PyObjSnapshot::becomeInternalizedOf(
     Type* t,
     PyObjSnapshotMaker& maker
 ) {
+    // we're always the internalized version of this object
+    if (maker.linkBackToOriginalObject()) {
+        mType = t;
+    }
+
+    mNamedInts["type_is_forward"] = t->isForwardDefined() ? 1 : 0;
+
     if (t->isListOf()) {
         mKind = Kind::ListOfType;
         mNamedElements["element_type"] = maker.internalize(((ListOfType*)t)->getEltType());
@@ -475,8 +690,7 @@ void PyObjSnapshot::becomeInternalizedOf(
         return;
     }
 
-    mKind = Kind::Type;
-    mType = t;
+    throw std::runtime_error("Type of category " + t->getTypeCategoryString() + " can't be snapshotted");
 }
 
 
@@ -916,8 +1130,12 @@ void PyObjSnapshot::becomeInternalizedOf(
 
     mNamedElements["func_globals"] = maker.internalize(val.getGlobals());
     mNamedElements["func_code"] = maker.internalize(val.getFunctionCode());
-    mNamedElements["func_defaults"] = maker.internalize(val.getFunctionDefaults());
-    mNamedElements["func_annotations"] = maker.internalize(val.getFunctionAnnotations());
+    if (val.getFunctionDefaults()) {
+        mNamedElements["func_defaults"] = maker.internalize(val.getFunctionDefaults());
+    }
+    if (val.getFunctionAnnotations()) {
+        mNamedElements["func_annotations"] = maker.internalize(val.getFunctionAnnotations());
+    }
     mNamedElements["func_args"] = maker.internalize(val.getArgs());
     mNamedElements["func_closure_varnames"] = maker.internalize(
         val.getFunctionClosureVarnames()

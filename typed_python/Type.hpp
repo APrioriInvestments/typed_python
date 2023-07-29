@@ -920,6 +920,10 @@ public:
 
     void attemptAutoresolveWrite();
 
+    void setIsForwardDefined(bool isForwardDefined) {
+        m_is_forward_defined = isForwardDefined;
+    }
+
     void markActivelyBeingDeserialized(bool isForwardDefined) {
         m_is_being_deserialized = true;
         m_is_forward_defined = isForwardDefined;

@@ -20,6 +20,7 @@
 #include "Type.hpp"
 #include "Instance.hpp"
 #include "PythonTypeInternals.hpp"
+#include "PyObjRehydrator.hpp"
 
 class PyObjGraphSnapshot;
 class PyObjSnapshot;
@@ -41,7 +42,6 @@ lets us determine if the object was modified (which would break compiler invaria
 gives us a self-consistent view of the world to compile against so we don't have state
 changing underneath us.
 **********************************/
-
 
 class PyObjSnapshotMaker {
 public:
@@ -109,6 +109,7 @@ private:
 class PyObjSnapshot {
 private:
     friend class PyObjSnapshotMaker;
+    friend class PyObjRehydrator;
 
     enum class Kind {
         // this should never be visible in a running program
@@ -121,9 +122,6 @@ private:
         // is the same across program invocations (its a C function and we can't
         // look inside of it)
         NamedPyObject,
-        // we're pointing back into a typed_python Type held in mType.
-        // it must be a 'leaf' type with no internals
-        Type,
         // we're pointing into a TP leaf instance (a register type, an int, bytes, etc.)
         Instance,
         // we're a primitive type (like int)
@@ -238,8 +236,9 @@ public:
     }
 
     static PyObjSnapshot* ForType(Type* t) {
+        // TODO: this needs to go away
         PyObjSnapshot* res = new PyObjSnapshot();
-        res->mKind = Kind::Type;
+        res->mKind = Kind::PrimitiveType;
         res->mType = t;
         return res;
     }
@@ -248,16 +247,8 @@ public:
         return mGraph;
     }
 
-    bool isUninitialized() const {
-        return mKind == Kind::Uninitialized;
-    }
-
     bool isType() const {
-        return mKind == Kind::Type;
-    }
-
-    bool isNamedPyObject() const {
-        return mKind == Kind::NamedPyObject;
+        return mKind == Kind::PrimitiveType;
     }
 
     bool isString() const {
@@ -268,245 +259,7 @@ public:
         return mKind == Kind::Instance;
     }
 
-    bool isPyList() const {
-        return mKind == Kind::PyList;
-    }
-
-    bool isPyDict() const {
-        return mKind == Kind::PyDict;
-    }
-
-    bool isPySet() const {
-        return mKind == Kind::PySet;
-    }
-
-    bool isPyTuple() const {
-        return mKind == Kind::PyTuple;
-    }
-
-    bool isPyClass() const {
-        return mKind == Kind::PyClass;
-    }
-
-    bool isPyFunction() const {
-        return mKind == Kind::PyFunction;
-    }
-
-    bool isPyCell() const {
-        return mKind == Kind::PyCell;
-    }
-
-    bool isPyObject() const {
-        return mKind == Kind::PyObject;
-    }
-
-    bool isPyCodeObject() const {
-        return mKind == Kind::PyCodeObject;
-    }
-
-    bool isPyModule() const {
-        return mKind == Kind::PyModule;
-    }
-
-    bool isArbitraryPyObject() const {
-        return mKind == Kind::ArbitraryPyObject;
-    }
-
-    std::string kindAsString() const {
-        if (mKind == Kind::Uninitialized) {
-            return "Uninitialized";
-        }
-
-        if (mKind == Kind::InternalBundle) {
-            return "InternalBundle";
-        }
-
-        if (mKind == Kind::String) {
-            return "String";
-        }
-
-        if (mKind == Kind::NamedPyObject) {
-            return "NamedPyObject";
-        }
-
-        if (mKind == Kind::Type) {
-            return "Type";
-        }
-
-        if (mKind == Kind::Instance) {
-            return "Instance";
-        }
-
-        if (mKind == Kind::PrimitiveType) {
-            return "PrimitiveType";
-        }
-
-        if (mKind == Kind::ListOfType) {
-            return "ListOfType";
-        }
-
-        if (mKind == Kind::TupleOfType) {
-            return "TupleOfType";
-        }
-
-        if (mKind == Kind::TupleType) {
-            return "TupleType";
-        }
-
-        if (mKind == Kind::NamedTupleType) {
-            return "NamedTupleType";
-        }
-
-        if (mKind == Kind::OneOfType) {
-            return "OneOfType";
-        }
-
-        if (mKind == Kind::ValueType) {
-            return "ValueType";
-        }
-
-        if (mKind == Kind::DictType) {
-            return "DictType";
-        }
-
-        if (mKind == Kind::ConstDictType) {
-            return "ConstDictType";
-        }
-
-        if (mKind == Kind::SetType) {
-            return "SetType";
-        }
-
-        if (mKind == Kind::PointerToType) {
-            return "PointerToType";
-        }
-
-        if (mKind == Kind::RefToType) {
-            return "RefToType";
-        }
-
-        if (mKind == Kind::AlternativeType) {
-            return "AlternativeType";
-        }
-
-        if (mKind == Kind::ConcreteAlternativeType) {
-            return "ConcreteAlternativeType";
-        }
-
-        if (mKind == Kind::AlternativeMatcherType) {
-            return "AlternativeMatcherType";
-        }
-
-        if (mKind == Kind::PythonObjectOfTypeType) {
-            return "PythonObjectOfTypeType";
-        }
-
-        if (mKind == Kind::SubclassOfTypeType) {
-            return "SubclassOfTypeType";
-        }
-
-        if (mKind == Kind::ClassType) {
-            return "ClassType";
-        }
-
-        if (mKind == Kind::HeldClassType) {
-            return "HeldClassType";
-        }
-
-        if (mKind == Kind::FunctionType) {
-            return "FunctionType";
-        }
-
-        if (mKind == Kind::FunctionOverload) {
-            return "FunctionOverload";
-        }
-
-        if (mKind == Kind::FunctionGlobal) {
-            return "FunctionGlobal";
-        }
-
-        if (mKind == Kind::BoundMethodType) {
-            return "BoundMethodType";
-        }
-
-        if (mKind == Kind::ForwardType) {
-            return "ForwardType";
-        }
-
-        if (mKind == Kind::TypedCellType) {
-            return "TypedCellType";
-        }
-
-        if (mKind == Kind::PyList) {
-            return "PyList";
-        }
-
-        if (mKind == Kind::PyDict) {
-            return "PyDict";
-        }
-
-        if (mKind == Kind::PySet) {
-            return "PySet";
-        }
-
-        if (mKind == Kind::PyTuple) {
-            return "PyTuple";
-        }
-
-        if (mKind == Kind::PyClass) {
-            return "PyClass";
-        }
-
-        if (mKind == Kind::PyFunction) {
-            return "PyFunction";
-        }
-
-        if (mKind == Kind::PyObject) {
-            return "PyObject";
-        }
-
-        if (mKind == Kind::PyCell) {
-            return "PyCell";
-        }
-
-        if (mKind == Kind::PyCodeObject) {
-            return "PyCodeObject";
-        }
-
-        if (mKind == Kind::PyModule) {
-            return "PyModule";
-        }
-
-        if (mKind == Kind::PyModuleDict) {
-            return "PyModuleDict";
-        }
-
-        if (mKind == Kind::PyClassDict) {
-            return "PyClassDict";
-        }
-
-        if (mKind == Kind::PyStaticMethod) {
-            return "PyStaticMethod";
-        }
-
-        if (mKind == Kind::PyClassMethod) {
-            return "PyClassMethod";
-        }
-
-        if (mKind == Kind::PyBoundMethod) {
-            return "PyBoundMethod";
-        }
-
-        if (mKind == Kind::PyProperty) {
-            return "PyProperty";
-        }
-
-        if (mKind == Kind::ArbitraryPyObject) {
-            return "ArbitraryPyObject";
-        }
-
-        throw std::runtime_error("Unknown PyObjSnapshot Kind: " + format((int)mKind));
-    }
+    std::string kindAsString() const;
 
     static std::string dictGetStringOrEmpty(PyObject* dict, const char* name) {
         if (!dict || !PyDict_Check(dict)) {
@@ -662,14 +415,6 @@ public:
         return mNamedInts;
     }
 
-    ::Type* getType() const {
-        return mType;
-    }
-
-    const ::Instance& getInstance() const {
-        return mInstance;
-    }
-
     const std::string& getStringValue() const {
         return mStringValue;
     }
@@ -684,7 +429,7 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {
-        if (mKind == Kind::Type) {
+        if (mKind == Kind::PrimitiveType) {
             v(mType);
             return;
         }
@@ -700,7 +445,7 @@ public:
 
     template<class visitor_type>
     void _visitCompilerVisibleInternals(const visitor_type& visitor) {
-        if (mKind == Kind::Type) {
+        if (mKind == Kind::PrimitiveType) {
             visitor.visitTopo(mType);
         }
 
@@ -719,6 +464,73 @@ public:
         }
     }
 
+    bool willBeATpType() const {
+        return mKind == Kind::PrimitiveType
+            || mKind == Kind::ListOfType
+            || mKind == Kind::TupleOfType
+            || mKind == Kind::TupleType
+            || mKind == Kind::NamedTupleType
+            || mKind == Kind::OneOfType
+            || mKind == Kind::ValueType
+            || mKind == Kind::DictType
+            || mKind == Kind::ConstDictType
+            || mKind == Kind::SetType
+            || mKind == Kind::PointerToType
+            || mKind == Kind::RefToType
+            || mKind == Kind::AlternativeType
+            || mKind == Kind::ConcreteAlternativeType
+            || mKind == Kind::AlternativeMatcherType
+            || mKind == Kind::PythonObjectOfTypeType
+            || mKind == Kind::SubclassOfTypeType
+            || mKind == Kind::ClassType
+            || mKind == Kind::HeldClassType
+            || mKind == Kind::FunctionType
+            || mKind == Kind::BoundMethodType
+            || mKind == Kind::ForwardType
+            || mKind == Kind::TypedCellType
+        ;
+    }
+
+
+    ::Type* getType() {
+        if (mKind == Kind::PrimitiveType) {
+            return mType;
+        }
+
+        if (willBeATpType() && !mType) {
+            rehydrate();
+            return mType;
+        }
+
+        return nullptr;
+    }
+
+    const ::Instance& getInstance() {
+        return mInstance;
+    }
+
+    bool needsHydration() const {
+        // currently, instances are 'out of band'. Eventually they'll be just like the
+        // other content.
+        if (mKind == Kind::Instance) {
+            return false;
+        }
+
+        if (mKind == Kind::String) {
+            return false;
+        }
+
+        if (mKind == Kind::Uninitialized || mKind == Kind::InternalBundle) {
+            return false;
+        }
+
+        if (mPyObject) {
+            return false;
+        }
+
+        return true;
+    }
+
     // get the python object representation of this object, which isn't guaranteed
     // to exist and may need to be constructed on demand.  this will do a pass over
     // all reachable objects, building skeletons, and then performs a second pass where
@@ -728,338 +540,51 @@ public:
             return mPyObject;
         }
 
-        std::unordered_set<PyObjSnapshot*> needsResolution;
-
-        PyObject* res = getPyObj(needsResolution);
-
-        for (auto n: needsResolution) {
-            n->finalizeGetPyObj();
+        if (mKind == Kind::String) {
+            mPyObject = PyUnicode_FromString(mStringValue.c_str());
+            return mPyObject;
         }
 
-        // do a second pass patching up classes. They don't inherit things
-        // from their dict correctly
-        for (auto n: needsResolution) {
-            n->finalizeGetPyObj2();
+        if (mKind == Kind::Instance) {
+            mPyObject = PyInstance::extractPythonObject(mInstance);
+            return mPyObject;
         }
 
-        return res;
-    }
-
-    void finalizeGetPyObj2() {
-        if (mKind == Kind::PyClass) {
-            if (mNamedElements.find("cls_dict") == mNamedElements.end()) {
-                throw std::runtime_error("Corrupt PyClass - no cls_dict");
-            }
-
-            PyObjSnapshot* clsDictPyObj = mNamedElements["cls_dict"];
-
-            for (long k = 0; k < clsDictPyObj->elements().size() && k < clsDictPyObj->keys().size(); k++) {
-                if (clsDictPyObj->keys()[k]->isString()) {
-                    PyObject_SetAttrString(
-                        mPyObject,
-                        clsDictPyObj->keys()[k]->getStringValue().c_str(),
-                        clsDictPyObj->elements()[k]->getPyObj()
-                    );
-                }
-            }
-        }
-    }
-
-    // we're a skeleton - finish ourselves out
-    void finalizeGetPyObj() {
-        if (mKind == Kind::PyDict || mKind == Kind::PyClassDict) {
-            for (long k = 0; k < mElements.size() && k < mKeys.size(); k++) {
-                PyDict_SetItem(
-                    mPyObject,
-                    mKeys[k]->getPyObj(),
-                    mElements[k]->getPyObj()
-                );
-            }
-        } else if (mKind == Kind::PyCell) {
-            auto it = mNamedElements.find("cell_contents");
-            if (it != mNamedElements.end()) {
-                PyCell_Set(
-                    mPyObject,
-                    it->second->getPyObj()
-                );
-            }
-        }
-    }
-
-    PyObject* getPyObj(std::unordered_set<PyObjSnapshot*>& needsResolution) {
-        PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
-
-        if (!mPyObject) {
-            if (mKind == Kind::ArbitraryPyObject) {
-                throw std::runtime_error("Corrupt PyObjSnapshot.ArbitraryPyObject: missing mPyObject");
-            } else if (mKind == Kind::Type) {
-                mPyObject = (PyObject*)PyInstance::typeObj(mType);
-            } else if (mKind == Kind::String) {
-                mPyObject = PyUnicode_FromString(mStringValue.c_str());
-            } else if (mKind == Kind::Instance) {
-                mPyObject = PyInstance::extractPythonObject(mInstance);
-            } else if (mKind == Kind::NamedPyObject) {
-                PyObjectStealer nameAsStr(PyUnicode_FromString(mModuleName.c_str()));
-                PyObjectStealer moduleObject(
-                    PyObject_GetItem(sysModuleModules, nameAsStr)
-                );
-
-                if (!moduleObject) {
-                    PyErr_Clear();
-                    // TODO: should we be importing here? that seems dangerous...
-                    throw std::runtime_error("Somehow module " + mModuleName + " is not loaded!");
-                }
-                PyObjectStealer inst(PyObject_GetAttrString(moduleObject, mName.c_str()));
-                if (!inst) {
-                    PyErr_Clear();
-
-                    // TODO: should we be importing here? that seems dangerous...
-                    throw std::runtime_error("Somehow module " + mModuleName + " is missing member " + mName);
-                }
-
-                mPyObject = incref(inst);
-            } else if (mKind == Kind::PyDict || mKind == Kind::PyClassDict) {
-                mPyObject = PyDict_New();
-                needsResolution.insert(this);
-            } else if (mKind == Kind::PyList) {
-                mPyObject = PyList_New(0);
-
-                for (long k = 0; k < mElements.size(); k++) {
-                    PyList_Append(mPyObject, mElements[k]->getPyObj(needsResolution));
-                }
-            } else if (mKind == Kind::PyTuple) {
-                mPyObject = PyTuple_New(mElements.size());
-
-                // first initialize it in case we throw somehow
-                for (long k = 0; k < mElements.size(); k++) {
-                    PyTuple_SetItem(mPyObject, k, incref(Py_None));
-                }
-
-                for (long k = 0; k < mElements.size(); k++) {
-                    PyTuple_SetItem(mPyObject, k, incref(mElements[k]->getPyObj(needsResolution)));
-                }
-            } else if (mKind == Kind::PySet) {
-                mPyObject = PySet_New(nullptr);
-
-                for (long k = 0; k < mElements.size(); k++) {
-                    PySet_Add(mPyObject, incref(mElements[k]->getPyObj(needsResolution)));
-                }
-            } else if (mKind == Kind::PyClass) {
-                needsResolution.insert(this);
-
-                PyObjectStealer argTup(PyTuple_New(3));
-                PyTuple_SetItem(argTup, 0, PyUnicode_FromString(mName.c_str()));
-                PyTuple_SetItem(argTup, 1, incref(getNamedElementPyobj("cls_bases", needsResolution)));
-                PyTuple_SetItem(argTup, 2, incref(getNamedElementPyobj("cls_dict", needsResolution)));
-
-                mPyObject = PyType_Type.tp_new(&PyType_Type, argTup, nullptr);
-
-                if (!mPyObject) {
-                    throw PythonExceptionSet();
-                }
-            } else if (mKind == Kind::PyModule) {
-                PyObjectStealer nameAsStr(PyUnicode_FromString(mName.c_str()));
-                PyObjectStealer moduleObject(
-                    PyObject_GetItem(sysModuleModules, nameAsStr)
-                );
-
-                if (!moduleObject) {
-                    PyErr_Clear();
-                    // TODO: should we be importing here? that seems dangerous...
-                    throw std::runtime_error("Somehow module " + mName + " is not loaded!");
-                }
-
-                mPyObject = incref(moduleObject);
-            } else if (mKind == Kind::PyModuleDict) {
-                mPyObject = PyObject_GenericGetDict(getNamedElementPyobj("module_dict_of", needsResolution), nullptr);
-                if (!mPyObject) {
-                    throw PythonExceptionSet();
-                }
-            } else if (mKind == Kind::PyCell) {
-                mPyObject = PyCell_New(nullptr);
-                needsResolution.insert(this);
-            } else if (mKind == Kind::PyObject) {
-                PyObject* t = getNamedElementPyobj("inst_type", needsResolution);
-                PyObject* d = getNamedElementPyobj("inst_dict", needsResolution);
-
-                static PyObject* emptyTuple = PyTuple_Pack(0);
-
-                mPyObject = ((PyTypeObject*)t)->tp_new(
-                    ((PyTypeObject*)t),
-                    emptyTuple,
-                    nullptr
-                );
-
-                if (PyObject_GenericSetDict(mPyObject, d, nullptr)) {
-                    throw PythonExceptionSet();
-                }
-            } else if (mKind == Kind::PyFunction) {
-                mPyObject = PyFunction_New(
-                    getNamedElementPyobj("func_code", needsResolution),
-                    getNamedElementPyobj("func_globals", needsResolution)
-                );
-
-                if (mNamedElements.find("func_closure") != mNamedElements.end()) {
-                    PyFunction_SetClosure(
-                        mPyObject,
-                        getNamedElementPyobj("func_closure", needsResolution)
-                    );
-                }
-
-                if (mNamedElements.find("func_annotations") != mNamedElements.end()) {
-                    PyFunction_SetAnnotations(
-                        mPyObject,
-                        getNamedElementPyobj("func_annotations", needsResolution)
-                    );
-                }
-
-                if (mNamedElements.find("func_defaults") != mNamedElements.end()) {
-                    PyFunction_SetAnnotations(
-                        mPyObject,
-                        getNamedElementPyobj("func_defaults", needsResolution)
-                    );
-                }
-
-                if (mNamedElements.find("func_qualname") != mNamedElements.end()) {
-                    PyObject_SetAttrString(
-                        mPyObject,
-                        "__qualname__",
-                        getNamedElementPyobj("func_qualname", needsResolution)
-                    );
-                }
-
-                if (mNamedElements.find("func_kwdefaults") != mNamedElements.end()) {
-                    PyObject_SetAttrString(
-                        mPyObject,
-                        "__kwdefaults__",
-                        getNamedElementPyobj("func_kwdefaults", needsResolution)
-                    );
-                }
-
-                if (mNamedElements.find("func_name") != mNamedElements.end()) {
-                    PyObject_SetAttrString(
-                        mPyObject,
-                        "__name__",
-                        getNamedElementPyobj("func_name", needsResolution)
-                    );
-                }
-            } else if (mKind == Kind::PyCodeObject) {
-#if PY_MINOR_VERSION < 8
-                mPyObject = (PyObject*)PyCode_New(
-#else
-                mPyObject = (PyObject*)PyCode_NewWithPosOnlyArgs(
-#endif
-                    mNamedInts["co_argcount"],
-#if PY_MINOR_VERSION >= 8
-                    mNamedInts["co_posonlyargcount"],
-#endif
-                    mNamedInts["co_kwonlyargcount"],
-                    mNamedInts["co_nlocals"],
-                    mNamedInts["co_stacksize"],
-                    mNamedInts["co_flags"],
-                    getNamedElementPyobj("co_code", needsResolution),
-                    getNamedElementPyobj("co_consts", needsResolution),
-                    getNamedElementPyobj("co_names", needsResolution),
-                    getNamedElementPyobj("co_varnames", needsResolution),
-                    getNamedElementPyobj("co_freevars", needsResolution),
-                    getNamedElementPyobj("co_cellvars", needsResolution),
-                    getNamedElementPyobj("co_filename", needsResolution),
-                    getNamedElementPyobj("co_name", needsResolution),
-                    mNamedInts["co_firstlineno"],
-                    getNamedElementPyobj(
-#if PY_MINOR_VERSION >= 10
-                        "co_linetable",
-#else
-                        "co_lnotab",
-#endif
-                    needsResolution
-                    )
-                );
-            } else if (mKind == Kind::PyStaticMethod) {
-                mPyObject = PyStaticMethod_New(Py_None);
-
-                JustLikeAClassOrStaticmethod* method = (JustLikeAClassOrStaticmethod*)mPyObject;
-                decref(method->cm_callable);
-                method->cm_callable = incref(getNamedElementPyobj("meth_func", needsResolution));
-            } else if (mKind == Kind::PyClassMethod) {
-                mPyObject = PyClassMethod_New(Py_None);
-
-                JustLikeAClassOrStaticmethod* method = (JustLikeAClassOrStaticmethod*)mPyObject;
-                decref(method->cm_callable);
-                method->cm_callable = incref(getNamedElementPyobj("meth_func", needsResolution));
-            } else if (mKind == Kind::PyProperty) {
-                static PyObject* nones = PyTuple_Pack(3, Py_None, Py_None, Py_None);
-
-                mPyObject = PyObject_CallObject((PyObject*)&PyProperty_Type, nones);
-
-                JustLikeAPropertyObject* dest = (JustLikeAPropertyObject*)mPyObject;
-
-                decref(dest->prop_get);
-                decref(dest->prop_set);
-                decref(dest->prop_del);
-                decref(dest->prop_doc);
-
-                dest->prop_get = nullptr;
-                dest->prop_set = nullptr;
-                dest->prop_del = nullptr;
-                dest->prop_doc = nullptr;
-
-                #if PY_MINOR_VERSION >= 10
-                decref(dest->prop_name);
-                dest->prop_name = nullptr;
-                #endif
-
-                dest->prop_get = incref(getNamedElementPyobj("prop_get", needsResolution, true));
-                dest->prop_set = incref(getNamedElementPyobj("prop_set", needsResolution, true));
-                dest->prop_del = incref(getNamedElementPyobj("prop_del", needsResolution, true));
-                dest->prop_doc = incref(getNamedElementPyobj("prop_doc", needsResolution, true));
-
-                #if PY_MINOR_VERSION >= 10
-                decref(dest->prop_name);
-                dest->prop_name = incref(getNamedElementPyobj("prop_name", needsResolution, true));
-                #endif
-            } else if (mKind == Kind::PyBoundMethod) {
-                mPyObject = PyMethod_New(Py_None, Py_None);
-                PyMethodObject* method = (PyMethodObject*)mPyObject;
-                decref(method->im_func);
-                decref(method->im_self);
-                method->im_func = nullptr;
-                method->im_self = nullptr;
-
-                method->im_func = incref(getNamedElementPyobj("meth_func", needsResolution));
-                method->im_self = incref(getNamedElementPyobj("meth_self", needsResolution));
-            } else {
-                throw std::runtime_error(
-                    "Can't make a python object representation for a CVPO of kind " + kindAsString()
-                );
-            }
-        }
-
+        rehydrate();
         return mPyObject;
     }
 
-    PyObject* getNamedElementPyobj(
-        std::string name,
-        std::unordered_set<PyObjSnapshot*>& needsResolution,
-        bool allowEmpty=false
-    ) {
-        auto it = mNamedElements.find(name);
-        if (it == mNamedElements.end()) {
-            if (allowEmpty) {
-                return nullptr;
-            }
-            throw std::runtime_error(
-                "Corrupt PyObjSnapshot." + kindAsString() + ". missing " + name
-            );
-        }
+    void rehydrate() {
+        PyObjRehydrator rehydrator;
 
-        return it->second->getPyObj(needsResolution);
+        rehydrator.rehydrate(this);
+        rehydrator.finalize();
     }
 
     std::string toString() const {
         return "PyObjSnapshot." + kindAsString() + "()";
     }
 
+    template<class T>
+    void becomeBundleOf(const std::map<std::string, T>& namedElements, PyObjSnapshotMaker& maker) {
+        mKind = Kind::InternalBundle;
+
+        for (auto& nameAndElt: namedElements) {
+            mNames.push_back(nameAndElt.first);
+            mElements.push_back(maker.internalize(nameAndElt.second));
+        }
+    }
+
+    template<class T>
+    void becomeBundleOf(const std::vector<T>& elements, PyObjSnapshotMaker& maker) {
+        mKind = Kind::InternalBundle;
+
+        for (auto& elt: elements) {
+            mElements.push_back(maker.internalize(elt));
+        }
+    }
+
+    // TODO: fix serialization. This is just not right.
     template<class serialization_context_t, class buf_t>
     void serialize(serialization_context_t& context, buf_t& buffer, int fieldNumber) const {
         uint32_t id;
@@ -1076,7 +601,8 @@ public:
             buffer.writeUnsignedVarintObject(0, id);
             buffer.writeUnsignedVarintObject(1, (int)mKind);
 
-            if (mKind == Kind::Type) {
+            // we only serialize Type, Instance, and PyObj if they are not caches.
+            if (mKind == Kind::PrimitiveType) {
                 context.serializeNativeType(mType, buffer, 2);
             } else
             if (mKind == Kind::Instance) {
@@ -1085,15 +611,15 @@ public:
                 mInstance.type()->serialize(mInstance.data(), buffer, 1);
                 buffer.writeEndCompound();
             } else
-            if (mKind == Kind::PyTuple) {
+            if (mKind == Kind::ArbitraryPyObject) {
+                context.serializePythonObject(mPyObject, buffer, 5);
+            } else
+            if (mElements.size()) {
                 buffer.writeBeginCompound(4);
                 for (long i = 0; i < mElements.size(); i++) {
                     mElements[i]->serialize(context, buffer, i);
                 }
                 buffer.writeEndCompound();
-            } else
-            if (mKind == Kind::ArbitraryPyObject) {
-                context.serializePythonObject(mPyObject, buffer, 5);
             }
 
             buffer.writeEndCompound();
@@ -1162,37 +688,18 @@ public:
         return result;
     }
 
-    template<class T>
-    void becomeBundleOf(const std::map<std::string, T>& namedElements, PyObjSnapshotMaker& maker) {
-        mKind = Kind::InternalBundle;
-
-        for (auto& nameAndElt: namedElements) {
-            mNames.push_back(nameAndElt.first);
-            mElements.push_back(maker.internalize(nameAndElt.second));
-        }
-    }
-
-    template<class T>
-    void becomeBundleOf(const std::vector<T>& elements, PyObjSnapshotMaker& maker) {
-        mKind = Kind::InternalBundle;
-
-        for (auto& elt: elements) {
-            mElements.push_back(maker.internalize(elt));
-        }
-    }
-
 private:
     // ensure we won't crash if we interact with this object.
     void validateAfterDeserialization() {
-        if (mKind == Kind::Type) {
+        if (mKind == Kind::PrimitiveType) {
             if (!mType) {
-                throw std::runtime_error("Corrupt CVPO: no Type");
+                throw std::runtime_error("Corrupt PyObjSnapshot: no Type");
             }
         }
 
         if (mKind == Kind::ArbitraryPyObject) {
             if (!mPyObject) {
-                throw std::runtime_error("Corrupt CVPO: no PyObject");
+                throw std::runtime_error("Corrupt PyObjSnapshot: no PyObject");
             }
         }
     }
@@ -1200,26 +707,34 @@ private:
     Kind mKind;
     PyObjGraphSnapshot* mGraph;
 
+    // if we are a PrimitiveType, then our type. If we resolve to a Type, a representation
+    // of us as that type. Otherwise nullptr.
     ::Type* mType;
+
+    // if we are a PrimitiveInstance, the instance value. Otherwise a cache of our value
+    // as an instance.
     ::Instance mInstance;
 
-    // if we are an ArbitraryPythonObject this is always populated
-    // otherwise, it will be a cache for a constructed instance of the object
+    // if we are an ArbitraryPythonObject, then our value. Otherwise, a cache of our value
+    // as a PyObject.
     PyObject* mPyObject;
 
+    // these are the actual data that represent us
     std::map<std::string, PyObjSnapshot*> mNamedElements;
+
     std::map<std::string, int64_t> mNamedInts;
 
-    // if we're a tuple, list, or dict
     std::vector<PyObjSnapshot*> mElements;
 
     std::vector<std::string> mNames;
 
-    // if we're a PyDict
     std::vector<PyObjSnapshot*> mKeys;
 
     std::string mStringValue;
+
     std::string mModuleName;
+
     std::string mName;
+
     std::string mQualname;
 };
