@@ -418,6 +418,10 @@ public:
         return m_methods;
     }
 
+    const std::vector<Type*>& getSubtypesConcrete() const {
+        return m_subtypes_concrete;
+    }
+
     ConcreteAlternative* concreteSubtype(size_t which);
 
 private:

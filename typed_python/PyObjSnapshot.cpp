@@ -596,7 +596,7 @@ void PyObjSnapshot::becomeInternalizedOf(
 
     if (t->isBoundMethod()) {
         mKind = Kind::BoundMethodType;
-        mNamedElements["element_type"] = maker.internalize(
+        mNamedElements["self_type"] = maker.internalize(
             ((BoundMethod*)t)->getFirstArgType()
         );
         mNames.push_back(((BoundMethod*)t)->getFuncName());
@@ -633,6 +633,7 @@ void PyObjSnapshot::becomeInternalizedOf(
         }
 
         mNamedElements["alt_methods"] = maker.internalize(alt->getMethods());
+        mNamedElements["alt_subtypes"] = maker.internalize(alt->getSubtypesConcrete());
         return;
     }
 
@@ -675,6 +676,21 @@ void PyObjSnapshot::becomeInternalizedOf(
         mModuleName = f->moduleName();
 
         mNamedElements["func_overloads"] = maker.internalize(f->getOverloads());
+        return;
+    }
+
+    if (t->isForward()) {
+        mKind = Kind::ForwardType;
+        Forward* f = (Forward*)t;
+
+        if (f->getTarget()) {
+            mNamedElements["fwd_target"] = maker.internalize(f->getTarget());
+        }
+        if (f->getCellOrDict()) {
+            mNamedElements["fwd_cell_or_dict"] = maker.internalize(f->getCellOrDict());
+        }
+
+        mName = f->name();
         return;
     }
 

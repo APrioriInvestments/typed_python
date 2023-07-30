@@ -58,6 +58,60 @@ PyObject* PyObjRehydrator::pyobjFor(PyObjSnapshot* snapshot) {
 }
 
 
+void PyObjRehydrator::getNamedBundle(
+    PyObjSnapshot* snapshot,
+    std::string name,
+    std::vector<Type*>& outTypes
+) {
+    auto it = snapshot->mNamedElements.find(name);
+    if (it == snapshot->mNamedElements.end()) {
+        return;
+    }
+
+    if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+        throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+    }
+
+    for (auto e: snapshot->mElements) {
+        Type* t = typeFor(e);
+
+        if (!t) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.InternalBundle - expected types");
+        }
+
+        outTypes.push_back(t);
+    }
+}
+
+void PyObjRehydrator::getNamedBundle(
+    PyObjSnapshot* snapshot,
+    std::string name,
+    std::map<std::string, Function*>& outTypes
+) {
+    auto it = snapshot->mNamedElements.find(name);
+    if (it == snapshot->mNamedElements.end()) {
+        return;
+    }
+
+    if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+        throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+    }
+
+    for (auto nameAndType: snapshot->mElements) {
+        Type* t = typeFor(nameAndType.second);
+
+        if (!t) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.InternalBundle - expected types");
+        }
+        if (!t->isFunction()) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.InternalBundle - expected a Function");
+        }
+
+        outTypes[nameAndType.first] = t;
+    }
+}
+
+
 PyObject* PyObjRehydrator::getNamedElementPyobj(
     PyObjSnapshot* snapshot,
     std::string name,
@@ -214,6 +268,110 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
         }
 
         ((NamedTuple*)snap->mType)->initializeDuringDeserialization(types, snap->mNames);
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::BoundMethodType) {
+        snap->mType = new BoundMethod();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        if (snap->mNames.size() != 1) {
+            throw std::runtime_error("Corrupt PyObjSnapshot::BoundMethod");
+        }
+
+        ((BoundMethod*)snap->mType)->initializeDuringDeserialization(
+            snap->mNames[0],
+            getNamedElementType(snap, "self_type")
+        );
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::TypedCellType) {
+        snap->mType = new TypedCellType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        ((TypedCellType*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "element_type")
+        );
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::ForwardType) {
+        snap->mType = new Forward(snap->mName);
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        if (snap->mNamedElements.find("fwd_cell_or_dict") != snap->mNamedElements.end()) {
+            ((Forward*)snap->mType)->setCellOrDict(
+                getNamedElementPyobj(snap, "fwd_cell_or_dict")
+            );
+        }
+
+        if (snap->mNamedElements.find("fwd_target") != snap->mNamedElements.end()) {
+            ((Forward*)snap->mType)->define(
+                getNamedElementType(snap, "fwd_target")
+            );
+        }
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::ConcreteAlternativeType) {
+        snap->mType = new ConcreteAlternative();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        if (!getNamedElementType(snap, "alternative")->isAlternative()){
+            throw std::runtime_error("Corrupt PyObjSnapshot.Alternative");
+        }
+
+        ((ConcreteAlternative*)snap->mType)->initializeDuringDeserialization(
+            snap->mNamedInts["which"],
+            (Alternative*)getNamedElementType(snap, "alternative")
+        );
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::AlternativeMatcherType) {
+        snap->mType = new AlternativeMatcher();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        ((AlternativeMatcher*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "alternative")
+        );
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::AlternativeType) {
+        snap->mType = new Alternative();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        std::vector<std::pair<std::string, NamedTuple*> > types;
+        std::map<std::string, Function*> methods;
+        std::vector<Type*> subtypesConcrete;
+
+        for (long k = 0; k < snap->mElements.size() && k < snap->mNames.size(); k++) {
+            types.push_back(
+                std::make_pair(
+                    typeFor(snap->mElements[k]),
+                    snap->mNames[k]
+                )
+            );
+        }
+
+        getNamedBundle(snap, "alt_methods", methods);
+        getNamedBundle(snap, "alt_subtypes", subtypesConcrete);
+
+        ((Alternative*)snap->mType)->initializeDuringDeserialization(
+            snap->mName,
+            snap->mModuleName,
+            types,
+            methods,
+            subtypesConcrete
+        );
         
         return;
     }

@@ -42,6 +42,18 @@ public:
         bool allowEmpty=false
     );
 
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        std::vector<Type*>& outTypes
+    );
+
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        std::map<std::string, Function*>& outTypes
+    );
+
 private:
     void rehydrate(PyObjSnapshot* snapshot);
 
