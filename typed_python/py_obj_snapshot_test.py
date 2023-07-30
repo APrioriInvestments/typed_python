@@ -202,7 +202,10 @@ def test_snapshot_rehydration():
     assert C2.getCInst is not C.getCInst
 
     c2Inst = C2snapshot.cls_dict.byKey['getCInst'].func_closure.elements[0].cell_contents.pyobj
-    c2InstMeth = C2snapshot.cls_dict.byKey['getCInstMeth'].func_closure.elements[0].cell_contents.pyobj
+    c2InstMethSnap = C2snapshot.cls_dict.byKey['getCInstMeth'].func_closure.elements[0].cell_contents
+    c2InstMeth = c2InstMethSnap.pyobj
+
+    assert c2InstMethSnap.meth_func.func_closure.elements[0].cell_contents.pyobj is c2InstMeth
 
     assert C2().getCInst() is c2Inst
     assert C2().getCInstMeth() is c2InstMeth

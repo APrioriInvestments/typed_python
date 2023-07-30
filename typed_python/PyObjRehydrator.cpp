@@ -1,10 +1,41 @@
 #include "PyObjRehydrator.hpp"
 #include "PyObjSnapshot.hpp"
 
+void PyObjRehydrator::start(PyObjSnapshot* snapshot) {
+    std::function<void (PyObjSnapshot*)> visit = [&](PyObjSnapshot* snap) {
+        if (mSnapshots.find(snap) != mSnapshots.end()) {
+            return;
+        }
+
+        if (!snap->needsHydration()) {
+            return;
+        }
+
+        mSnapshots.insert(snap);
+
+        for (auto elt: snap->mElements) {
+            visit(elt);
+        }
+        
+        for (auto elt: snap->mKeys) {
+            visit(elt);
+        }
+        
+        for (auto& nameAndElt: snap->mNamedElements) {
+            visit(nameAndElt.second);
+        }
+    };
+
+    visit(snapshot);
+
+    for (auto s: mSnapshots) {
+        rehydrate(s);
+    }
+}
 
 Type* PyObjRehydrator::typeFor(PyObjSnapshot* snapshot) {
-    if (snapshot->mType) {
-        return snapshot->mType;
+    if (!snapshot->needsHydration()) {
+        return snapshot->getType();
     }
 
     if (snapshot->willBeATpType()) {
@@ -17,8 +48,8 @@ Type* PyObjRehydrator::typeFor(PyObjSnapshot* snapshot) {
 
 
 PyObject* PyObjRehydrator::pyobjFor(PyObjSnapshot* snapshot) {
-    if (snapshot->mPyObject) {
-        return snapshot->mPyObject;
+    if (!snapshot->needsHydration()) {
+        return snapshot->getPyObj();
     }
 
     rehydrate(snapshot);
@@ -70,15 +101,120 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
 
     if (snap->mKind == PyObjSnapshot::Kind::ListOfType) {
         snap->mType = new ListOfType();
-        snap->mType->setIsForwardDefined(snap->mNamedInts["type_is_forward"]);
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
         ((ListOfType*)snap->mType)->initializeDuringDeserialization(getNamedElementType(snap, "element_type"));
         return;
     }
 
     if (snap->mKind == PyObjSnapshot::Kind::TupleOfType) {
         snap->mType = new TupleOfType();
-        snap->mType->setIsForwardDefined(snap->mNamedInts["type_is_forward"]);
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
         ((TupleOfType*)snap->mType)->initializeDuringDeserialization(getNamedElementType(snap, "element_type"));
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::DictType) {
+        snap->mType = new DictType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        ((DictType*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "key_type"),
+            getNamedElementType(snap, "value_type")
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::ConstDictType) {
+        snap->mType = new ConstDictType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        ((ConstDictType*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "key_type"),
+            getNamedElementType(snap, "value_type")
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::SetType) {
+        snap->mType = new SetType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        ((SetType*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "key_type")
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::PointerToType) {
+        snap->mType = new PointerTo();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        ((PointerTo*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "element_type")
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::RefToType) {
+        snap->mType = new RefTo();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        ((RefTo*)snap->mType)->initializeDuringDeserialization(
+            getNamedElementType(snap, "element_type")
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::ValueType) {
+        snap->mType = new Value();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        if (snap->mNamedElements.find("value_instance") == snap->mNamedElements.end()) {
+            throw std::runtime_error("Corrupt PyObjSnapshot::Value");
+        }
+
+        rehydrate(snap->mNamedElements["value_instance"]);
+
+        ((Value*)snap->mType)->initializeDuringDeserialization(
+            snap->mNamedElements["value_instance"]->mInstance            
+        );
+
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::OneOfType) {
+        snap->mType = new OneOfType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        std::vector<Type*> types;
+        for (auto s: snap->mElements) {
+            types.push_back(typeFor(s));
+        }
+
+        ((OneOfType*)snap->mType)->initializeDuringDeserialization(types);
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::TupleType) {
+        snap->mType = new Tuple();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        std::vector<Type*> types;
+        for (auto s: snap->mElements) {
+            types.push_back(typeFor(s));
+        }
+
+        ((Tuple*)snap->mType)->initializeDuringDeserialization(types);
+        
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::NamedTupleType) {
+        snap->mType = new NamedTuple();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        std::vector<Type*> types;
+        for (auto s: snap->mElements) {
+            types.push_back(typeFor(s));
+        }
+
+        ((NamedTuple*)snap->mType)->initializeDuringDeserialization(types, snap->mNames);
+        
         return;
     }
 
@@ -86,21 +222,27 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
 }
 
 void PyObjRehydrator::rehydrate(PyObjSnapshot* obj) {
-    if (mSnapshots.find(obj) != mSnapshots.end()) {
-        throw std::runtime_error("We should already have a rehydration for this object.");
+    if (mSnapshots.find(obj) == mSnapshots.end()) {
+        throw std::runtime_error(
+            "PyObjRehydrator walk didn't pick up snap of type "
+            + obj->kindAsString()
+        );
     }
-
-    mSnapshots.insert(obj);
 
     if (obj->willBeATpType()) {
         rehydrateTpType(obj);
         return;
     }
 
-    static PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
-
     PyObjSnapshot::Kind kind = obj->mKind;
     PyObject*& pyObject(obj->mPyObject);
+
+    // already rehydrated
+    if (pyObject) {
+        return;
+    }
+
+    static PyObject* sysModuleModules = staticPythonInstance("sys", "modules");
 
     if (kind == PyObjSnapshot::Kind::ArbitraryPyObject) {
         throw std::runtime_error("Corrupt PyObjSnapshot.ArbitraryPyObject: missing pyObject");
@@ -343,19 +485,13 @@ void PyObjRehydrator::rehydrate(PyObjSnapshot* obj) {
     }
 }
 
-
 void PyObjRehydrator::finalize() {
     for (auto n: mSnapshots) {
         finalizeRehydration(n);
     }
-
-    for (auto n: mSnapshots) {
-        finalizeRehydration2(n);
-    }
 }
 
-
-void PyObjRehydrator::finalizeRehydration2(PyObjSnapshot* obj) {
+void PyObjRehydrator::finalizeRehydration(PyObjSnapshot* obj) {
     if (obj->mKind == PyObjSnapshot::Kind::PyClass) {
         if (obj->mNamedElements.find("cls_dict") == obj->mNamedElements.end()) {
             throw std::runtime_error("Corrupt PyClass - no cls_dict");
@@ -363,7 +499,8 @@ void PyObjRehydrator::finalizeRehydration2(PyObjSnapshot* obj) {
 
         PyObjSnapshot* clsDictPyObj = obj->mNamedElements["cls_dict"];
 
-        for (long k = 0; k < clsDictPyObj->elements().size() && k < clsDictPyObj->keys().size(); k++) {
+        for (long k = 0; k < clsDictPyObj->elements().size() 
+                        && k < clsDictPyObj->keys().size(); k++) {
             if (clsDictPyObj->keys()[k]->isString()) {
                 PyObject_SetAttrString(
                     obj->mPyObject,
@@ -372,19 +509,18 @@ void PyObjRehydrator::finalizeRehydration2(PyObjSnapshot* obj) {
                 );
             }
         }
-    }
-}
-
-void PyObjRehydrator::finalizeRehydration(PyObjSnapshot* obj) {
+    } else 
     if (obj->mKind == PyObjSnapshot::Kind::PyDict || obj->mKind == PyObjSnapshot::Kind::PyClassDict) {
-        for (long k = 0; k < obj->mElements.size() && k < obj->mKeys.size(); k++) {
+        for (long k = 0; k < obj->mElements.size() 
+                && k < obj->mKeys.size(); k++) {
             PyDict_SetItem(
                 obj->mPyObject,
                 obj->mKeys[k]->getPyObj(),
                 obj->mElements[k]->getPyObj()
             );
         }
-    } else if (obj->mKind == PyObjSnapshot::Kind::PyCell) {
+    } else 
+    if (obj->mKind == PyObjSnapshot::Kind::PyCell) {
         auto it = obj->mNamedElements.find("cell_contents");
         if (it != obj->mNamedElements.end()) {
             PyCell_Set(
@@ -392,5 +528,12 @@ void PyObjRehydrator::finalizeRehydration(PyObjSnapshot* obj) {
                 it->second->getPyObj()
             );
         }
+    } else 
+    if (obj->mType) {
+        obj->mType->recomputeName();
+        obj->mType->finalizeType();
+        obj->mType->typeFinishedBeingDeserializedPhase1();
+        obj->mType->typeFinishedBeingDeserializedPhase2();
+        obj->mPyObject = incref((PyObject*)PyInstance::typeObj(obj->mType));
     }
 }

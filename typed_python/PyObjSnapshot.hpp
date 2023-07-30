@@ -236,7 +236,8 @@ public:
     }
 
     static PyObjSnapshot* ForType(Type* t) {
-        // TODO: this needs to go away
+        // TODO: this needs to go away. its a shim to handle the current
+        // code which is a little confused about these objects.
         PyObjSnapshot* res = new PyObjSnapshot();
         res->mKind = Kind::PrimitiveType;
         res->mType = t;
@@ -540,6 +541,11 @@ public:
             return mPyObject;
         }
 
+        if (mType) {
+            mPyObject = incref((PyObject*)PyInstance::typeObj(mType));
+            return mPyObject;
+        }
+
         if (mKind == Kind::String) {
             mPyObject = PyUnicode_FromString(mStringValue.c_str());
             return mPyObject;
@@ -557,7 +563,7 @@ public:
     void rehydrate() {
         PyObjRehydrator rehydrator;
 
-        rehydrator.rehydrate(this);
+        rehydrator.start(this);
         rehydrator.finalize();
     }
 

@@ -22,7 +22,7 @@ class PyObjSnapshot;
 
 class PyObjRehydrator {
 public:
-    void rehydrate(PyObjSnapshot* snapshot);
+    void start(PyObjSnapshot* snapshot);
 
     Type* typeFor(PyObjSnapshot* snapshot);
 
@@ -43,11 +43,11 @@ public:
     );
 
 private:
+    void rehydrate(PyObjSnapshot* snapshot);
+
     void rehydrateTpType(PyObjSnapshot* snap);
 
     void finalizeRehydration(PyObjSnapshot* snap);
-
-    void finalizeRehydration2(PyObjSnapshot* snap);
 
     std::unordered_set<PyObjSnapshot*> mSnapshots;
 };

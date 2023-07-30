@@ -149,6 +149,10 @@ public:
 
     static OneOfType* Make(const std::vector<Type*>& types);
 
+    void initializeDuringDeserialization(const std::vector<Type*>& types) {
+        m_types = types;
+    }
+
     Type* cloneForForwardResolutionConcrete();
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf);

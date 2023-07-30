@@ -1998,6 +1998,22 @@ void PythonSerializationContext::deserializeNativeTypeIntoBlank(
             (PyTypeObject*)(PyObject*)obj
         );
     }
+    else if (category == Type::TypeCategory::catValue) {
+        if (!blankShell->isValue()) {
+            throw std::runtime_error("Shell is not a Value");
+        }
+
+        ((Value*)blankShell)->initializeDuringDeserialization(instance);
+    }
+    else if (category == Type::TypeCategory::catOneOf) {
+        if (!blankShell->isOneOf()) {
+            throw std::runtime_error("Shell is not a OneOf");
+        }
+
+        ((OneOfType*)blankShell)->initializeDuringDeserialization(
+            types
+        );
+    }
     else if (category == Type::TypeCategory::catConcreteAlternative) {
         if (types.size() != 1) {
             throw std::runtime_error("Invalid native type: ConcreteAlternative needs exactly 1 type.");
