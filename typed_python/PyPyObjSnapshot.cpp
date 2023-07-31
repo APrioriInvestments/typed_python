@@ -42,7 +42,6 @@ PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwar
         std::unordered_map<PyObject*, PyObjSnapshot*> constantMapCache;
         std::unordered_map<Type*, PyObjSnapshot*> constantMapCacheType;
         std::unordered_map<InstanceRef, PyObjSnapshot*> constantMapCacheInst;
-        std::map<::Type*, ::Type*> groupMap;
 
         PyObjGraphSnapshot* graph = new PyObjGraphSnapshot();
 
@@ -50,7 +49,6 @@ PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwar
             constantMapCache,
             constantMapCacheType,
             constantMapCacheInst,
-            groupMap,
             graph,
             linkBack
         );
