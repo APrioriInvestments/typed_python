@@ -20,6 +20,12 @@
 
 class FunctionArg {
 public:
+    FunctionArg() :
+        m_typeFilter(nullptr),
+         m_defaultValue(nullptr)
+    {
+    }
+
     FunctionArg(std::string name, Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) :
         m_name(name),
         m_typeFilter(typeFilterOrNull),

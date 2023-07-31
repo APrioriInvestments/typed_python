@@ -30,6 +30,17 @@
 
 class FunctionOverload {
 public:
+    FunctionOverload() :
+        mFunctionCode(nullptr),
+        mFunctionDefaults(nullptr),
+        mFunctionAnnotations(nullptr),
+        mReturnType(nullptr),
+        mSignatureFunction(nullptr),
+        mCachedFunctionObj(nullptr),
+        mMethodOf(nullptr)
+    {
+    }
+
     FunctionOverload(
         PyObject* pyFuncCode,
         PyObject* pyFuncDefaults,
@@ -37,7 +48,7 @@ public:
         const std::map<std::string, FunctionGlobal>& inGlobals,
         const std::vector<std::string>& pyFuncClosureVarnames,
         const std::vector<std::string>& globalsInClosureVarnames,
-        const std::map<std::string, ClosureVariableBinding> closureBindings,
+        const std::map<std::string, ClosureVariableBinding>& closureBindings,
         Type* returnType,
         PyObject* pySignatureFunction,
         const std::vector<FunctionArg>& args,

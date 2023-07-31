@@ -17,8 +17,10 @@
 #pragma once
 
 #include <unordered_set>
+#include "PyObjSnapshot.hpp"
 
-class PyObjSnapshot;
+class FunctionOverload;
+class FunctionGlobal;
 
 class PyObjRehydrator {
 public:
@@ -48,37 +50,129 @@ public:
         bool allowEmpty=false
     );
 
-    void getNamedBundle(
+    void getFrom(
         PyObjSnapshot* snapshot,
-        std::string name,
-        std::vector<Type*>& outTypes
+        Type*& out
     );
 
-    void getNamedBundle(
+    void getFrom(
         PyObjSnapshot* snapshot,
-        std::string name,
-        std::vector<MemberDefinition>& out
+        PyObject*& out
     );
 
-    void getNamedBundle(
+    void getFrom(
         PyObjSnapshot* snapshot,
-        std::string name,
-        std::vector<HeldClass*>& outTypes
+        Function*& out
     );
 
-    void getNamedBundle(
+    void getFrom(
         PyObjSnapshot* snapshot,
-        std::string name,
-        std::map<std::string, Function*>& outTypes
+        HeldClass*& out
     );
 
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        MemberDefinition& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        FunctionOverload& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        std::string& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        FunctionGlobal& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        FunctionArg& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        ClosureVariableBinding& out
+    );
+
+    void getFrom(
+        PyObjSnapshot* snapshot,
+        ClosureVariableBindingStep& out
+    );
+
+    template<class T>
     void getNamedBundle(
         PyObjSnapshot* snapshot,
         std::string name,
-        std::map<std::string, PyObject*>& outPyobj
-    );
+        std::map<std::string, T>& out
+    ) {
+        auto it = snapshot->mNamedElements.find(name);
+        if (it == snapshot->mNamedElements.end()) {
+            return;
+        }
+
+        if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+            throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+        }
+
+        for (auto nameAndType: it->second->mNamedElements) {
+            T item;
+
+            getFrom(nameAndType.second, item);
+
+            out[nameAndType.first] = item;
+        }
+    }
+
+    template<class T>
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        std::vector<T>& out
+    ) {
+        auto it = snapshot->mNamedElements.find(name);
+        if (it == snapshot->mNamedElements.end()) {
+            return;
+        }
+
+        if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+            throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+        }
+
+        for (auto snap: it->second->mElements) {
+            T item;
+
+            getFrom(snap, item);
+
+            out.push_back(item);
+        }
+    }
+
+    template<class T>
+    void getNamed(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        T& out
+    ) {
+        auto it = snapshot->mNamedElements.find(name);
+        if (it == snapshot->mNamedElements.end()) {
+            return;
+        }
+
+        if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+            throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+        }
+
+        getFrom(it->second, out);
+    }
 
 private:
+
     void rehydrate(PyObjSnapshot* snapshot);
 
     void rehydrateTpType(PyObjSnapshot* snap);

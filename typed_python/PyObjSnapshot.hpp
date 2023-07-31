@@ -20,12 +20,12 @@
 #include "Type.hpp"
 #include "Instance.hpp"
 #include "PythonTypeInternals.hpp"
-#include "PyObjRehydrator.hpp"
 
 class PyObjGraphSnapshot;
 class PyObjSnapshot;
 class FunctionGlobal;
 class FunctionOverload;
+class PyObjRehydrator;
 
 /*********************************
 PyObjSnapshot
@@ -562,12 +562,7 @@ public:
         return mPyObject;
     }
 
-    void rehydrate() {
-        PyObjRehydrator rehydrator;
-
-        rehydrator.start(this);
-        rehydrator.finalize();
-    }
+    void rehydrate();
 
     std::string toString() const {
         return "PyObjSnapshot." + kindAsString() + "()";

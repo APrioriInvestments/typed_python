@@ -70,9 +70,14 @@ public:
     }
 };
 
+
 // models a single class member definition
 class MemberDefinition {
 public:
+    MemberDefinition() : mType(nullptr)
+    {
+    }
+
     MemberDefinition(
         const std::string& inName,
         Type* inType,

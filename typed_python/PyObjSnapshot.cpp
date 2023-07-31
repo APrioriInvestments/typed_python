@@ -1,6 +1,14 @@
 #include "PyObjSnapshot.hpp"
 #include "PyObjGraphSnapshot.hpp"
+#include "PyObjRehydrator.hpp"
 
+
+void PyObjSnapshot::rehydrate() {
+    PyObjRehydrator rehydrator;
+
+    rehydrator.start(this);
+    rehydrator.finalize();
+}
 
 std::string PyObjSnapshot::kindAsString() const {
     if (mKind == Kind::Uninitialized) {

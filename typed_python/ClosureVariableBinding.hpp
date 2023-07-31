@@ -26,13 +26,13 @@ class ClosureVariableBindingStep {
         ACCESS_CELL = 4
     };
 
+public:
     ClosureVariableBindingStep() :
         mKind(BindingType::ACCESS_CELL),
         mIndexedFieldToAccess(0),
         mFunctionToBind(nullptr)
     {}
 
-public:
     ClosureVariableBindingStep(Type* bindFunction) :
         mKind(BindingType::FUNCTION),
         mIndexedFieldToAccess(0),
