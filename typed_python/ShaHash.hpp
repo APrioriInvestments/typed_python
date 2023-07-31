@@ -189,3 +189,19 @@ inline ShaHash operator+(const ShaHash& l, const ShaHash& r) {
 
     return tr;
 }
+
+namespace std {
+    template<>
+    struct hash<ShaHash> {
+        typedef ShaHash argument_type;
+        typedef std::size_t result_type;
+
+        result_type operator()(argument_type const& s) const noexcept {
+            return ((size_t)s[0] + (((size_t)s[1]) << 32))
+                ^ ((size_t)s[2] + (((size_t)s[3]) << 32))
+                ^ (size_t)s[3];
+        }
+    };
+}
+
+

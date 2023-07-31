@@ -89,6 +89,17 @@ void PyObjRehydrator::getFrom(
 }
 
 void PyObjRehydrator::getFrom(
+    PyObjSnapshot* snapshot,
+    Function*& out
+) {
+    Type* t = typeFor(snapshot);
+    if (!t->isFunction()) {
+        throw std::runtime_error("Corrupt PyObjSnapshot - expected a Function");
+    }
+    out = (Function*)t;
+}
+
+void PyObjRehydrator::getFrom(
     PyObjSnapshot* e,
     MemberDefinition& out
 ) {

@@ -113,6 +113,15 @@ private:
     friend class PyObjSnapshotMaker;
     friend class PyObjRehydrator;
 
+    PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
+        mKind(Kind::Uninitialized),
+        mType(nullptr),
+        mPyObject(nullptr),
+        mGraph(inGraph)
+    {
+    }
+
+public:
     enum class Kind {
         // this should never be visible in a running program
         Uninitialized = 0,
@@ -224,15 +233,6 @@ private:
         InternalBundle
     };
 
-    PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
-        mKind(Kind::Uninitialized),
-        mType(nullptr),
-        mPyObject(nullptr),
-        mGraph(inGraph)
-    {
-    }
-
-public:
     ~PyObjSnapshot() {
         decref(mPyObject);
     }
@@ -244,6 +244,10 @@ public:
         res->mKind = Kind::PrimitiveType;
         res->mType = t;
         return res;
+    }
+
+    Kind getKind() const {
+        return mKind;
     }
 
     PyObjGraphSnapshot* getGraph() const {
@@ -414,6 +418,10 @@ public:
         return mNamedElements;
     }
 
+    const std::vector<std::string>& names() const {
+        return mNames;
+    }
+
     const std::map<std::string, int64_t>& namedInts() const {
         return mNamedInts;
     }
@@ -428,6 +436,10 @@ public:
 
     const std::string& getModuleName() const {
         return mModuleName;
+    }
+
+    const std::string& getQualname() const {
+        return mQualname;
     }
 
     template<class visitor_type>
@@ -496,6 +508,10 @@ public:
 
 
     ::Type* getType() {
+        if (mType) {
+            return mType;
+        }
+
         if (mKind == Kind::PrimitiveType) {
             return mType;
         }
@@ -689,6 +705,21 @@ public:
         result->validateAfterDeserialization();
 
         return result;
+    }
+
+    template<class visitor_type>
+    void visitOutbound(const visitor_type& v) {
+        for (auto e: mElements) {
+            v(e);
+        }
+
+        for (auto e: mKeys) {
+            v(e);
+        }
+
+        for (auto& nameAndE: mNamedElements) {
+            v(nameAndE.second);
+        }
     }
 
 private:

@@ -1,7 +1,15 @@
 import numpy
 
 from typed_python import ListOf
-from typed_python._types import PyObjSnapshot
+from typed_python._types import PyObjSnapshot, _enableTypeAutoresolution
+
+
+class DisableForwardAutoresolve:
+    def __enter__(self):
+        _enableTypeAutoresolution(False)
+
+    def __exit__(self, *args):
+        _enableTypeAutoresolution(True)
 
 
 def test_make_snapshot_basic():
@@ -223,3 +231,23 @@ def test_snapshot_graph():
     assert s1.kind == 'PyFunction'
     assert s1.func_closure.graph is s1.graph
     assert s1.func_closure.graph is not s2.func_closure.graph
+
+
+def test_sha_hashing_of_primitive_types():
+    assert PyObjSnapshot.create(int).shaHash != PyObjSnapshot.create(float).shaHash
+    assert PyObjSnapshot.create((1, 2, 3)).shaHash == PyObjSnapshot.create((1, 2, 3)).shaHash
+
+
+def graphIdempotenceCheck(x):
+    snap = PyObjSnapshot.create(x, False)
+    snap2 = PyObjSnapshot.create(snap.pyobj, False)
+
+    assert snap.shaHash == snap2.shaHash
+
+
+def test_rehydration_preserves_sha_hashing():
+    # disable forward autoresolution so we can look at the type graphs without
+    # the autoresolver going in and resolving forwards
+    with DisableForwardAutoresolve():
+        graphIdempotenceCheck(int)
+        graphIdempotenceCheck(ListOf(int))

@@ -104,7 +104,7 @@ PyObject* PyPyObjSnapshot::new_(PyTypeObject *type, PyObject *args, PyObject *kw
 }
 
 PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
-    PyPyObjSnapshot* pyCVPO = (PyPyObjSnapshot*)selfObj;
+    PyPyObjSnapshot* pySnap = (PyPyObjSnapshot*)selfObj;
 
     return translateExceptionToPyObject([&] {
         if (!PyUnicode_Check(attrName)) {
@@ -113,13 +113,13 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
 
         std::string attr(PyUnicode_AsUTF8(attrName));
 
-        PyObjSnapshot* obj = pyCVPO->mPyobj;
+        PyObjSnapshot* obj = pySnap->mPyobj;
 
         auto it = obj->namedElements().find(attr);
         if (it != obj->namedElements().end()) {
             return PyPyObjSnapshot::newPyObjSnapshot(
                 it->second,
-                it->second->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                it->second->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
             );
         }
 
@@ -141,7 +141,12 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
         }
 
         if (attr == "graph") {
-            return incref(pyCVPO->mGraph ? pyCVPO->mGraph : Py_None);
+            return incref(pySnap->mGraph ? pySnap->mGraph : Py_None);
+        }
+
+        if (attr == "shaHash" && obj->getGraph()) {
+            ShaHash hash = obj->getGraph()->hashFor(obj);
+            return PyUnicode_FromString(hash.digestAsHexString().c_str());
         }
 
         if (attr == "type" && obj->getType()) {
@@ -165,57 +170,57 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
         }
 
         if (attr == "elements") {
-            if (!pyCVPO->mElements) {
-                pyCVPO->mElements = PyList_New(0);
+            if (!pySnap->mElements) {
+                pySnap->mElements = PyList_New(0);
                 for (auto p: obj->elements()) {
                     PyList_Append(
-                        pyCVPO->mElements,
+                        pySnap->mElements,
                         PyPyObjSnapshot::newPyObjSnapshot(
                             p,
-                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                            p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
                         )
                     );
                 }
             }
 
-            return incref(pyCVPO->mElements);
+            return incref(pySnap->mElements);
         }
 
         if (attr == "keys") {
-            if (!pyCVPO->mKeys) {
-                pyCVPO->mKeys = PyList_New(0);
+            if (!pySnap->mKeys) {
+                pySnap->mKeys = PyList_New(0);
                 for (auto p: obj->keys()) {
                     PyList_Append(
-                        pyCVPO->mKeys,
+                        pySnap->mKeys,
                         PyPyObjSnapshot::newPyObjSnapshot(
                             p,
-                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                            p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
                         )
                     );
                 }
             }
 
-            return incref(pyCVPO->mKeys);
+            return incref(pySnap->mKeys);
         }
 
         if (attr == "byKey") {
-            if (!pyCVPO->mByKey) {
-                pyCVPO->mByKey = PyDict_New();
+            if (!pySnap->mByKey) {
+                pySnap->mByKey = PyDict_New();
                 for (long k = 0; k < obj->keys().size(); k++) {
                     PyObjSnapshot* p = obj->elements()[k];
 
                     PyDict_SetItem(
-                        pyCVPO->mByKey,
+                        pySnap->mByKey,
                         obj->keys()[k]->getPyObj(),
                         PyPyObjSnapshot::newPyObjSnapshot(
                             p,
-                            p->getGraph() == obj->getGraph() ? pyCVPO->mGraph : nullptr
+                            p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
                         )
                     );
                 }
             }
 
-            return incref(pyCVPO->mByKey);
+            return incref(pySnap->mByKey);
         }
 
         return PyObject_GenericGetAttr(selfObj, attrName);
