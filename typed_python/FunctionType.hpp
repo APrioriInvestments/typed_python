@@ -160,9 +160,9 @@ public:
 
     // replace any direct references to PyObject we're holding internally
     // with PyObjSnapshot references instead
-    void internalizeConstants(PyObjSnapshotMaker& snapMaker) {
+    void internalizeConstants(const std::map<Type*, Type*>& typeMap) {
         for (auto& o: mOverloads) {
-            o.internalizeConstants(snapMaker);
+            o.internalizeConstants(typeMap);
         }
     }
 

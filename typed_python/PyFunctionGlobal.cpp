@@ -160,7 +160,7 @@ PyObject* PyFunctionGlobal::tp_getattro(PyObject* selfObj, PyObject* attrName) {
         }
 
         if (attr == "constant" && global.isConstant()) {
-            return PyPyObjSnapshot::newPyObjSnapshot(global.getConstant());
+            return incref((PyObject*)PyInstance::typeObj(global.getConstant()));
         }
 
         if (attr == "name" && (global.isNamedModuleMember() || global.isGlobalInDict())) {

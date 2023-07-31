@@ -288,9 +288,9 @@ public:
         }
     }
 
-    void internalizeConstants(PyObjSnapshotMaker& snapMaker) {
+    void internalizeConstants(const std::map<Type*, Type*>& typeMap) {
         for (auto& nameAndGlobal: mGlobals) {
-            nameAndGlobal.second = nameAndGlobal.second.withConstantsInternalized(snapMaker);
+            nameAndGlobal.second = nameAndGlobal.second.withConstantsInternalized(typeMap);
         }
     }
 

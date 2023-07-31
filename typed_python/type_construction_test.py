@@ -173,7 +173,7 @@ def test_type_looks_resolvable_alternative():
 
     bGlobal = A.f.overloads[0].globals['B']
     assert bGlobal.kind == "Constant"
-    assert bGlobal.constant.kind == "Type"
+    assert bGlobal.constant.kind == "PrimitiveType"
     assert bGlobal.constant.type is B
 
     bFwdGlobal = AFwd[0].f.overloads[0].globals['B']

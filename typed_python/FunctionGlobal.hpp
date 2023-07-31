@@ -24,7 +24,7 @@ class FunctionGlobal {
     enum class GlobalType {
         Unbound = 1, // this global is not bound to anything - its a Name error
         NamedModuleMember = 2, // this global is a member of a particular module
-        Constant = 3, // this global is bound to a constant that we resolved to at some point
+        Constant = 3, // this global is bound to a constant that we resolved at some point
         GlobalInDict = 4, // this global is an unresolved variable residing in some python dict
         GlobalInCell = 5, // this global is an unresolved variable residing in some PyCell
     };
@@ -34,7 +34,7 @@ class FunctionGlobal {
         PyObject* dictOrCell,
         std::string name,
         std::string moduleName,
-        PyObjSnapshot* constant
+        Type* constant
     ) :
         mKind(inKind),
         mModuleDictOrCell(incref(dictOrCell)),
@@ -49,6 +49,25 @@ public:
         mKind(GlobalType::Unbound),
         mModuleDictOrCell(nullptr)
     {
+    }
+
+    FunctionGlobal withConstantsInternalized(const std::map<Type*, Type*>& typeMap) {
+        if (!(isGlobalInDict() || isGlobalInCell())) {
+            return *this;
+        }
+
+        Type* t = getValueAsType();
+
+        if (t) {
+            auto it = typeMap.find(t);
+            if (it != typeMap.end()) {
+                return FunctionGlobal::Constant(it->second);
+            } else {
+                return FunctionGlobal::Constant(t);
+            }
+        }
+
+        return *this;
     }
 
     std::string toString() {
@@ -69,7 +88,7 @@ public:
         }
 
         if (isConstant()) {
-            return "FunctionGlobal.Constant(" + mConstant->toString() + ")";
+            return "FunctionGlobal.Constant(type=" + mConstant->name() + ")";
         }
 
         throw std::runtime_error("Unknown FunctionGlobal Kind");
@@ -79,7 +98,11 @@ public:
         return FunctionGlobal();
     }
 
-    static FunctionGlobal Constant(PyObjSnapshot* constant) {
+    static FunctionGlobal Constant(Type* constant) {
+        if (!constant) {
+            throw std::runtime_error("FunctionGlobal::Constant can't be null");
+        }
+
         return FunctionGlobal(
             GlobalType::Constant,
             nullptr,
@@ -173,10 +196,7 @@ public:
         }
 
         if (isConstant()) {
-            if (mConstant->isType()) {
-                return mConstant->getType();
-            }
-            return nullptr;
+            return mConstant;
         }
 
         throw std::runtime_error("Unknown global kind.");
@@ -192,7 +212,7 @@ public:
         }
 
         if (isConstant()) {
-            return mConstant->getPyObj();
+            return (PyObject*)PyInstance::typeObj(mConstant);
         }
 
         throw std::runtime_error("Unknown global kind.");
@@ -202,7 +222,7 @@ public:
         return mKind;
     }
 
-    PyObjSnapshot* getConstant() const {
+    Type* getConstant() const {
         return mConstant;
     }
 
@@ -242,7 +262,7 @@ public:
         }
 
         if (isConstant()) {
-            mConstant->_visitReferencedTypes(visitor);
+            visitor(mConstant);
             return;
         }
 
@@ -280,19 +300,12 @@ public:
         }
 
         if (isConstant()) {
-            mConstant->_visitCompilerVisibleInternals(visitor);
+            visitor.visitTopo(mConstant);
             return;
         }
 
         if (isGlobalInDict() || isGlobalInCell() || isNamedModuleMember()) {
             PyObject* obj = extractGlobalRefFromDictOrCell();
-
-            if (isNamedModuleMember() && mModuleName == "typed_python.compiler.native_compiler.native_ast" && mName == "Expression") {
-                std::cout << "Visiting it! " << (obj ? "not empty":"empty") << "\n";
-                if (!obj) {
-                    asm("int3");
-                }
-            }
 
             if (obj) {
                 _visitCompilerVisibleInternalsInPyobj(obj, visitor);
@@ -322,35 +335,6 @@ public:
         }
     }
 
-    FunctionGlobal withConstantsInternalized(PyObjSnapshotMaker& maker) {
-        if (!(isGlobalInDict() || isGlobalInCell())) {
-            return *this;
-        }
-
-        Type* t = getValueAsType();
-
-        if (t) {
-            auto it = maker.getGroupMap().find(t);
-            if (it != maker.getGroupMap().end()) {
-                return FunctionGlobal::Constant(
-                    PyObjSnapshot::ForType(it->second)
-                );
-            } else {
-                return FunctionGlobal::Constant(
-                    PyObjSnapshot::ForType(t)
-                );
-            }
-        }
-
-        PyObject* value = getValueAsPyobj();
-
-        if (!value) {
-            return FunctionGlobal::Unbound();
-        }
-
-        return FunctionGlobal::Constant(maker.internalize(value));
-    }
-
     FunctionGlobal withUpdatedInternalTypePointers(const std::map<Type*, Type*>& groupMap) {
         Type* t = getValueAsType();
 
@@ -363,7 +347,7 @@ public:
         if (it != groupMap.end()) {
             // we're actually a constant!
             return FunctionGlobal::Constant(
-                PyObjSnapshot::ForType(it->second)
+                it->second
             );
         }
 
@@ -451,7 +435,7 @@ public:
             buffer.writeStringObject(3, mModuleName);
         } else
         if (mKind == GlobalType::Constant) {
-            mConstant->serialize(context, buffer, 4);
+            context.serializeNativeType(mConstant, buffer, 4);
         } else
         if (mKind == GlobalType::GlobalInDict) {
             context.serializePythonObject(mModuleDictOrCell, buffer, 1);
@@ -469,7 +453,7 @@ public:
         uint64_t kind = 0;
         std::string name, moduleName;
         PyObjectHolder cellOrModule;
-        PyObjSnapshot* constant = nullptr;
+        Type* constant;
 
         buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
             if (fieldNumber == 0) {
@@ -485,7 +469,7 @@ public:
                 moduleName = buffer.readStringObject();
             } else
             if (fieldNumber == 4) {
-                constant = PyObjSnapshot::deserialize(context, buffer, wireType);
+                constant = context.deserializeNativeType(buffer, wireType);
             }
         });
 
@@ -555,7 +539,7 @@ public:
 private:
     GlobalType mKind;
 
-    PyObjSnapshot* mConstant;
+    Type* mConstant;
 
     std::string mName;
     std::string mModuleName;

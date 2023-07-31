@@ -476,21 +476,9 @@ void Type::attemptToResolve() {
 
     // allow each Function type to build CompilerVisiblePythonObjects for its globals
     // after this, any FunctionGlobals will refer to Constants not cells
-    std::unordered_map<PyObject*, PyObjSnapshot*> compilerVisiblePyObjMap;
-    std::unordered_map<Type*, PyObjSnapshot*> compilerVisibleTypeMap;
-    std::unordered_map<InstanceRef, PyObjSnapshot*> compilerVisibleInstanceMap;
-    PyObjSnapshotMaker snapMaker(
-        compilerVisiblePyObjMap,
-        compilerVisibleTypeMap,
-        compilerVisibleInstanceMap,
-        resolutionMapping,
-        nullptr,
-        true
-    );
-
     for (auto typeAndSource: resolutionSource) {
         if (typeAndSource.first->isFunction()) {
-            ((Function*)typeAndSource.first)->internalizeConstants(snapMaker);
+            ((Function*)typeAndSource.first)->internalizeConstants(resolutionMapping);
         }
     }
 
