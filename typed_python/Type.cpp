@@ -255,6 +255,14 @@ bool Type::canConvertToTrivially(Type* otherType) {
 }
 
 void reachableUnresolvedTypes(Type* root, std::set<Type*>& outTypes) {
+    PyObjGraphSnapshot graph;
+    std::unordered_map<PyObject*, PyObjSnapshot*> objMapCache;
+    std::unordered_map<Type*, PyObjSnapshot*> typeMapCache;
+    std::unordered_map<InstanceRef, PyObjSnapshot*> instanceCache;
+
+
+    PyObjSnapshotMaker snapMaker(objMapCache, typeMapCache, instanceCache, &graph, true);
+
     std::set<Type*> toVisit;
     toVisit.insert(root);
 
