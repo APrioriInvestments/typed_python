@@ -61,6 +61,22 @@ PyObject* PyObjRehydrator::pyobjFor(PyObjSnapshot* snapshot) {
 void PyObjRehydrator::getNamedBundle(
     PyObjSnapshot* snapshot,
     std::string name,
+    std::vector<HeldClass*>& outTypes
+) {
+    std::vector<Type*> types;
+    getNamedBundle(snapshot, name, types);
+
+    for (auto t: types) {
+        if (!t->isHeldClass()) {
+            throw std::runtime_error("Corrupt PyObjSnapshot - expected a HeldClass");
+        }
+        outTypes.push_back((HeldClass*)t);
+    }
+}
+
+void PyObjRehydrator::getNamedBundle(
+    PyObjSnapshot* snapshot,
+    std::string name,
     std::vector<Type*>& outTypes
 ) {
     auto it = snapshot->mNamedElements.find(name);
@@ -86,6 +102,41 @@ void PyObjRehydrator::getNamedBundle(
 void PyObjRehydrator::getNamedBundle(
     PyObjSnapshot* snapshot,
     std::string name,
+    std::vector<MemberDefinition>& outMembers
+) {
+    auto it = snapshot->mNamedElements.find(name);
+    if (it == snapshot->mNamedElements.end()) {
+        return;
+    }
+
+    if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+        throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+    }
+
+    for (auto e: snapshot->mElements) {
+        outMembers.push_back(
+            MemberDefinition(
+                e->mName,
+                getNamedElementType(e, "type"),
+                getNamedElementInstance(e, "defaultValue"),
+                e->mNamedInts["isNonempty"]
+            )
+        );
+    }
+}
+
+Instance PyObjRehydrator::getNamedElementInstance(
+    PyObjSnapshot* snapshot,
+    std::string name,
+    bool allowEmpty
+) {
+    // TODO: this is just wrong
+    return snapshot->mInstance;
+}
+
+void PyObjRehydrator::getNamedBundle(
+    PyObjSnapshot* snapshot,
+    std::string name,
     std::map<std::string, Function*>& outTypes
 ) {
     auto it = snapshot->mNamedElements.find(name);
@@ -97,7 +148,7 @@ void PyObjRehydrator::getNamedBundle(
         throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
     }
 
-    for (auto nameAndType: snapshot->mElements) {
+    for (auto nameAndType: snapshot->mNamedElements) {
         Type* t = typeFor(nameAndType.second);
 
         if (!t) {
@@ -107,7 +158,32 @@ void PyObjRehydrator::getNamedBundle(
             throw std::runtime_error("Corrupt PyObjSnapshot.InternalBundle - expected a Function");
         }
 
-        outTypes[nameAndType.first] = t;
+        outTypes[nameAndType.first] = (Function*)t;
+    }
+}
+
+void PyObjRehydrator::getNamedBundle(
+    PyObjSnapshot* snapshot,
+    std::string name,
+    std::map<std::string, PyObject*>& outPyobj
+) {
+    auto it = snapshot->mNamedElements.find(name);
+    if (it == snapshot->mNamedElements.end()) {
+        return;
+    }
+
+    if (it->second->mKind != PyObjSnapshot::Kind::InternalBundle) {
+        throw std::runtime_error("Corrupt PyObjSnapshot - expected a bundle");
+    }
+
+    for (auto nameAndType: snapshot->mNamedElements) {
+        PyObject* o = pyobjFor(nameAndType.second);
+
+        if (!o) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.InternalBundle - expected a pyobj");
+        }
+
+        outPyobj[nameAndType.first] = incref(o);
     }
 }
 
@@ -354,10 +430,16 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
         std::vector<Type*> subtypesConcrete;
 
         for (long k = 0; k < snap->mElements.size() && k < snap->mNames.size(); k++) {
+            Type* nt = typeFor(snap->mElements[k]);
+            
+            if (!nt->isNamedTuple()) {
+                throw std::runtime_error("Corrupt PyObjSnapshot.Alternative");
+            }
+
             types.push_back(
                 std::make_pair(
-                    typeFor(snap->mElements[k]),
-                    snap->mNames[k]
+                    snap->mNames[k],
+                    (NamedTuple*)nt
                 )
             );
         }
@@ -373,6 +455,63 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
             subtypesConcrete
         );
         
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::ClassType) {
+        snap->mType = new Class();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+        
+        Type* heldClass = getNamedElementType(snap, "held_class_type");
+        
+        if (!heldClass->isHeldClass()) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.Class");
+        }
+
+        ((Class*)snap->mType)->initializeDuringDeserialization(
+            snap->mName,
+            (HeldClass*)heldClass 
+        );
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::HeldClassType) {
+        snap->mType = new HeldClass();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+
+        std::vector<HeldClass*> bases;
+        std::vector<MemberDefinition> members;
+        std::map<std::string, Function*> memberFunctions;
+        std::map<std::string, Function*> staticFunctions;
+        std::map<std::string, Function*> propertyFunctions;
+        std::map<std::string, PyObject*> classMembers;
+        std::map<std::string, Function*> classMethods;
+
+        getNamedBundle(snap, "cls_bases", bases);
+        getNamedBundle(snap, "cls_members", members);
+        getNamedBundle(snap, "cls_methods", memberFunctions);
+        getNamedBundle(snap, "cls_staticmethods", staticFunctions);
+        getNamedBundle(snap, "cls_properties", propertyFunctions);
+        getNamedBundle(snap, "cls_classmembers", classMembers);
+        getNamedBundle(snap, "cls_classmethods", classMethods);
+
+        Type* clsType = getNamedElementType(snap, "cls_type");
+        if (!clsType->isClass()) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.HeldClass");
+        }
+
+        ((HeldClass*)snap->mType)->initializeDuringDeserialization(
+            snap->mName,
+            bases,
+            snap->mNamedInts["cls_is_final"],
+            members,
+            memberFunctions,
+            staticFunctions,
+            propertyFunctions,
+            classMembers,
+            classMethods,
+            (Class*)clsType
+        );
         return;
     }
 

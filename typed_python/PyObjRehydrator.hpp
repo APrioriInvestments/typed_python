@@ -42,6 +42,12 @@ public:
         bool allowEmpty=false
     );
 
+    Instance getNamedElementInstance(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        bool allowEmpty=false
+    );
+
     void getNamedBundle(
         PyObjSnapshot* snapshot,
         std::string name,
@@ -51,7 +57,25 @@ public:
     void getNamedBundle(
         PyObjSnapshot* snapshot,
         std::string name,
+        std::vector<MemberDefinition>& out
+    );
+
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        std::vector<HeldClass*>& outTypes
+    );
+
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
         std::map<std::string, Function*>& outTypes
+    );
+
+    void getNamedBundle(
+        PyObjSnapshot* snapshot,
+        std::string name,
+        std::map<std::string, PyObject*>& outPyobj
     );
 
 private:

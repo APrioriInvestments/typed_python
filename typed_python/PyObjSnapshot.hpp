@@ -71,6 +71,8 @@ public:
     PyObjSnapshot* internalize(const ClosureVariableBindingStep& def);
     PyObjSnapshot* internalize(const std::vector<FunctionOverload>& def);
     PyObjSnapshot* internalize(const std::vector<FunctionArg>& inArgs);
+    PyObjSnapshot* internalize(const std::vector<HeldClass*>& inArgs);
+    PyObjSnapshot* internalize(const std::vector<Type*>& inArgs);
     PyObjSnapshot* internalize(const std::vector<std::string>& inArgs);
     PyObjSnapshot* internalize(const std::map<std::string, ClosureVariableBinding>& inBindings);
     PyObjSnapshot* internalize(const std::map<std::string, FunctionGlobal>& inGlobals);

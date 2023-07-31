@@ -270,6 +270,28 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionOverload& def) {
     return res;
 }
 
+PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<Type*>& def) {
+    PyObjSnapshot* res = new PyObjSnapshot(mGraph);
+    if (mGraph) {
+        mGraph->registerSnapshot(res);
+    }
+
+    res->becomeBundleOf(def, *this);
+
+    return res;
+}
+
+PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<HeldClass*>& def) {
+    PyObjSnapshot* res = new PyObjSnapshot(mGraph);
+    if (mGraph) {
+        mGraph->registerSnapshot(res);
+    }
+
+    res->becomeBundleOf(def, *this);
+
+    return res;
+}
+
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<FunctionArg>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
     if (mGraph) {
@@ -652,7 +674,8 @@ void PyObjSnapshot::becomeInternalizedOf(
         mName = cls->name();
         mModuleName = cls->moduleName();
 
-        mNamedElements["class_type"] = maker.internalize(cls->getClassType());
+        mNamedElements["cls_type"] = maker.internalize(cls->getClassType());
+        mNamedElements["cls_bases"] = maker.internalize(cls->getBases());
         mNamedElements["cls_methods"] = maker.internalize(cls->getOwnMemberFunctions());
         mNamedElements["cls_staticmethods"] = maker.internalize(cls->getOwnStaticFunctions());
         mNamedElements["cls_classmethods"] = maker.internalize(cls->getOwnClassMethods());
