@@ -208,3 +208,58 @@ execution plan:
 		just like forward types, or to be passed into a Class definition
 3. allow forward function types to be resolved just like regular function types
 	* forward function instances also participate in instance resolution
+
+
+
+
+
+how to do this:
+1. new graph needs a hashing methodology that's totally independent of MRTG
+2. type internalization framework needs to use it
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+D = Forward(lambda: X)
+
+class C:
+    MyD = D
+
+
+class D(Class):
+    MyC = C
+
+
+How should we handle this case?
+
+At some level, both C and D are 'forward defined' because 'C' has a forward reference to D and vice versa.
+
+So, now we will have a new C and a new D, triggered at the moment we constructed 'D'.
+
+Of course, if we allowed 'C' to escape then we have a problem
+
+
+
+Of course, when we define C we wont' have
+
+at the module level, we shouldn't be replacing 'C', we should be updating it?
+
+how can we tell the difference between these two?
+
+Should 'C' have been considered 'Forward Defined'?
+

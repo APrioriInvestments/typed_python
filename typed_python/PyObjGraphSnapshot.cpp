@@ -17,6 +17,29 @@
 #include "PyObjGraphSnapshot.hpp"
 #include "PyObjSnapshotGroupSearch.hpp"
 
+PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBak) :
+    mGroupsConsumed(0),
+    mGroupSearch(this)
+{
+    std::unordered_map<PyObject*, PyObjSnapshot*> objMapCache;
+    std::unordered_map<Type*, PyObjSnapshot*> typeMapCache;
+    std::unordered_map<InstanceRef, PyObjSnapshot*> instanceCache;
+
+    // this finds every reachable python objects from 'root', with the search terminating at
+    // named module objects and named module dicts. This is enough information to completely
+    // characterize a type's "identity hash", since there can be at most one version of a
+    // given named module per program.
+    PyObjSnapshotMaker snapMaker(
+        objMapCache,
+        typeMapCache,
+        instanceCache,
+        this,
+        linkBak
+    );
+
+    snapMaker.internalize(root);
+}
+
 template<class compute_type>
 ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
     if (snap->getKind() == PyObjSnapshot::Kind::Instance) {
@@ -234,46 +257,10 @@ PyObjSnapshot* PyObjGraphSnapshot::pickRootFor(const std::unordered_set<PyObjSna
     return *group.begin();
 }
 
-// find every FunctionGlobal and Forward that's pointing at 
-// a cell or ModuleDict. These objects determine how our types
-// actually get linked together into concrete definitions.
-void PyObjGraphSnapshot::getOutboundLinks(std::set<FwdDefLink>& links) {
-    for (auto snap: mObjects) {
-        if (
-            snap->getKind() == PyObjSnapshot::Kind::ForwardType && 
-            snap->hasNamedElement("fwd_cell_or_dict")
-        ) {
-            links.insert(
-                FwdDefLink(
-                    snap->getNamedElement("fwd_cell_or_dict")->getPyObj(),
-                    snap->getName()
-                )
-            );
-        } else 
-        if (snap->getKind() == PyObjSnapshot::Kind::FunctionGlobal) {
-            if (snap->hasNamedElement("moduleDict")) {
-                links.insert(
-                    FwdDefLink(
-                        snap->getNamedElement("moduleDict"),
-                        snap->getName()
-                    )
-                );
-            } else if (snap->hasNamedElement("cell")) {
-                links.insert(
-                    FwdDefLink(
-                        snap->getNamedElement("cell"),
-                        ""
-                    )
-                );
-            }
-        }
-    }
-}
-
-void PyObjGraphSnapshot::getOutboundLinks(std::set<PyObjSnapshot*>& outTypes) {
+void PyObjGraphSnapshot::getTypes(std::unordered_set<PyObjSnapshot*>& outTypes) {
     for (auto snap: mObjects) {
         if (snap->willBeATpType()) {
             outTypes.insert(snap);
         }
     }
-
+}

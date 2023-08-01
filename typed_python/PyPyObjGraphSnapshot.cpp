@@ -22,6 +22,7 @@ PyDoc_STRVAR(PyPyObjGraphSnapshot_doc,
 );
 
 PyMethodDef PyPyObjGraphSnapshot_methods[] = {
+    {"extractTypes", (PyCFunction)PyPyObjGraphSnapshot::extractTypes, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -42,6 +43,29 @@ PyObject* PyPyObjGraphSnapshot::newPyObjGraphSnapshot(PyObjGraphSnapshot* g, boo
     self->mOwnsSnapshot = ownsIt;
 
     return (PyObject*)self;
+}
+
+/* static */
+PyObject* PyPyObjGraphSnapshot::extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs) {
+    PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
+
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+            throw PythonExceptionSet();
+        }
+
+        PyObjectStealer res(PySet_New(NULL));
+
+        for (auto o: self->mGraphSnapshot->getObjects()) {
+            if (o->getType()) {
+                PySet_Add(res, (PyObject*)PyInstance::typeObj(o->getType()));
+            }
+        }
+
+        return incref(res);
+    });
 }
 
 /* static */

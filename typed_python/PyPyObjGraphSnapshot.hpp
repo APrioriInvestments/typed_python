@@ -30,6 +30,8 @@ public:
 
     static void dealloc(PyPyObjGraphSnapshot *self);
 
+    static PyObject* extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs);
+
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
 
     static PyObject* newPyObjGraphSnapshot(PyObjGraphSnapshot* o, bool ownsIt);

@@ -37,34 +37,6 @@ A graph knows how to assign a unique hash to every object it contains.
 
 **********************************/
 
-// formally, a FwdDefLink is a forward definition of a python value
-// contained in a cell or a module member whose definition may only
-// change from being undefined or a forward to a concrete value.
-class FwdDefLink {
-public:
-    FwdDefLink(PyObject* cellOrDict, std::string name) :
-        mName(name),
-        mCellOrDict(cellOrDict)
-    {
-    }
-
-    bool operator<(const FwdDefLink& in) const {
-        if (mCellOrDict < in.mCellOrDict) {
-            return true;
-        }
-        if (mCellOrDict > in.mCellOrDict) {
-            return false;
-        }
-
-        return mName < in.mName;
-    }
-
-private:
-    PyObjectHolder mCellOrDict;
-    std::string mName;
-};
-
-
 class PyObjGraphSnapshot {
 public:
     PyObjGraphSnapshot() :
@@ -73,11 +45,21 @@ public:
     {
     }
 
+    PyObjGraphSnapshot(Type* root, bool linkBackToOriginal=true);
+
     ~PyObjGraphSnapshot() {
         for (auto oPtr: mObjects) {
             delete oPtr;
         }
     }
+
+    // walk over the graph and point any forwards to the type they actually point to.
+    // after this, any Kind::ForwardType will have a target set and empty name.
+    // Any outbound link pointing to a Forward will now point to what the forward was
+    // pointing to
+    void resolveForwards();
+
+    void internalize();
 
     // get the "internal" graph snapshot, which is responsible for holding all the objects
     // that are actually interned inside the system.
@@ -100,16 +82,8 @@ public:
 
     ShaHash hashFor(PyObjSnapshot* snap);
 
-    // find every FunctionGlobal and Forward that's pointing at 
-    // a cell or ModuleDict. These objects determine how our types
-    // actually get linked together into concrete definitions.
-    void getOutboundLinks(std::set<FwdDefLink>& links);
-
     // all contained snapshots that represent TP types
-    void getTypes(std::set<PyObjSnapshot*>& outTypeSnaps);
-
-    // 
-    void getOutboundLinks(std::set<FwdDefLink>& links);
+    void getTypes(std::unordered_set<PyObjSnapshot*>& outTypeSnaps);
 
 private:
     void installSnapHash(PyObjSnapshot* snap, ShaHash h);

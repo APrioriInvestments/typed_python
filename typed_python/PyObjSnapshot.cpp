@@ -15,193 +15,155 @@ std::string PyObjSnapshot::kindAsString() const {
     if (mKind == Kind::Uninitialized) {
         return "Uninitialized";
     }
-
-    if (mKind == Kind::InternalBundle) {
-        return "InternalBundle";
-    }
-
     if (mKind == Kind::String) {
         return "String";
     }
-
     if (mKind == Kind::NamedPyObject) {
         return "NamedPyObject";
     }
-
-    if (mKind == Kind::PrimitiveType) {
-        return "PrimitiveType";
-    }
-
     if (mKind == Kind::Instance) {
         return "Instance";
     }
-
     if (mKind == Kind::PrimitiveType) {
         return "PrimitiveType";
     }
-
     if (mKind == Kind::ListOfType) {
         return "ListOfType";
     }
-
     if (mKind == Kind::TupleOfType) {
         return "TupleOfType";
     }
-
     if (mKind == Kind::TupleType) {
         return "TupleType";
     }
-
     if (mKind == Kind::NamedTupleType) {
         return "NamedTupleType";
     }
-
     if (mKind == Kind::OneOfType) {
         return "OneOfType";
     }
-
     if (mKind == Kind::ValueType) {
         return "ValueType";
     }
-
     if (mKind == Kind::DictType) {
         return "DictType";
     }
-
     if (mKind == Kind::ConstDictType) {
         return "ConstDictType";
     }
-
     if (mKind == Kind::SetType) {
         return "SetType";
     }
-
     if (mKind == Kind::PointerToType) {
         return "PointerToType";
     }
-
     if (mKind == Kind::RefToType) {
         return "RefToType";
     }
-
     if (mKind == Kind::AlternativeType) {
         return "AlternativeType";
     }
-
     if (mKind == Kind::ConcreteAlternativeType) {
         return "ConcreteAlternativeType";
     }
-
     if (mKind == Kind::AlternativeMatcherType) {
         return "AlternativeMatcherType";
     }
-
     if (mKind == Kind::PythonObjectOfTypeType) {
         return "PythonObjectOfTypeType";
     }
-
     if (mKind == Kind::SubclassOfTypeType) {
         return "SubclassOfTypeType";
     }
-
     if (mKind == Kind::ClassType) {
         return "ClassType";
     }
-
     if (mKind == Kind::HeldClassType) {
         return "HeldClassType";
     }
-
     if (mKind == Kind::FunctionType) {
         return "FunctionType";
     }
-
     if (mKind == Kind::FunctionOverload) {
         return "FunctionOverload";
     }
-
     if (mKind == Kind::FunctionGlobal) {
         return "FunctionGlobal";
     }
-
+    if (mKind == Kind::FunctionArg) {
+        return "FunctionArg";
+    }
+    if (mKind == Kind::FunctionClosureVariableBinding) {
+        return "FunctionClosureVariableBinding";
+    }
+    if (mKind == Kind::FunctionClosureVariableBindingStep) {
+        return "FunctionClosureVariableBindingStep";
+    }
+    if (mKind == Kind::ClassMemberDefinition) {
+        return "ClassMemberDefinition";
+    }
     if (mKind == Kind::BoundMethodType) {
         return "BoundMethodType";
     }
-
     if (mKind == Kind::ForwardType) {
         return "ForwardType";
     }
-
     if (mKind == Kind::TypedCellType) {
         return "TypedCellType";
     }
-
     if (mKind == Kind::PyList) {
         return "PyList";
     }
-
     if (mKind == Kind::PyDict) {
         return "PyDict";
     }
-
     if (mKind == Kind::PySet) {
         return "PySet";
     }
-
     if (mKind == Kind::PyTuple) {
         return "PyTuple";
     }
-
     if (mKind == Kind::PyClass) {
         return "PyClass";
     }
-
-    if (mKind == Kind::PyFunction) {
-        return "PyFunction";
-    }
-
     if (mKind == Kind::PyObject) {
         return "PyObject";
     }
-
-    if (mKind == Kind::PyCell) {
-        return "PyCell";
+    if (mKind == Kind::PyFunction) {
+        return "PyFunction";
     }
-
     if (mKind == Kind::PyCodeObject) {
         return "PyCodeObject";
     }
-
+    if (mKind == Kind::PyCell) {
+        return "PyCell";
+    }
     if (mKind == Kind::PyModule) {
         return "PyModule";
     }
-
     if (mKind == Kind::PyModuleDict) {
         return "PyModuleDict";
     }
-
     if (mKind == Kind::PyClassDict) {
         return "PyClassDict";
     }
-
     if (mKind == Kind::PyStaticMethod) {
         return "PyStaticMethod";
     }
-
     if (mKind == Kind::PyClassMethod) {
         return "PyClassMethod";
     }
-
     if (mKind == Kind::PyBoundMethod) {
         return "PyBoundMethod";
     }
-
     if (mKind == Kind::PyProperty) {
         return "PyProperty";
     }
-
     if (mKind == Kind::ArbitraryPyObject) {
         return "ArbitraryPyObject";
+    }
+    if (mKind == Kind::InternalBundle) {
+        return "InternalBundle";
     }
 
     throw std::runtime_error("Unknown PyObjSnapshot Kind: " + format((int)mKind));
@@ -428,11 +390,24 @@ void PyObjSnapshot::becomeInternalizedOf(
         mKind = Kind::ForwardType;
         Forward* f = (Forward*)t;
 
-        if (f->getTarget()) {
-            mNamedElements["fwd_target"] = maker.internalize(f->getTarget());
-        }
         if (f->getCellOrDict()) {
             mNamedElements["fwd_cell_or_dict"] = maker.internalize(f->getCellOrDict());
+
+            // if we are a 'lambda' forward, we need to know what we resolve to, assuming
+            // we do resolve.
+            if (PyCell_Check(f->getCellOrDict()) && PyCell_Get(f->getCellOrDict())) {
+                mNamedElements["fwd_cell_resolves_to"] = maker.internalize(PyCell_Get(f->getCellOrDict()));
+            } else
+            if (PyDict_Check(f->getCellOrDict())) {
+                PyObject* o = PyDict_GetItemString(f->getCellOrDict(), f->name().c_str());
+                if (o) {
+                    mNamedElements["fwd_dict_resolves_to"] = maker.internalize(o);
+                }
+            }
+        }
+
+        if (f->getTarget()) {
+            mNamedElements["fwd_target"] = maker.internalize(f->getTarget());
         }
 
         mName = f->name();
@@ -868,6 +843,18 @@ void PyObjSnapshot::becomeInternalizedOf(
         mModuleName = val.getModuleName();
         mName = val.getName();
         mNamedElements["moduleDict"] = maker.internalize(val.getModuleDictOrCell());
+
+        // TODO: ultimately we should get rid of this. It shouldn't be necessary to
+        // establish a valid 'identity' and its a little arbitrary that we're only recursing
+        // into types instead of all python objects. For the moment, we need it to keep everything
+        // working.
+        PyObject* o = val.extractGlobalRefFromDictOrCell();
+        if (o && PyType_Check(o) && PyInstance::extractTypeFrom(o, true)) {
+            mNamedElements["resolve_to"] = maker.internalize(
+                PyInstance::extractTypeFrom(o, true)
+            );
+        }
+
         return;
     }
 
@@ -879,6 +866,11 @@ void PyObjSnapshot::becomeInternalizedOf(
     if (val.isGlobalInDict()) {
         mNamedElements["moduleDict"] = maker.internalize(val.getModuleDictOrCell());
         mName = val.getName();
+        return;
+    }
+
+    if (val.isConstant()) {
+        mNamedElements["constant"] = maker.internalize(val.getConstant());
         return;
     }
 }

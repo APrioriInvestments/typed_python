@@ -238,7 +238,7 @@ public:
         return mModuleDictOrCell;
     }
 
-    PyObject* extractGlobalRefFromDictOrCell() {
+    PyObject* extractGlobalRefFromDictOrCell() const {
         if (isGlobalInDict()) {
             return PyDict_GetItemString(mModuleDictOrCell, mName.c_str());
         }

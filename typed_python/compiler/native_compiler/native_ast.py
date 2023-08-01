@@ -88,8 +88,8 @@ def typeZeroConstant(self):
     raise Exception(f"Can't make a zero value from {self}")
 
 
-Type = Forward()
-Type.define(Alternative(
+Type = Forward(lambda: Type)
+Type = Alternative(
     "Type",
     # the 'Void' type. should only be used in function signatures. Use an empty
     # struct if you want the 'empty' data structure instead.
@@ -109,7 +109,7 @@ Type.define(Alternative(
         all(valType.isEmpty() for keyType, valType in self.element_types) if self.matches.Struct
         else False,
     zeroConstant=typeZeroConstant
-))
+)
 
 
 def const_truth_value(c):
@@ -145,8 +145,8 @@ def const_str(c):
     assert False, type(c)
 
 
-Constant = Forward()
-Constant.define(Alternative(
+Constant = Forward(lambda: Constant)
+Constant = Alternative(
     "Constant",
     Void={},
     Float={'val': float, 'bits': int},
@@ -157,7 +157,8 @@ Constant.define(Alternative(
     NullPointer={'value_type': Type},
     truth_value=const_truth_value,
     __str__=const_str
-))
+)
+
 
 UnaryOp = Alternative(
     "UnaryOp",
@@ -661,11 +662,11 @@ Expression.define(Alternative(
 ))
 
 
+Expression = resolveForwardDefinedType(Expression)
 NamedCallTarget = resolveForwardDefinedType(NamedCallTarget)
 Type = resolveForwardDefinedType(Type)
 Constant = resolveForwardDefinedType(Constant)
 ExpressionIntermediate = resolveForwardDefinedType(ExpressionIntermediate)
-Expression = resolveForwardDefinedType(Expression)
 Teardown = resolveForwardDefinedType(Teardown)
 CallTarget = resolveForwardDefinedType(CallTarget)
 

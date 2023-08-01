@@ -260,32 +260,33 @@ void reachableUnresolvedTypes(Type* root, std::set<Type*>& outTypes) {
     std::unordered_map<Type*, PyObjSnapshot*> typeMapCache;
     std::unordered_map<InstanceRef, PyObjSnapshot*> instanceCache;
 
-    PyObjSnapshotMaker snapMaker(objMapCache, typeMapCache, instanceCache, &graph, true);
+    // this finds every reachable python objects from 'root', with the search terminating at
+    // named module objects and named module dicts. This is enough information to completely
+    // characterize a type's "identity hash", since there can be at most one version of a
+    // given named module per program.
+    PyObjSnapshotMaker snapMaker(
+        objMapCache,
+        typeMapCache,
+        instanceCache,
+        &graph,
+        true
+    );
 
-    // this finds every reachable python object from here ending at module objects.
-    // or fully resolved types.
-    
-    // if we have Forwards defined inside of us, then the target of the forward, if
-    // defined, will be contained in this graph. But if we have 
+    snapMaker.internalize(root);
 
-    std::set<Type*> toVisit;
-    toVisit.insert(root);
+    std::unordered_set<PyObjSnapshot*> typeSnaps;
+    graph.getTypes(typeSnaps);
 
-    // walk the graph and determine all forwards that are not resolved
-    while (toVisit.size()) {
-        Type* toCheck = *toVisit.begin();
-        toVisit.erase(toCheck);
+    for (auto snap: typeSnaps) {
+        Type* t = snap->getType();
+        if (!t) {
+            throw std::runtime_error(
+                "Snap of kind " + snap->kindAsString() + " didn't produce a type"
+            );
+        }
 
-        if (toCheck->isForwardDefined() && !toCheck->isResolved()) {
-            if (outTypes.find(toCheck) == outTypes.end()) {
-                outTypes.insert(toCheck);
-
-                toCheck->visitReferencedTypes([&](Type* subtype) {
-                    if (subtype->isForwardDefined() && !subtype->isResolved()) {
-                        toVisit.insert(subtype);
-                    }
-                });
-            }
+        if (t->isForwardDefined() && !t->isResolved()) {
+            outTypes.insert(t);
         }
     }
 }
@@ -416,6 +417,21 @@ void Type::attemptToResolve() {
 
     // do the entire type resolution process while holding the GIL
     PyEnsureGilAcquired getTheGil;
+
+    // compute a snapshot starting with us as the root
+    // PyObjGraphSnapshot graph(this);
+
+    // // take the graph and remove any forwards from it. We will now have a graph where
+    // // no object points directly to a forward anymore. Each forward will point to its
+    // // resolution, and every PyObjSnapshot has a link back to the original object or
+    // // type that it came from.
+    // graph.resolveForwards();
+
+    // // now take every non-forward node and make a version of it in the internal graph,
+    // // if it doesn't already exist.  Then rehydrate it.
+    // graph.internalize();
+
+    // // now type in 'graph' can determine which fully realized type it maps to.
 
     std::set<Type*> typesNeedingResolution;
     reachableUnresolvedTypes(this, typesNeedingResolution);
