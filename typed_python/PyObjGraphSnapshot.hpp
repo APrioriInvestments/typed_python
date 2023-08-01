@@ -37,6 +37,34 @@ A graph knows how to assign a unique hash to every object it contains.
 
 **********************************/
 
+// formally, a FwdDefLink is a forward definition of a python value
+// contained in a cell or a module member whose definition may only
+// change from being undefined or a forward to a concrete value.
+class FwdDefLink {
+public:
+    FwdDefLink(PyObject* cellOrDict, std::string name) :
+        mName(name),
+        mCellOrDict(cellOrDict)
+    {
+    }
+
+    bool operator<(const FwdDefLink& in) const {
+        if (mCellOrDict < in.mCellOrDict) {
+            return true;
+        }
+        if (mCellOrDict > in.mCellOrDict) {
+            return false;
+        }
+
+        return mName < in.mName;
+    }
+
+private:
+    PyObjectHolder mCellOrDict;
+    std::string mName;
+};
+
+
 class PyObjGraphSnapshot {
 public:
     PyObjGraphSnapshot() :
@@ -71,6 +99,17 @@ public:
     }
 
     ShaHash hashFor(PyObjSnapshot* snap);
+
+    // find every FunctionGlobal and Forward that's pointing at 
+    // a cell or ModuleDict. These objects determine how our types
+    // actually get linked together into concrete definitions.
+    void getOutboundLinks(std::set<FwdDefLink>& links);
+
+    // all contained snapshots that represent TP types
+    void getTypes(std::set<PyObjSnapshot*>& outTypeSnaps);
+
+    // 
+    void getOutboundLinks(std::set<FwdDefLink>& links);
 
 private:
     void installSnapHash(PyObjSnapshot* snap, ShaHash h);

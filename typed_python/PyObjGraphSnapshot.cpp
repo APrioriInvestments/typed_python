@@ -233,3 +233,47 @@ PyObjSnapshot* PyObjGraphSnapshot::pickRootFor(const std::unordered_set<PyObjSna
     // just pick one.
     return *group.begin();
 }
+
+// find every FunctionGlobal and Forward that's pointing at 
+// a cell or ModuleDict. These objects determine how our types
+// actually get linked together into concrete definitions.
+void PyObjGraphSnapshot::getOutboundLinks(std::set<FwdDefLink>& links) {
+    for (auto snap: mObjects) {
+        if (
+            snap->getKind() == PyObjSnapshot::Kind::ForwardType && 
+            snap->hasNamedElement("fwd_cell_or_dict")
+        ) {
+            links.insert(
+                FwdDefLink(
+                    snap->getNamedElement("fwd_cell_or_dict")->getPyObj(),
+                    snap->getName()
+                )
+            );
+        } else 
+        if (snap->getKind() == PyObjSnapshot::Kind::FunctionGlobal) {
+            if (snap->hasNamedElement("moduleDict")) {
+                links.insert(
+                    FwdDefLink(
+                        snap->getNamedElement("moduleDict"),
+                        snap->getName()
+                    )
+                );
+            } else if (snap->hasNamedElement("cell")) {
+                links.insert(
+                    FwdDefLink(
+                        snap->getNamedElement("cell"),
+                        ""
+                    )
+                );
+            }
+        }
+    }
+}
+
+void PyObjGraphSnapshot::getOutboundLinks(std::set<PyObjSnapshot*>& outTypes) {
+    for (auto snap: mObjects) {
+        if (snap->willBeATpType()) {
+            outTypes.insert(snap);
+        }
+    }
+

@@ -126,7 +126,9 @@ public:
         ClassMemberDefinition,
         // a TP BoundMethod type
         BoundMethodType,
-        // a TP Forward type
+        // a TP Forward type. Contains fwd_target for the target, if set,
+        // fwd_cell_or_dict for a forward defined using a lambda, and
+        // mName if the forward dict was a global.
         ForwardType,
         // a TP TypedCellType
         TypedCellType,
@@ -353,6 +355,20 @@ public:
 
     const std::map<std::string, PyObjSnapshot*>& namedElements() const {
         return mNamedElements;
+    }
+
+    bool hasNamedElement(std::string s) const {
+        return mNamedElements.find(s) != mNamedElements.end();
+    }
+
+    PyObjSnapshot* getNamedElement(std::string s) const {
+        auto it = mNamedElements.find(s);
+
+        if (it != mNamedElements.end()) {
+            return it->second;
+        }
+
+        return nullptr;
     }
 
     const std::vector<std::string>& names() const {

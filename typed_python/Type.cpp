@@ -260,8 +260,13 @@ void reachableUnresolvedTypes(Type* root, std::set<Type*>& outTypes) {
     std::unordered_map<Type*, PyObjSnapshot*> typeMapCache;
     std::unordered_map<InstanceRef, PyObjSnapshot*> instanceCache;
 
-
     PyObjSnapshotMaker snapMaker(objMapCache, typeMapCache, instanceCache, &graph, true);
+
+    // this finds every reachable python object from here ending at module objects.
+    // or fully resolved types.
+    
+    // if we have Forwards defined inside of us, then the target of the forward, if
+    // defined, will be contained in this graph. But if we have 
 
     std::set<Type*> toVisit;
     toVisit.insert(root);
