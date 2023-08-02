@@ -40,14 +40,106 @@ PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBak) :
     snapMaker.internalize(root);
 }
 
-PyObjGraphSnapshot::resolveForwards() {
-    std::set<PyObjSnapshot*> fwdDefined;
+/* walk over the graph and point any forwards to the type they actually point to.
 
+This will modify nodes in the following way:
+    Any Kind::ForwardType will have a target set if its resolvable
+    Any snapshot pointing at a Forward will now point at what the forward points to
+    Any snapshot with a valid cache that can reach a type that was changed will have its
+        cache cleared
+
+*/
+void PyObjGraphSnapshot::resolveForwards() {
+    // any snapshot that was modified
+    std::set<PyObjSnapshot*> modified;
+
+    // point forwards where they go
     for (auto o: mObjects) {
-        if (o->isForwardDefinedType()) {
-            fwdDefined.insert(o);
+        if (o->getKind() == PyObjSnapshot::Kind::ForwardType) {
+            o->pointForwardToFinalType();
+            modified.insert(o);
+        }
+
+        if (o->willBeATpType()) {
+            if (o->markTypeNotFwdDefined()) {
+                modified.insert(0);
+            }
         }
     }
+
+    for (auto o: mObjects) {
+        if (o->replaceOutboundForwardsWithTargets()) {
+            modified.insert(o);
+        }
+    }
+
+    // build a reverse graph map
+    std::map<PyObjSnapshot*, std::set<PyObjSnapshot*> > inbound;
+
+    for (auto o: mObjects) {
+        o->visitOutbound([&](PyObjSnapshot* outbound) {
+            if (outbound->getGraph() == this) {
+                inbound[outbound].insert(o);
+            }
+        });
+    }
+
+    std::set<PyObjSnapshot*> modifiedTransitive;
+    std::function<void (PyObjSnapshot*)> check = [&](PyObjSnapshot* s) {
+        if (modifiedTransitive.find(s) == modifiedTransitive.end()) {
+            modifiedTransitive.insert(s);
+            for (auto upstream: inbound[s]) {
+                check(upstream);
+            }
+        }
+    };
+
+    for (auto m: modified) {
+        check(m);
+    }
+
+    for (auto m: modifiedTransitive) {
+        m->clearCache();
+    }
+}
+
+
+void PyObjGraphSnapshot::internalize() {
+    std::map<ShaHash, std::pair<PyObjSnapshot*, PyObjSnapshot*> > skeletons;
+
+    for (auto s: mObjects) {
+        ShaHash h = hashFor(s);
+
+        if (!internal().snapshotForHash(h)) {
+             skeletons[h] = std::make_pair(s, internal().createSkeleton(h));
+        }
+    }
+
+    for (auto hashAndSkeleton: skeletons) {
+        hashAndSkeleton.second.second->cloneFromSnapByHash(hashAndSkeleton.second.first);
+    }
+
+    // rehydrate this portion of the graph, so that we have concrete objects for everything
+    // we just interned
+    for (auto hashAndSkeleton: skeletons) {
+        hashAndSkeleton.second.second->rehydrate();
+    }
+
+    for (auto hashAndSkeleton: skeletons) {
+        hashAndSkeleton.second.second->markInternalizedOnType();
+    }
+}
+
+PyObjSnapshot* PyObjGraphSnapshot::createSkeleton(ShaHash h) {
+    if (mHashToSnap.find(h) != mHashToSnap.end()) {
+        throw std::runtime_error("Can't create a skeleton for an object that already exists");
+    }
+
+    PyObjSnapshot* snap = new PyObjSnapshot(this);
+
+    mHashToSnap[h] = snap;
+    mObjects.insert(snap);
+    return snap;
 }
 
 
@@ -124,6 +216,15 @@ ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
     }
 
     return res;
+}
+
+
+PyObjSnapshot* PyObjGraphSnapshot::snapshotForHash(ShaHash hash) {
+    auto it = mHashToSnap.find(hash);
+    if (it != mHashToSnap.end()) {
+        return it->second;
+    }
+    return nullptr;
 }
 
 

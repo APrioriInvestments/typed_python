@@ -48,6 +48,7 @@ changing underneath us.
 class PyObjSnapshot {
 private:
     friend class PyObjSnapshotMaker;
+    friend class PyObjGraphSnapshot;
     friend class PyObjRehydrator;
 
     PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
@@ -174,15 +175,6 @@ public:
 
     ~PyObjSnapshot() {
         decref(mPyObject);
-    }
-
-    static PyObjSnapshot* ForType(Type* t) {
-        // TODO: this needs to go away. its a shim to handle the current
-        // code which is a little confused about these objects.
-        PyObjSnapshot* res = new PyObjSnapshot();
-        res->mKind = Kind::PrimitiveType;
-        res->mType = t;
-        return res;
     }
 
     Kind getKind() const {
@@ -395,43 +387,6 @@ public:
         return mQualname;
     }
 
-    template<class visitor_type>
-    void _visitReferencedTypes(const visitor_type& v) {
-        if (mKind == Kind::PrimitiveType) {
-            v(mType);
-            return;
-        }
-
-        if (mKind == Kind::Instance) {
-            // TODO: what to do here?
-        }
-
-        if (mKind == Kind::PyTuple) {
-            // TODO: what to do here?
-        }
-    }
-
-    template<class visitor_type>
-    void _visitCompilerVisibleInternals(const visitor_type& visitor) {
-        if (mKind == Kind::PrimitiveType) {
-            visitor.visitTopo(mType);
-        }
-
-        if (mKind == Kind::Instance) {
-            // TODO: what to do here?
-            visitor.visitInstance(mInstance.type(), mInstance.data());
-        }
-
-        if (mKind == Kind::PyTuple) {
-            // TODO: what to do here?
-            throw std::runtime_error("TODO: PyObjSnapshot::_visitCompilerVisibleInternals PyTuple");
-        }
-
-        if (mKind == Kind::ArbitraryPyObject) {
-            visitor.visitTopo(mPyObject);
-        }
-    }
-
     bool willBeATpType() const {
         return mKind == Kind::PrimitiveType
             || mKind == Kind::ListOfType
@@ -458,7 +413,6 @@ public:
             || mKind == Kind::TypedCellType
         ;
     }
-
 
     ::Type* getType() {
         if (mType) {
@@ -660,6 +614,22 @@ public:
         return result;
     }
 
+    void clearCache() {
+        if (mKind == Kind::ArbitraryPyObject
+            || mKind == Kind::Instance
+            || mKind == Kind::PrimitiveType
+        ) {
+            throw std::runtime_error("Can't clear the cache of a leaf node.");
+        }
+
+        mType = nullptr;
+        mInstance = Instance();
+        if (mPyObject) {
+            decref(mPyObject);
+            mPyObject = nullptr;
+        }
+    }
+
     template<class visitor_type>
     void visitOutbound(const visitor_type& v) {
         for (auto e: mElements) {
@@ -675,7 +645,82 @@ public:
         }
     }
 
+    void pointForwardToFinalType() {
+        if (mKind != Kind::ForwardType) {
+            throw std::runtime_error("Makes no sense to call this on a non-forward");
+        }
+
+        PyObjSnapshot* target = computeForwardTargetTransitive();;
+
+        if (!target) {
+            throw std::runtime_error("Forward doesn't resolve to a valid target");
+        }
+
+        mNamedElements["fwd_target"] = target;
+    }
+
+    // replace any outbound links that are pointing to forwards with the forward target
+    // returns true if we modified the object
+    bool replaceOutboundForwardsWithTargets() {
+        bool updated = false;
+
+        visitOutbound([&](PyObjSnapshot*& snap) {
+            if (snap->mKind == Kind::ForwardType) {
+                PyObjSnapshot* tgt = snap->getNamedElement("fwd_target");
+                if (!tgt) {
+                    throw std::runtime_error("Somehow a forward doesn't have a target");
+                }
+                snap = tgt;
+                updated = true;
+            }
+        });
+
+        return updated;
+    }
+
+    PyObjSnapshot* computeForwardTarget() {
+        if (mKind != Kind::ForwardType) {
+            return nullptr;
+        }
+        PyObjSnapshot* snap = getNamedElement("fwd_target");
+        if (snap) {
+            return snap;
+        }
+
+        snap = getNamedElement("fwd_cell_resolves_to");
+        if (snap) {
+            return snap;
+        }
+
+        snap = getNamedElement("fwd_dict_resolves_to");
+        if (snap) {
+            return snap;
+        }
+        return nullptr;
+    }
+
+    PyObjSnapshot* computeForwardTargetTransitive();
+
 private:
+    void markInternalizeOnType() {
+        if (!mType) {
+            return;
+        }
+
+        mType->setSnapshot(this);
+    }
+
+    bool markTypeNotFwdDefined() {
+        if (mNamedInts["type_is_forward"]) {
+            mNamedInts["type_is_forward"] = 0;
+            return true;
+        }
+
+        return false;
+    }
+
+    void cloneFromSnapByHash(PyObjSnapshot* snap);
+
     // ensure we won't crash if we interact with this object.
     void validateAfterDeserialization() {
         if (mKind == Kind::PrimitiveType) {

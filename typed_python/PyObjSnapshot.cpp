@@ -5,6 +5,10 @@
 
 
 void PyObjSnapshot::rehydrate() {
+    if (!needsHydration()) {
+        return;
+    }
+
     PyObjRehydrator rehydrator;
 
     rehydrator.start(this);
@@ -170,7 +174,42 @@ std::string PyObjSnapshot::kindAsString() const {
 }
 
 
+void PyObjSnapshot::cloneFromSnapByHash(PyObjSnapshot* snap) {
+    mKind = snap->mKind;
+    mType = snap->mType;
+    mInstance = snap->mInstance;
+    mPyObject = incref(snap->mPyObject);
+    mNamedInts = snap->mNamedInts;
+    mNames = snap->mNames;
+    mStringValue = snap->mStringValue;
+    mModuleName = snap->mModuleName;
+    mName = snap->mName;
+    mQualname = snap->mQualname;
 
+    auto intern = [&](PyObjSnapshot* s) {
+        PyObjSnapshot* res = mGraph->snapshotForHash(
+            snap->mGraph->hashFor(snap)
+        );
+
+        if (!res) {
+            throw std::runtime_error("Somehow, when interning, a hash is missing");
+        }
+
+        return res;
+    };
+
+    for (auto e: snap->mElements) {
+        mElements.push_back(intern(e));
+    }
+
+    for (auto e: snap->mKeys) {
+        mKeys.push_back(intern(e));
+    }
+
+    for (auto nameAndE: snap->mNamedElements) {
+        mNamedElements[nameAndE.first] = intern(nameAndE.second);
+    }
+}
 
 void PyObjSnapshot::becomeInternalizedOf(
     Type* t,
@@ -969,3 +1008,30 @@ void PyObjSnapshot::becomeInternalizedOf(
     mKind = Kind::String;
     mStringValue = val;
 }
+
+PyObjSnapshot* PyObjSnapshot::computeForwardTargetTransitive() {
+    PyObjSnapshot* source = this;
+    int steps = 0;
+
+    while (true) {
+        steps += 1;
+        if (steps > mGraph->getObjects().size()) {
+            throw std::runtime_error("Forward cycle detected");
+        }
+
+        if (source->mKind != Kind::ForwardType) {
+            // TODO - what if we're not a type?
+            if (!source->willBeATpType()) {
+                throw std::runtime_error("Should we be converting this to a Value type?");
+            }
+
+            return this;
+        }
+
+        source = source->computeForwardTarget();
+        if (!source) {
+            return nullptr;
+        }
+    }
+}
+

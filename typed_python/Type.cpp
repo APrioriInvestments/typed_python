@@ -419,17 +419,18 @@ void Type::attemptToResolve() {
     PyEnsureGilAcquired getTheGil;
 
     // compute a snapshot starting with us as the root
-    // PyObjGraphSnapshot graph(this);
+    PyObjGraphSnapshot graph(this);
 
-    // // take the graph and remove any forwards from it. We will now have a graph where
-    // // no object points directly to a forward anymore. Each forward will point to its
-    // // resolution, and every PyObjSnapshot has a link back to the original object or
-    // // type that it came from.
-    // graph.resolveForwards();
+    // take the graph and remove any forwards from it. We will now have a graph where
+    // no object points directly to a forward anymore. Each forward will point to its
+    // resolution, and every PyObjSnapshot has a link back to the original object or
+    // type that it came from.
+    graph.resolveForwards();
 
-    // // now take every non-forward node and make a version of it in the internal graph,
-    // // if it doesn't already exist.  Then rehydrate it.
-    // graph.internalize();
+    // now take every non-forward node and make a version of it in the internal graph,
+    // if it doesn't already exist.  Then rehydrate it.
+    unresolved object, then we didn't need to update it and it'll be hydrated as normal
+    graph.internalize();
 
     // // now type in 'graph' can determine which fully realized type it maps to.
 

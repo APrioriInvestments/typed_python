@@ -43,6 +43,7 @@
 
 class SerializationBuffer;
 class DeserializationBuffer;
+class PyObjSnapshot;
 
 class Type;
 class NoneType;
@@ -953,8 +954,11 @@ protected:
             m_is_forward_defined(false),
             m_forward_resolves_to(nullptr),
             m_is_redundant(false),
-            m_is_being_deserialized(false)
+            m_is_being_deserialized(false),
+            mSnapshot(nullptr)
         {}
+
+    PyObjSnapshot* mSnapshot;
 
     TypeCategory m_typeCategory;
 
@@ -1053,6 +1057,12 @@ protected:
     }
 
     static std::map<ShaHash, Type*> mInternalizedIdentityHashToType;
+
+    void setSnapshot(PyObjSnapshot* snapshot);
+
+    PyObjSnapshot* getSnapshot() const {
+        return mSnapshot;
+    }
 
 public:
     void addForwardDefinition(Type* t) {
