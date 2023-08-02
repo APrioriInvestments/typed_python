@@ -40,6 +40,17 @@ PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBak) :
     snapMaker.internalize(root);
 }
 
+PyObjGraphSnapshot::resolveForwards() {
+    std::set<PyObjSnapshot*> fwdDefined;
+
+    for (auto o: mObjects) {
+        if (o->isForwardDefinedType()) {
+            fwdDefined.insert(o);
+        }
+    }
+}
+
+
 template<class compute_type>
 ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
     if (snap->getKind() == PyObjSnapshot::Kind::Instance) {

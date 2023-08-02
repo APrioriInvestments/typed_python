@@ -56,10 +56,9 @@ public:
     // walk over the graph and point any forwards to the type they actually point to.
     // after this, any Kind::ForwardType will have a target set and empty name.
     // Any outbound link pointing to a Forward will now point to what the forward was
-    // pointing to
+    // pointing to. Any Snapshots that had valid caches that were modified or that can 
+    // reach modified values will have their snapshots cleared. 
     void resolveForwards();
-
-    void internalize();
 
     // get the "internal" graph snapshot, which is responsible for holding all the objects
     // that are actually interned inside the system.
