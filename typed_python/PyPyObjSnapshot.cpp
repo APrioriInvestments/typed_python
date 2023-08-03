@@ -68,6 +68,7 @@ void PyPyObjSnapshot::dealloc(PyPyObjSnapshot *self)
     decref(self->mKeys);
     decref(self->mGraph);
     decref(self->mByKey);
+    decref(self->mNamedElements);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -79,6 +80,7 @@ PyObject* PyPyObjSnapshot::newPyObjSnapshot(PyObjSnapshot* g, PyObject* pyGraphP
     self->mElements = nullptr;
     self->mKeys = nullptr;
     self->mByKey = nullptr;
+    self->mNamedElements = nullptr;
 
     return (PyObject*)self;
 }
@@ -96,6 +98,7 @@ PyObject* PyPyObjSnapshot::new_(PyTypeObject *type, PyObject *args, PyObject *kw
         self->mKeys = nullptr;
         self->mGraph = nullptr;
         self->mByKey = nullptr;
+        self->mNamedElements = nullptr;
     }
 
     return (PyObject*)self;
@@ -188,13 +191,14 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
             if (!pySnap->mKeys) {
                 pySnap->mKeys = PyList_New(0);
                 for (auto p: obj->keys()) {
-                    PyList_Append(
-                        pySnap->mKeys,
+                    PyObjectStealer subPySnap(
                         PyPyObjSnapshot::newPyObjSnapshot(
                             p,
                             p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
                         )
                     );
+
+                    PyList_Append(pySnap->mKeys, subPySnap);
                 }
             }
 
@@ -207,18 +211,44 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
                 for (long k = 0; k < obj->keys().size(); k++) {
                     PyObjSnapshot* p = obj->elements()[k];
 
-                    PyDict_SetItem(
-                        pySnap->mByKey,
-                        obj->keys()[k]->getPyObj(),
+                    PyObjectStealer subPySnap(
                         PyPyObjSnapshot::newPyObjSnapshot(
                             p,
                             p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
                         )
                     );
+
+                    PyDict_SetItem(
+                        pySnap->mByKey,
+                        obj->keys()[k]->getPyObj(),
+                        subPySnap
+                    );
                 }
             }
 
             return incref(pySnap->mByKey);
+        }
+
+        if (attr == "namedElements") {
+            if (!pySnap->mNamedElements) {
+                pySnap->mNamedElements = PyDict_New();
+                for (auto nameAndSnap: obj->namedElements()) {
+                    PyObjSnapshot* p = nameAndSnap.second;
+                    PyObjectStealer newSnap(
+                        PyPyObjSnapshot::newPyObjSnapshot(
+                            p,
+                            p->getGraph() == obj->getGraph() ? pySnap->mGraph : nullptr
+                        )
+                    );
+                    PyDict_SetItemString(
+                        pySnap->mNamedElements,
+                        nameAndSnap.first.c_str(),
+                        newSnap
+                    );
+                }
+            }
+
+            return incref(pySnap->mNamedElements);
         }
 
         return PyObject_GenericGetAttr(selfObj, attrName);

@@ -51,13 +51,7 @@ private:
     friend class PyObjGraphSnapshot;
     friend class PyObjRehydrator;
 
-    PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr) :
-        mKind(Kind::Uninitialized),
-        mType(nullptr),
-        mPyObject(nullptr),
-        mGraph(inGraph)
-    {
-    }
+    PyObjSnapshot(PyObjGraphSnapshot* inGraph=nullptr);
 
 public:
     enum class Kind {
@@ -446,7 +440,15 @@ public:
             return false;
         }
 
-        if (mKind == Kind::Uninitialized || mKind == Kind::InternalBundle) {
+        if (mKind == Kind::Uninitialized
+            || mKind == Kind::InternalBundle
+            || mKind == Kind::FunctionOverload
+            || mKind == Kind::FunctionGlobal
+            || mKind == Kind::FunctionArg
+            || mKind == Kind::FunctionClosureVariableBinding
+            || mKind == Kind::FunctionClosureVariableBindingStep
+            || mKind == Kind::ClassMemberDefinition
+        ) {
             return false;
         }
 
@@ -455,6 +457,18 @@ public:
         }
 
         return true;
+    }
+
+    // are we an object that doesn't actually produce a cacheable value
+    bool isUncacheable() const {
+        return mKind == Kind::InternalBundle
+            || mKind == Kind::FunctionOverload
+            || mKind == Kind::FunctionGlobal
+            || mKind == Kind::FunctionArg
+            || mKind == Kind::FunctionClosureVariableBinding
+            || mKind == Kind::FunctionClosureVariableBindingStep
+            || mKind == Kind::ClassMemberDefinition
+        ;
     }
 
     // get the python object representation of this object, which isn't guaranteed
@@ -488,7 +502,7 @@ public:
     void rehydrate();
 
     std::string toString() const {
-        return "PyObjSnapshot." + kindAsString() + "()";
+        return "PyObjSnapshot." + kindAsString() + "(ix=" + format(mIndexInGraph) + ")";
     }
 
     template<class T>
@@ -650,7 +664,7 @@ public:
             throw std::runtime_error("Makes no sense to call this on a non-forward");
         }
 
-        PyObjSnapshot* target = computeForwardTargetTransitive();;
+        PyObjSnapshot* target = computeForwardTargetTransitive();
 
         if (!target) {
             throw std::runtime_error("Forward doesn't resolve to a valid target");
@@ -702,7 +716,7 @@ public:
     PyObjSnapshot* computeForwardTargetTransitive();
 
 private:
-    void markInternalizeOnType() {
+    void markInternalizedOnType() {
         if (!mType) {
             return;
         }
@@ -738,6 +752,7 @@ private:
 
     Kind mKind;
     PyObjGraphSnapshot* mGraph;
+    size_t mIndexInGraph;
 
     // if we are a PrimitiveType, then our type. If we resolve to a Type, a representation
     // of us as that type. Otherwise nullptr.

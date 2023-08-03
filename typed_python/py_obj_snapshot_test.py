@@ -1,7 +1,7 @@
 import numpy
 
 from typed_python import ListOf
-from typed_python._types import PyObjSnapshot, _enableTypeAutoresolution
+from typed_python._types import PyObjSnapshot, PyObjGraphSnapshot, _enableTypeAutoresolution
 
 
 class DisableForwardAutoresolve:
@@ -251,3 +251,32 @@ def test_rehydration_preserves_sha_hashing():
     with DisableForwardAutoresolve():
         graphIdempotenceCheck(int)
         graphIdempotenceCheck(ListOf(int))
+
+
+def test_snapshot_of_object():
+    assert PyObjSnapshot.create(object).kind == 'NamedPyObject'
+    assert PyObjSnapshot.create(type).kind == 'NamedPyObject'
+
+
+def test_snapshot_of_types_basic():
+    snap = PyObjSnapshot.create(ListOf(float), False)
+    assert snap.kind == 'ListOfType'
+    assert snap.element_type.kind == 'PrimitiveType'
+
+    newGraph = PyObjGraphSnapshot()
+    newGraph.internalize(snap.graph)
+    newsnap = newGraph.hashToObject(snap.shaHash)
+    assert newsnap.kind == 'ListOfType'
+    assert newsnap.type.__typed_python_category__ == 'ListOf'
+
+
+def test_snapshot_of_types_with_object():
+    snap = PyObjSnapshot.create(ListOf(object), False)
+    assert snap.kind == 'ListOfType'
+    assert snap.element_type.kind == 'PythonObjectOfTypeType'
+
+    newGraph = PyObjGraphSnapshot()
+    newGraph.internalize(snap.graph)
+    newsnap = newGraph.hashToObject(snap.shaHash)
+    assert newsnap.kind == 'ListOfType'
+    assert newsnap.type.__typed_python_category__ == 'ListOf'

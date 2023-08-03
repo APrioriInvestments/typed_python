@@ -122,6 +122,29 @@ public:
         return res;
     }
 
+    static ShaHash fromHexDigest(std::string s) {
+        if (s.size() != sizeof(ShaHash) * 2 + 2) {
+            throw std::runtime_error("Incorrect size for hash-digest");
+        }
+
+        ShaHash res;
+        uint8_t* srcDataPtr = (uint8_t*)&s[2];
+        uint8_t* destDataPtr = (uint8_t*)&res;
+
+        auto fromHex = [&](uint8_t u) {
+            if (u >= '0' && u <= '9') { return u - '0'; }
+            if (u >= 'a' && u <= 'f') { return 10 + u - 'a'; }
+            if (u >= 'A' && u <= 'F') { return 10 + u - 'A'; }
+            return 0;
+        };
+
+        for (int i = 0; i < sizeof(ShaHash); i++) {
+            destDataPtr[i] = fromHex(srcDataPtr[i * 2]) * 16 + fromHex(srcDataPtr[i * 2 + 1]);
+        }
+
+        return res;
+    }
+
     // create a 'poison' sha hash that, like a nan in float-land,
     // always produces another poison sha hash when added. We can use this
     // to indicate that a hash is 'bad' in some dimension.

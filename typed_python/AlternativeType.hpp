@@ -132,6 +132,10 @@ public:
         m_methods = methods;
         m_subtypes = types;
         m_subtypes_concrete = subtypes_concrete;
+
+        if (m_subtypes.size() != m_subtypes_concrete.size()) {
+            throw std::runtime_error("Corrupt Alternative: #types != #subtypes");
+        }
     }
 
     void initializeFromConcrete(Type* forwardDefinitionOfSelf) {

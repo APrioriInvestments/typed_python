@@ -92,6 +92,7 @@ public:
         }
 
         if (target == this) {
+            asm("int3");
             throw std::runtime_error("Forward can't be resolved to itself.");
         }
 
@@ -177,6 +178,8 @@ public:
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         throw std::runtime_error("Forward types should never be explicity instantiated.");
     }
+
+    void postInitializeConcrete() {};
 
 private:
     Type* mTarget;

@@ -23,6 +23,9 @@ PyDoc_STRVAR(PyPyObjGraphSnapshot_doc,
 
 PyMethodDef PyPyObjGraphSnapshot_methods[] = {
     {"extractTypes", (PyCFunction)PyPyObjGraphSnapshot::extractTypes, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getObjects", (PyCFunction)PyPyObjGraphSnapshot::getObjects, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"internalize", (PyCFunction)PyPyObjGraphSnapshot::internalize, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"hashToObject", (PyCFunction)PyPyObjGraphSnapshot::hashToObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -46,6 +49,61 @@ PyObject* PyPyObjGraphSnapshot::newPyObjGraphSnapshot(PyObjGraphSnapshot* g, boo
 }
 
 /* static */
+PyObject* PyPyObjGraphSnapshot::hashToObject(PyObject* graph, PyObject *args, PyObject *kwargs) {
+    PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
+
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {"hash", NULL};
+
+        PyObject* hashPyobj = nullptr;
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &hashPyobj)) {
+            throw PythonExceptionSet();
+        }
+
+        if (!PyUnicode_Check(hashPyobj)) {
+            throw std::runtime_error("Invalid sha hash argument");
+        }
+
+        const char* hash = PyUnicode_AsUTF8(hashPyobj);
+
+        ShaHash h = ShaHash::fromHexDigest(hash);
+
+        PyObjSnapshot* s = self->mGraphSnapshot->snapshotForHash(h);
+
+        if (!s) {
+            return incref(Py_None);
+        }
+
+        return PyPyObjSnapshot::newPyObjSnapshot(s, graph);
+    });
+}
+
+/* static */
+PyObject* PyPyObjGraphSnapshot::internalize(PyObject* graph, PyObject *args, PyObject *kwargs) {
+    PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
+
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {"sourceGraph", NULL};
+
+        PyObject* pySourceGraph = nullptr;
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &pySourceGraph)) {
+            throw PythonExceptionSet();
+        }
+
+        if (pySourceGraph->ob_type != &PyType_PyObjGraphSnapshot) {
+            throw std::runtime_error("Expected a PyObjGraphSnapshot for 'sourceGraph'");
+        }
+
+        PyPyObjGraphSnapshot* sourceGraph = (PyPyObjGraphSnapshot*)pySourceGraph;
+
+        self->mGraphSnapshot->internalize(*sourceGraph->mGraphSnapshot, false);
+        return incref(Py_None);
+    });
+}
+
+/* static */
 PyObject* PyPyObjGraphSnapshot::extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs) {
     PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
 
@@ -62,6 +120,27 @@ PyObject* PyPyObjGraphSnapshot::extractTypes(PyObject* graph, PyObject *args, Py
             if (o->getType()) {
                 PySet_Add(res, (PyObject*)PyInstance::typeObj(o->getType()));
             }
+        }
+
+        return incref(res);
+    });
+}
+
+/* static */
+PyObject* PyPyObjGraphSnapshot::getObjects(PyObject* graph, PyObject *args, PyObject *kwargs) {
+    PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
+
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+            throw PythonExceptionSet();
+        }
+
+        PyObjectStealer res(PySet_New(NULL));
+
+        for (auto o: self->mGraphSnapshot->getObjects()) {
+            PySet_Add(res, PyPyObjSnapshot::newPyObjSnapshot(o, graph));
         }
 
         return incref(res);
@@ -101,8 +180,9 @@ PyObject* PyPyObjGraphSnapshot::tp_repr(PyObject *selfObj) {
 /* static */
 int PyPyObjGraphSnapshot::init(PyPyObjGraphSnapshot *self, PyObject *args, PyObject *kwargs)
 {
-    PyErr_Format(PyExc_RuntimeError, "PyObjGraphSnapshot cannot be initialized directly");
-    return -1;
+    self->mGraphSnapshot = new PyObjGraphSnapshot();
+    self->mOwnsSnapshot = true;
+    return 0;
 }
 
 

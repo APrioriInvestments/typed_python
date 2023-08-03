@@ -30,7 +30,13 @@ public:
 
     static void dealloc(PyPyObjGraphSnapshot *self);
 
+    static PyObject* hashToObject(PyObject* graph, PyObject *args, PyObject *kwargs);
+
+    static PyObject* internalize(PyObject* graph, PyObject *args, PyObject *kwargs);
+
     static PyObject* extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs);
+
+    static PyObject* getObjects(PyObject* graph, PyObject *args, PyObject *kwargs);
 
     static PyObject *new_(PyTypeObject *type, PyObject *args, PyObject *kwargs);
 

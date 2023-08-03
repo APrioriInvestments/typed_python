@@ -415,204 +415,243 @@ void Type::attemptToResolve() {
         return;
     }
 
-    // do the entire type resolution process while holding the GIL
-    PyEnsureGilAcquired getTheGil;
+    if (::getenv("TP_NEW_INTERNING") && ::getenv("TP_NEW_INTERNING")[0]) {
+        // do the entire type resolution process while holding the GIL
+        PyEnsureGilAcquired getTheGil;
 
-    // compute a snapshot starting with us as the root
-    PyObjGraphSnapshot graph(this);
+        // compute a snapshot starting with us as the root
+        PyObjGraphSnapshot graph(this);
 
-    // take the graph and remove any forwards from it. We will now have a graph where
-    // no object points directly to a forward anymore. Each forward will point to its
-    // resolution, and every PyObjSnapshot has a link back to the original object or
-    // type that it came from.
-    graph.resolveForwards();
+        // build a map from our existing types into the graph since the graph is going
+        // to change
+        std::map<Type*, PyObjSnapshot*> typeToSnap;
+        for (auto snap: graph.getObjects()) {
+            if (snap->getType()) {
+                typeToSnap[snap->getType()] = snap;
+            }
+        }
+        if (typeToSnap.find(this) == typeToSnap.end()) {
+            throw std::runtime_error("Somehow, we're not in the graph?");
+        }
 
-    // now take every non-forward node and make a version of it in the internal graph,
-    // if it doesn't already exist.  Then rehydrate it.
-    unresolved object, then we didn't need to update it and it'll be hydrated as normal
-    graph.internalize();
+        // take the graph and remove any forwards from it. We will now have a graph where
+        // no object points directly to a forward anymore. Each forward will point to its
+        // resolution, and every PyObjSnapshot has a link back to the original object or
+        // type that it came from.
+        graph.resolveForwards();
 
-    // // now type in 'graph' can determine which fully realized type it maps to.
+        // now take every non-forward node and make a version of it in the internal graph,
+        // if it doesn't already exist.  Then rehydrate it. At this point, we have an interned
+        // copy of every single type and pyobject that was present in this graph.
+        graph.internalize();
 
-    std::set<Type*> typesNeedingResolution;
-    reachableUnresolvedTypes(this, typesNeedingResolution);
-
-    std::set<Type*> existingReferencedTypes;
-
-    for (auto t: typesNeedingResolution) {
-        if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
-            throw std::runtime_error(
-                "Forward defined as " + t->nameWithModule() + " has not been defined."
+        // now we need to link the new graph back to our types.
+        // Every forward Type in our current graph needs to be pointed to the resolved type.
+        for (auto typeAndSnap: typeToSnap) {
+            PyObjSnapshot* internalizedSnap = graph.internal().snapshotForHash(
+                graph.hashFor(typeAndSnap.second)
             );
-        }
-    }
 
-    for (auto t: typesNeedingResolution) {
-        if (t->isForward() && !((Forward*)t)->getTarget()) {
-            ((Forward*)t)->define(
-                ((Forward*)t)->lambdaDefinition()
-            );
-        }
-    }
-
-    // for each type that we have defined in our graph, what type are we mapping it to?
-    // for Forwards of primitive types like ListOf or TupleOf that can see themselves, this
-    // this will be a 'named copy' of the type depending on the Forward name.
-    std::map<Type*, Type*> resolutionMapping;
-
-    // for each type we end up defining, which type did it come from
-    std::map<Type*, Type*> resolutionSource;
-
-    // allocate new target type bodies for all regular types in the graph
-    // that are forward declared.
-    for (auto t: typesNeedingResolution) {
-        if (!t->isForward()) {
-            // we're resolving to this type directly
-            resolutionMapping[t] = t->cloneForForwardResolution();
-            resolutionSource[resolutionMapping[t]] = t;
-        }
-    }
-
-    // now ensure that the target for any forward is the underlying type
-    // note that we don't need a source for any of these since nobody will end up
-    // actually having a forward in their graph
-    for (auto t: typesNeedingResolution) {
-        if (t->isForward()) {
-            Forward* f = (Forward*)t;
-
-            Type* tgt = f->getTargetTransitive();
-
-            if (!tgt) {
-                throw std::runtime_error("somehow this forward doesn't have a target");
+            if (!internalizedSnap) {
+                throw std::runtime_error("Somehow our Type didn't map to a type in the internalized graph");
             }
 
-            if (typesNeedingResolution.find(tgt) == typesNeedingResolution.end()) {
-                resolutionMapping[t] = tgt;
-                existingReferencedTypes.insert(tgt);
+            Type* target = internalizedSnap->getType();
+
+            if (typeAndSnap.first->m_forward_resolves_to) {
+                if (typeAndSnap.first->m_forward_resolves_to != target) {
+                    throw std::runtime_error("This type is already resolved and not to our target!");
+                }
             } else {
-                // resolve this forward to whatever its target resolves to
-                resolutionMapping[t] = resolutionMapping[tgt];
+                typeAndSnap.first->m_forward_resolves_to = target;
             }
         }
-    }
 
-    // copy all the types. At this point, they all know that they are not forwards
-    // but none of them is ready to be identity-hashed yet. They all will be in a state of
-    // where m_needs_post_init is true.
-    for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->initializeFrom(typeAndSource.second);
-        typeAndSource.first->updateInternalTypePointers(resolutionMapping);
-    }
-
-    // allow each Function type to build CompilerVisiblePythonObjects for its globals
-    // after this, any FunctionGlobals will refer to Constants not cells
-    for (auto typeAndSource: resolutionSource) {
-        if (typeAndSource.first->isFunction()) {
-            ((Function*)typeAndSource.first)->internalizeConstants(resolutionMapping);
+        if (!m_forward_resolves_to) {
+            throw std::runtime_error("Somehow, we didn't resolve???");
         }
-    }
+    } else {
+        std::set<Type*> typesNeedingResolution;
+        reachableUnresolvedTypes(this, typesNeedingResolution);
 
-    // cause each type to recompute its name. We have to do this in a single pass
-    // without any types being aware of their final name before we run the post initialize
-    // step. Otherwise, it's possible for the names to depend on the order of initialization
-    // and we want them to be stable.
-    for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->recomputeName();
-    }
+        std::set<Type*> existingReferencedTypes;
 
-    // cause each type to post-initialize itself, which lets it update internal bytecounts and
-    // default initialization flags
-    bool anyUpdated = true;
-    size_t passCt = 0;
-    while (anyUpdated) {
-        anyUpdated = false;
-        for (auto typeAndSource: resolutionSource) {
-            if (typeAndSource.first->postInitialize()) {
-                anyUpdated = true;
-            }
-        }
-        passCt += 1;
-
-        // we can run this algorithm until all type sizes have stabilized. Conceivably we
-        // could introduce an error that would cause this to not converge - this should
-        // detect that.
-        if (passCt > resolutionSource.size() * 2 + 10) {
-            throw std::runtime_error("Type size graph is not stabilizing.");
-        }
-    }
-
-    // let each type update any internal caches it might need before it gets instantiated
-    for (auto typeAndSource: resolutionSource) {
-        typeAndSource.first->finalizeType();
-    }
-
-    // std::cout << "resolving group:\n";
-    // for (auto typeAndSource: resolutionSource) {
-    //     std::cout << "    " << TypeOrPyobj(typeAndSource.first).name() << " from " << TypeOrPyobj(typeAndSource.second).name() << "\n";
-    // }
-
-    // now internalize the types by their hash. For each type, we compute a hash
-    // and then look to see if we've seen it before. We build a lookup table from
-    // each existing type to the internalized type, and then do the same process we did
-    // above to map any roots across.
-
-    std::map<Type*, Type*> resolvedToInternal; // each 'resolved' type what should it be replaced with
-
-    std::set<Type*> newTypes;
-    std::set<Type*> redundantTypes;
-
-    for (auto typeAndSource: resolutionSource) {
-        ShaHash h = typeAndSource.first->identityHash();
-
-        auto it = mInternalizedIdentityHashToType.find(h);
-        if (it == mInternalizedIdentityHashToType.end()) {
-            // this is a new type. We're going to put it in the memo and
-            // update it so that it ponts
-            newTypes.insert(typeAndSource.first);
-        } else {
-            resolvedToInternal[typeAndSource.first] = it->second;
-            redundantTypes.insert(typeAndSource.first);
-        }
-    }
-
-    // update all the new types to no longer look at the redundant types
-    for (auto t: newTypes) {
-        t->updateInternalTypePointers(resolvedToInternal);
-        mInternalizedIdentityHashToType[t->identityHash()] = t;
-        resolvedToInternal[t] = t;
-    }
-
-    for (auto t: redundantTypes) {
-        t->markRedundant();
-    }
-
-    // tell each source type which type it actually resolves to. We're holding the GIL so
-    // nobody should see anything until we finish this process.
-    for (auto typeAndTarget: resolutionMapping) {
-        auto it = resolvedToInternal.find(typeAndTarget.second);
-        if (it == resolvedToInternal.end()) {
-            // this must be an existing type
-            if (existingReferencedTypes.find(typeAndTarget.second) == existingReferencedTypes.end()) {
+        for (auto t: typesNeedingResolution) {
+            if (t->isForward() && !((Forward*)t)->getTarget() && !((Forward*)t)->lambdaDefinition()) {
                 throw std::runtime_error(
-                    "Failed to get an internalization of Type "
-                    + typeAndTarget.second->name() + " and it wasn't a pre-existing type either."
+                    "Forward defined as " + t->nameWithModule() + " has not been defined."
                 );
             }
-
-            // we resolve to it directly
-            typeAndTarget.first->m_forward_resolves_to = typeAndTarget.second;
-        } else {
-            typeAndTarget.first->m_forward_resolves_to = it->second;
         }
-    }
 
-    if (!m_forward_resolves_to) {
-        throw std::runtime_error("Somehow, we didn't resolve???");
-    }
+        for (auto t: typesNeedingResolution) {
+            if (t->isForward() && !((Forward*)t)->getTarget()) {
+                ((Forward*)t)->define(
+                    ((Forward*)t)->lambdaDefinition()
+                );
+            }
+        }
 
-    for (auto typeAndTarget: resolutionMapping) {
-        if (typeAndTarget.first->isForwardDefined()) {
-            typeAndTarget.second->addForwardDefinition(typeAndTarget.first);
+
+        // for each type that we have defined in our graph, what type are we mapping it to?
+        // for Forwards of primitive types like ListOf or TupleOf that can see themselves, this
+        // this will be a 'named copy' of the type depending on the Forward name.
+        std::map<Type*, Type*> resolutionMapping;
+
+        // for each type we end up defining, which type did it come from
+        std::map<Type*, Type*> resolutionSource;
+
+        // allocate new target type bodies for all regular types in the graph
+        // that are forward declared.
+        for (auto t: typesNeedingResolution) {
+            if (!t->isForward()) {
+                // we're resolving to this type directly
+                resolutionMapping[t] = t->cloneForForwardResolution();
+                resolutionSource[resolutionMapping[t]] = t;
+            }
+        }
+
+        // now ensure that the target for any forward is the underlying type
+        // note that we don't need a source for any of these since nobody will end up
+        // actually having a forward in their graph
+        for (auto t: typesNeedingResolution) {
+            if (t->isForward()) {
+                Forward* f = (Forward*)t;
+
+                Type* tgt = f->getTargetTransitive();
+
+                if (!tgt) {
+                    throw std::runtime_error("somehow this forward doesn't have a target");
+                }
+
+                if (typesNeedingResolution.find(tgt) == typesNeedingResolution.end()) {
+                    resolutionMapping[t] = tgt;
+                    existingReferencedTypes.insert(tgt);
+                } else {
+                    // resolve this forward to whatever its target resolves to
+                    resolutionMapping[t] = resolutionMapping[tgt];
+                }
+            }
+        }
+
+        // copy all the types. At this point, they all know that they are not forwards
+        // but none of them is ready to be identity-hashed yet. They all will be in a state of
+        // where m_needs_post_init is true.
+        for (auto typeAndSource: resolutionSource) {
+            typeAndSource.first->initializeFrom(typeAndSource.second);
+            typeAndSource.first->updateInternalTypePointers(resolutionMapping);
+        }
+
+        // allow each Function type to build CompilerVisiblePythonObjects for its globals
+        // after this, any FunctionGlobals will refer to Constants not cells
+        for (auto typeAndSource: resolutionSource) {
+            if (typeAndSource.first->isFunction()) {
+                ((Function*)typeAndSource.first)->internalizeConstants(resolutionMapping);
+            }
+        }
+
+        // cause each type to recompute its name. We have to do this in a single pass
+        // without any types being aware of their final name before we run the post initialize
+        // step. Otherwise, it's possible for the names to depend on the order of initialization
+        // and we want them to be stable.
+        for (auto typeAndSource: resolutionSource) {
+            typeAndSource.first->recomputeName();
+        }
+
+        // cause each type to post-initialize itself, which lets it update internal bytecounts and
+        // default initialization flags
+        bool anyUpdated = true;
+        size_t passCt = 0;
+        while (anyUpdated) {
+            anyUpdated = false;
+            for (auto typeAndSource: resolutionSource) {
+                if (typeAndSource.first->postInitialize()) {
+                    anyUpdated = true;
+                }
+            }
+            passCt += 1;
+
+            // we can run this algorithm until all type sizes have stabilized. Conceivably we
+            // could introduce an error that would cause this to not converge - this should
+            // detect that.
+            if (passCt > resolutionSource.size() * 2 + 10) {
+                throw std::runtime_error("Type size graph is not stabilizing.");
+            }
+        }
+
+        // let each type update any internal caches it might need before it gets instantiated
+        for (auto typeAndSource: resolutionSource) {
+            typeAndSource.first->finalizeType();
+        }
+
+        // std::cout << "resolving group:\n";
+        // for (auto typeAndSource: resolutionSource) {
+        //     std::cout << "    " << TypeOrPyobj(typeAndSource.first).name() << " from " << TypeOrPyobj(typeAndSource.second).name() << "\n";
+        // }
+
+        // now internalize the types by their hash. For each type, we compute a hash
+        // and then look to see if we've seen it before. We build a lookup table from
+        // each existing type to the internalized type, and then do the same process we did
+        // above to map any roots across.
+
+        std::map<Type*, Type*> resolvedToInternal; // each 'resolved' type what should it be replaced with
+
+        std::set<Type*> newTypes;
+        std::set<Type*> redundantTypes;
+
+        for (auto typeAndSource: resolutionSource) {
+            ShaHash h = typeAndSource.first->identityHash();
+
+            auto it = mInternalizedIdentityHashToType.find(h);
+            if (it == mInternalizedIdentityHashToType.end()) {
+                // this is a new type. We're going to put it in the memo and
+                // update it so that it ponts
+                newTypes.insert(typeAndSource.first);
+            } else {
+                resolvedToInternal[typeAndSource.first] = it->second;
+                redundantTypes.insert(typeAndSource.first);
+            }
+        }
+
+        // update all the new types to no longer look at the redundant types
+        for (auto t: newTypes) {
+            t->updateInternalTypePointers(resolvedToInternal);
+            mInternalizedIdentityHashToType[t->identityHash()] = t;
+            resolvedToInternal[t] = t;
+        }
+
+        for (auto t: redundantTypes) {
+            t->markRedundant();
+        }
+
+        // tell each source type which type it actually resolves to. We're holding the GIL so
+        // nobody should see anything until we finish this process.
+        for (auto typeAndTarget: resolutionMapping) {
+            auto it = resolvedToInternal.find(typeAndTarget.second);
+            if (it == resolvedToInternal.end()) {
+                // this must be an existing type
+                if (existingReferencedTypes.find(typeAndTarget.second) == existingReferencedTypes.end()) {
+                    throw std::runtime_error(
+                        "Failed to get an internalization of Type "
+                        + typeAndTarget.second->name() + " and it wasn't a pre-existing type either."
+                    );
+                }
+
+                // we resolve to it directly
+                typeAndTarget.first->m_forward_resolves_to = typeAndTarget.second;
+            } else {
+                typeAndTarget.first->m_forward_resolves_to = it->second;
+            }
+        }
+
+        if (!m_forward_resolves_to) {
+            throw std::runtime_error("Somehow, we didn't resolve???");
+        }
+
+        for (auto typeAndTarget: resolutionMapping) {
+            if (typeAndTarget.first->isForwardDefined()) {
+                typeAndTarget.second->addForwardDefinition(typeAndTarget.first);
+            }
         }
     }
 }

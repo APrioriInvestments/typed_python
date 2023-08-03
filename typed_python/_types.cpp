@@ -3840,9 +3840,14 @@ PyInit__types(void)
     if (module == NULL)
         return NULL;
 
-    // initialize a couple of global references to things in typed_python.internals
-    PythonObjectOfType::AnyPyObject();
-    PythonObjectOfType::AnyPyType();
+    try {
+        // initialize a couple of global references to things in typed_python.internals
+        PythonObjectOfType::AnyPyObject();
+        PythonObjectOfType::AnyPyType();
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
 
     if (PyType_Ready(&PyType_Slab) < 0) {
         return NULL;

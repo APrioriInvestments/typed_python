@@ -62,7 +62,7 @@ void PyObjGraphSnapshot::resolveForwards() {
 
         if (o->willBeATpType()) {
             if (o->markTypeNotFwdDefined()) {
-                modified.insert(0);
+                modified.insert(o);
             }
         }
     }
@@ -105,13 +105,17 @@ void PyObjGraphSnapshot::resolveForwards() {
 
 
 void PyObjGraphSnapshot::internalize() {
+    internal().internalize(*this, false);
+}
+
+void PyObjGraphSnapshot::internalize(PyObjGraphSnapshot& otherGraph, bool markInternalized) {
     std::map<ShaHash, std::pair<PyObjSnapshot*, PyObjSnapshot*> > skeletons;
 
-    for (auto s: mObjects) {
-        ShaHash h = hashFor(s);
+    for (auto s: otherGraph.mObjects) {
+        ShaHash h = otherGraph.hashFor(s);
 
-        if (!internal().snapshotForHash(h)) {
-             skeletons[h] = std::make_pair(s, internal().createSkeleton(h));
+        if (!snapshotForHash(h)) {
+             skeletons[h] = std::make_pair(s, createSkeleton(h));
         }
     }
 
@@ -119,14 +123,25 @@ void PyObjGraphSnapshot::internalize() {
         hashAndSkeleton.second.second->cloneFromSnapByHash(hashAndSkeleton.second.first);
     }
 
-    // rehydrate this portion of the graph, so that we have concrete objects for everything
-    // we just interned
-    for (auto hashAndSkeleton: skeletons) {
-        hashAndSkeleton.second.second->rehydrate();
-    }
+    if (markInternalized) {
+        try {
+            // rehydrate this portion of the graph, so that we have concrete objects for everything
+            // we just interned
+            for (auto hashAndSkeleton: skeletons) {
+                hashAndSkeleton.second.second->rehydrate();
+            }
 
-    for (auto hashAndSkeleton: skeletons) {
-        hashAndSkeleton.second.second->markInternalizedOnType();
+            for (auto hashAndSkeleton: skeletons) {
+                hashAndSkeleton.second.second->markInternalizedOnType();
+            }
+        } catch(...) {
+            // undo this since the state is somehow corrupt
+            for (auto hashAndSkeleton: skeletons) {
+                mObjects.erase(hashAndSkeleton.second.second);
+                mHashToSnap.erase(hashAndSkeleton.first);
+            }
+            throw;
+        }
     }
 }
 
@@ -147,8 +162,17 @@ template<class compute_type>
 ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
     if (snap->getKind() == PyObjSnapshot::Kind::Instance) {
         if (snap->getInstance().type()->isPOD()) {
-            return ShaHash(int(snap->getKind()))
+            return ShaHash(int(snap->getKind()), int(snap->getInstance().type()->getTypeCategory()))
                 + ShaHash::SHA1(snap->getInstance().data(), snap->getInstance().type()->bytecount());
+        }
+        if (snap->getInstance().type()->isBytes()) {
+            static BytesType* b = BytesType::Make();
+
+            return ShaHash(int(snap->getKind()), int(snap->getInstance().type()->getTypeCategory()))
+                + ShaHash::SHA1(
+                    b->eltPtr(snap->getInstance().data(), 0),
+                    b->count(snap->getInstance().data())
+                );
         }
         throw std::runtime_error(
             "Can't hash a PyObjSnapshot Instance of type " + snap->getInstance().type()->name()

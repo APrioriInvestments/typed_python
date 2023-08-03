@@ -5,9 +5,6 @@
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::string& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
 
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -17,9 +14,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::string& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionArg& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -29,9 +23,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionArg& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const ClosureVariableBinding& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -41,9 +32,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const ClosureVariableBinding& def
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const ClosureVariableBindingStep& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -53,9 +41,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const ClosureVariableBindingStep&
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const MemberDefinition& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -64,9 +49,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const MemberDefinition& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionOverload& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -75,9 +57,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionOverload& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<Type*>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(def, *this);
 
@@ -86,9 +65,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<Type*>& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<HeldClass*>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(def, *this);
 
@@ -97,9 +73,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<HeldClass*>& de
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<FunctionArg>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(def, *this);
 
@@ -108,9 +81,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<FunctionArg>& d
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<std::string>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(def, *this);
 
@@ -119,9 +89,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<std::string>& d
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<FunctionOverload>& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(def, *this);
 
@@ -130,9 +97,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<FunctionOverloa
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionGlobal& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeInternalizedOf(def, *this);
 
@@ -141,9 +105,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const FunctionGlobal& def) {
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, Function*>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(inMethods, *this);
 
@@ -152,9 +113,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, Funct
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, ClosureVariableBinding>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(inMethods, *this);
 
@@ -163,9 +121,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, Closu
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, FunctionGlobal>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(inMethods, *this);
 
@@ -174,9 +129,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, Funct
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, PyObject*>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(inMethods, *this);
 
@@ -185,9 +137,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::map<std::string, PyObj
 
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::vector<MemberDefinition>& inMethods) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
-    if (mGraph) {
-        mGraph->registerSnapshot(res);
-    }
 
     res->becomeBundleOf(inMethods, *this);
 
@@ -220,10 +169,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(PyObject* val)
 
     mObjMapCache[val] = new PyObjSnapshot(mGraph);
 
-    if (mGraph) {
-        mGraph->registerSnapshot(mObjMapCache[val]);
-    }
-
     mObjMapCache[val]->becomeInternalizedOf(val, *this);
 
     return mObjMapCache[val];
@@ -239,10 +184,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(Type* val)
     }
 
     mTypeMapCache[val] = new PyObjSnapshot(mGraph);
-
-    if (mGraph) {
-        mGraph->registerSnapshot(mTypeMapCache[val]);
-    }
 
     mTypeMapCache[val]->becomeInternalizedOf(val, *this);
 
@@ -269,10 +210,6 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(InstanceRef val)
     }
 
     mInstanceCache[val] = new PyObjSnapshot(mGraph);
-
-    if (mGraph) {
-        mGraph->registerSnapshot(mInstanceCache[val]);
-    }
 
     mInstanceCache[val]->becomeInternalizedOf(val, *this);
 

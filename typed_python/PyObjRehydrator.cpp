@@ -7,11 +7,13 @@ void PyObjRehydrator::start(PyObjSnapshot* snapshot) {
             return;
         }
 
-        if (!snap->needsHydration()) {
-            return;
-        }
+        if (!snap->isUncacheable()) {
+            if (!snap->needsHydration()) {
+                return;
+            }
 
-        mSnapshots.insert(snap);
+            mSnapshots.insert(snap);
+        }
 
         for (auto elt: snap->mElements) {
             visit(elt);
@@ -128,9 +130,9 @@ void PyObjRehydrator::getFrom(
     getNamedBundle(snapshot, "func_args", args);
 
     out = FunctionOverload(
-        getNamedElementPyobj(snapshot, "func_globals"),
         getNamedElementPyobj(snapshot, "func_code"),
         getNamedElementPyobj(snapshot, "func_defaults", true),
+        getNamedElementPyobj(snapshot, "func_annotations", true),
         globals,
         pyFuncClosureVarnames,
         globalsInClosureVarnames,
@@ -261,6 +263,18 @@ PyObject* PyObjRehydrator::getNamedElementPyobj(
         );
     }
 
+    if (!it->second) {
+        throw std::runtime_error("Corrupt PyObjSnapshot: nullptr in mNamedElements");
+    }
+
+    PyObject* o = pyobjFor(it->second);
+
+    if (!o && !allowEmpty) {
+        throw std::runtime_error("Corrupt " + snapshot->toString()
+            + ": no pyobj for elt " + name + " which is " + it->second->toString()
+        );
+    }
+
     return pyobjFor(it->second);
 }
 
@@ -375,6 +389,20 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
 
         ((OneOfType*)snap->mType)->initializeDuringDeserialization(types);
 
+        return;
+    }
+
+    if (snap->mKind == PyObjSnapshot::Kind::PythonObjectOfTypeType) {
+        snap->mType = new PythonObjectOfType();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+
+        PyObject* obType = getNamedElementPyobj(snap, "element_type", false);
+
+        if (!PyType_Check(obType)) {
+            throw std::runtime_error("Can't rehydrate a PythonObjectOfType without a subclass of type");
+        };
+
+        ((PythonObjectOfType*)snap->mType)->initializeDuringDeserialization((PyTypeObject*)obType);
         return;
     }
 
@@ -870,6 +898,76 @@ void PyObjRehydrator::finalize() {
     for (auto n: mSnapshots) {
         finalizeRehydration(n);
     }
+
+    std::vector<Type*> types;
+    for (auto o: mSnapshots) {
+        if (o->mType) {
+            types.push_back(o->mType);
+        }
+    }
+
+    std::sort(types.begin(), types.end(), [&](Type* l, Type* r) {
+        if (l->typeLevel() < r->typeLevel()) {
+            return true;
+        }
+        if (l->typeLevel() > r->typeLevel()) {
+            return false;
+        }
+        return l < r;
+    });
+
+    for (auto t: types) {
+        t->recomputeName();
+    }
+
+    bool anyUpdated = true;
+    size_t passCt = 0;
+    while (anyUpdated) {
+        anyUpdated = false;
+        for (auto t: types) {
+            if (t->postInitialize()) {
+                anyUpdated = true;
+            }
+        }
+        passCt += 1;
+
+        // we can run this algorithm until all type sizes have stabilized. Conceivably we
+        // could introduce an error that would cause this to not converge - this should
+        // detect that.
+        if (passCt > types.size() * 2 + 10) {
+            throw std::runtime_error("Type size graph is not stabilizing.");
+        }
+    }
+
+    // let each type update any internal caches it might need before it gets instantiated
+    for (auto t: types) {
+        t->finalizeType();
+    }
+
+    for (auto t: types) {
+        t->typeFinishedBeingDeserializedPhase1();
+    }
+
+    // now that we've set function globals, we need to go over all the classes and
+    // held classes and make sure the versions of the function types they're actually
+    // using have the new definitions. Unfortunately, Overload objects are not pointers
+    // (maybe they should be?) and so when we merge Overloads from base/child classes
+    // they don't get their globals replaced with the appropriate values
+    for (auto& t: types) {
+        if (t && t->isHeldClass()) {
+            ((HeldClass*)t)->mergeOwnFunctionsIntoInheritanceTree();
+        }
+    }
+
+    for (auto t: types) {
+        t->typeFinishedBeingDeserializedPhase2();
+    }
+
+    for (auto obj: mSnapshots) {
+        if (obj->mType) {
+            obj->mPyObject = incref((PyObject*)PyInstance::typeObj(obj->mType));
+        }
+    }
 }
 
 void PyObjRehydrator::finalizeRehydration(PyObjSnapshot* obj) {
@@ -909,12 +1007,5 @@ void PyObjRehydrator::finalizeRehydration(PyObjSnapshot* obj) {
                 it->second->getPyObj()
             );
         }
-    } else
-    if (obj->mType) {
-        obj->mType->recomputeName();
-        obj->mType->finalizeType();
-        obj->mType->typeFinishedBeingDeserializedPhase1();
-        obj->mType->typeFinishedBeingDeserializedPhase2();
-        obj->mPyObject = incref((PyObject*)PyInstance::typeObj(obj->mType));
     }
 }

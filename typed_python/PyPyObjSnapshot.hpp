@@ -31,6 +31,7 @@ public:
     PyObject* mElements;
     PyObject* mKeys;
     PyObject* mByKey;
+    PyObject* mNamedElements;
 
     static PyObject* tp_repr(PyObject *selfObj);
 

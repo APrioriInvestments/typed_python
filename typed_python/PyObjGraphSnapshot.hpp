@@ -60,9 +60,11 @@ public:
     // reach modified values will have their snapshots cleared.
     void resolveForwards();
 
-    // make a copy of every object in here in the internal graph, matched up by
-    // sha hash
+    // copy this into the 'internal' graph.
     void internalize();
+
+    // internalize a graph into ourselves
+    void internalize(PyObjGraphSnapshot& graph, bool markInternalized);
 
     // get the "internal" graph snapshot, which is responsible for holding all the objects
     // that are actually interned inside the system.
@@ -71,12 +73,14 @@ public:
         return *graph;
     }
 
-    void registerSnapshot(PyObjSnapshot* obj) {
+    size_t registerSnapshot(PyObjSnapshot* obj) {
         if (obj->getGraph() != this) {
             throw std::runtime_error("Can't register a snapshot for a different graph");
         }
-
+        size_t ix = mObjects.size();
         mObjects.insert(obj);
+
+        return ix;
     }
 
     const std::unordered_set<PyObjSnapshot*>& getObjects() const {

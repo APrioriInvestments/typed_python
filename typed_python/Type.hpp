@@ -637,6 +637,14 @@ public:
         return m_base;
     }
 
+    size_t typeLevel() const {
+        if (!m_base) {
+            return 0;
+        }
+
+        return m_base->typeLevel() + 1;
+    }
+
     // are these types equivalent up to identity? This should be
     // preferred over t1 == t2 for comparing types in cases where
     // we don't need _exact_ identity equiality, because there are
@@ -1058,13 +1066,15 @@ protected:
 
     static std::map<ShaHash, Type*> mInternalizedIdentityHashToType;
 
-    void setSnapshot(PyObjSnapshot* snapshot);
+public:
+    void setSnapshot(PyObjSnapshot* snapshot) {
+        mSnapshot = snapshot;
+    }
 
     PyObjSnapshot* getSnapshot() const {
         return mSnapshot;
     }
 
-public:
     void addForwardDefinition(Type* t) {
         if (!t->isForwardDefined()) {
             throw std::runtime_error("Can't add a non-forward defined type as a reverse Forward link");

@@ -4,6 +4,19 @@
 #include "PyObjRehydrator.hpp"
 
 
+
+PyObjSnapshot::PyObjSnapshot(PyObjGraphSnapshot* inGraph) :
+    mKind(Kind::Uninitialized),
+    mType(nullptr),
+    mPyObject(nullptr),
+    mGraph(inGraph),
+    mIndexInGraph(0)
+{
+    if (mGraph) {
+        mIndexInGraph = mGraph->registerSnapshot(this);
+    }
+}
+
 void PyObjSnapshot::rehydrate() {
     if (!needsHydration()) {
         return;
@@ -188,7 +201,7 @@ void PyObjSnapshot::cloneFromSnapByHash(PyObjSnapshot* snap) {
 
     auto intern = [&](PyObjSnapshot* s) {
         PyObjSnapshot* res = mGraph->snapshotForHash(
-            snap->mGraph->hashFor(snap)
+            s->mGraph->hashFor(s)
         );
 
         if (!res) {
@@ -483,7 +496,7 @@ void PyObjSnapshot::becomeInternalizedOf(
         mPyObject = incref(val);
     }
 
-    PyObject* environType = staticPythonInstance("os", "_Environ");
+    static PyObject* environType = staticPythonInstance("os", "_Environ");
 
     if (val->ob_type == (PyTypeObject*)environType) {
         mKind = Kind::NamedPyObject;
@@ -492,6 +505,23 @@ void PyObjSnapshot::becomeInternalizedOf(
         return;
     }
 
+    static PyObject* pyObj_object = staticPythonInstance("builtins", "object");
+
+    if (val == pyObj_object) {
+        mKind = Kind::NamedPyObject;
+        mName = "object";
+        mModuleName = "builtins";
+        return;
+    }
+
+    static PyObject* pyObj_type = staticPythonInstance("builtins", "type");
+
+    if (val == pyObj_type) {
+        mKind = Kind::NamedPyObject;
+        mName = "type";
+        mModuleName = "builtins";
+        return;
+    }
 
     if (PyUnicode_Check(val)) {
         mKind = Kind::String;
@@ -1025,7 +1055,7 @@ PyObjSnapshot* PyObjSnapshot::computeForwardTargetTransitive() {
                 throw std::runtime_error("Should we be converting this to a Value type?");
             }
 
-            return this;
+            return source;
         }
 
         source = source->computeForwardTarget();

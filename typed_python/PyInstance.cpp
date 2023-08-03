@@ -320,54 +320,56 @@ PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr da
 
 // static
 PyObject* PyInstance::tp_new_type(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
-    Type::TypeCategory catToProduce = ((NativeTypeCategoryWrapper*)subtype)->mCategory;
+    return translateExceptionToPyObject([&]() -> PyObject* {
+        Type::TypeCategory catToProduce = ((NativeTypeCategoryWrapper*)subtype)->mCategory;
 
-    if (catToProduce != Type::TypeCategory::catNamedTuple &&
-            catToProduce != Type::TypeCategory::catAlternative) {
-        if (kwds && PyDict_Size(kwds)) {
-            PyErr_Format(PyExc_TypeError, "Type %S does not accept keyword arguments", (PyObject*)subtype);
-            return NULL;
+        if (catToProduce != Type::TypeCategory::catNamedTuple &&
+                catToProduce != Type::TypeCategory::catAlternative) {
+            if (kwds && PyDict_Size(kwds)) {
+                PyErr_Format(PyExc_TypeError, "Type %S does not accept keyword arguments", (PyObject*)subtype);
+                return nullptr;
+            }
         }
-    }
 
-    if (catToProduce == Type::TypeCategory::catListOf) { return MakeListOfType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catTupleOf) { return MakeTupleOfType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catPointerTo ) { return MakePointerToType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catRefTo ) { return MakeRefToType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catTuple ) { return MakeTupleType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catConstDict ) { return MakeConstDictType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catSet ) { return MakeSetType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catDict ) { return MakeDictType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catOneOf ) { return MakeOneOfType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catNamedTuple ) { return MakeNamedTupleType(nullptr, args, kwds); }
-    if (catToProduce == Type::TypeCategory::catBool ) { return MakeBoolType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catInt8 ) { return MakeInt8Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catInt16 ) { return MakeInt16Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catInt32 ) { return MakeInt32Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catInt64 ) { return MakeInt64Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catFloat32 ) { return MakeFloat32Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catFloat64 ) { return MakeFloat64Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catUInt8 ) { return MakeUInt8Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catUInt16 ) { return MakeUInt16Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catUInt32 ) { return MakeUInt32Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catUInt64 ) { return MakeUInt64Type(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catString ) { return MakeStringType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catBytes ) { return MakeBytesType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catEmbeddedMessage ) { return MakeEmbeddedMessageType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catPyCell ) { return MakePyCellType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catTypedCell ) { return MakeTypedCellType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catNone ) { return MakeNoneType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catValue ) { return MakeValueType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catBoundMethod ) { return MakeBoundMethodType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catAlternativeMatcher ) { return MakeAlternativeMatcherType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catFunction ) { return MakeFunctionType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catClass ) { return MakeClassType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catAlternative ) { return MakeAlternativeType(nullptr, args, kwds); }
-    if (catToProduce == Type::TypeCategory::catSubclassOf ) { return MakeSubclassOfType(nullptr, args); }
-    if (catToProduce == Type::TypeCategory::catForward ) { return MakeForwardType(nullptr, args, kwds); }
+        if (catToProduce == Type::TypeCategory::catListOf) { return (PyObject*)MakeListOfType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catTupleOf) { return (PyObject*)MakeTupleOfType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catPointerTo ) { return (PyObject*)MakePointerToType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catRefTo ) { return (PyObject*)MakeRefToType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catTuple ) { return (PyObject*)MakeTupleType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catConstDict ) { return (PyObject*)MakeConstDictType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catSet ) { return (PyObject*)MakeSetType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catDict ) { return (PyObject*)MakeDictType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catOneOf ) { return (PyObject*)MakeOneOfType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catNamedTuple ) { return (PyObject*)MakeNamedTupleType(nullptr, args, kwds); }
+        if (catToProduce == Type::TypeCategory::catBool ) { return (PyObject*)MakeBoolType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catInt8 ) { return (PyObject*)MakeInt8Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catInt16 ) { return (PyObject*)MakeInt16Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catInt32 ) { return (PyObject*)MakeInt32Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catInt64 ) { return (PyObject*)MakeInt64Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catFloat32 ) { return (PyObject*)MakeFloat32Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catFloat64 ) { return (PyObject*)MakeFloat64Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catUInt8 ) { return (PyObject*)MakeUInt8Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catUInt16 ) { return (PyObject*)MakeUInt16Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catUInt32 ) { return (PyObject*)MakeUInt32Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catUInt64 ) { return (PyObject*)MakeUInt64Type(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catString ) { return (PyObject*)MakeStringType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catBytes ) { return (PyObject*)MakeBytesType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catEmbeddedMessage ) { return (PyObject*)MakeEmbeddedMessageType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catPyCell ) { return (PyObject*)MakePyCellType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catTypedCell ) { return (PyObject*)MakeTypedCellType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catNone ) { return (PyObject*)MakeNoneType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catValue ) { return (PyObject*)MakeValueType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catBoundMethod ) { return (PyObject*)MakeBoundMethodType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catAlternativeMatcher ) { return (PyObject*)MakeAlternativeMatcherType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catFunction ) { return (PyObject*)MakeFunctionType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catClass ) { return (PyObject*)MakeClassType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catAlternative ) { return (PyObject*)MakeAlternativeType(nullptr, args, kwds); }
+        if (catToProduce == Type::TypeCategory::catSubclassOf ) { return (PyObject*)MakeSubclassOfType(nullptr, args); }
+        if (catToProduce == Type::TypeCategory::catForward ) { return (PyObject*)MakeForwardType(nullptr, args, kwds); }
 
-    PyErr_Format(PyExc_TypeError, "unknown TypeCategory %S", (PyObject*)subtype);
-    return NULL;
+        PyErr_Format(PyExc_TypeError, "unknown TypeCategory %S", (PyObject*)subtype);
+        return nullptr;
+    });
 }
 
 // static

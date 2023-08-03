@@ -50,6 +50,14 @@ public:
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
+        if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
+            throw std::runtime_error(
+                "invalid alternative index: " +
+                format(m_which) + " not in [0," +
+                format(m_alternative->subtypes().size()) + ")"
+            );
+        }
+
         return m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
     }
 
