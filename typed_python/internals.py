@@ -44,6 +44,7 @@ class UndefinedBehaviorException(BaseException):
 # needed by the C api
 object = object
 type = type
+lockType = type(threading.Lock())
 
 
 class Final:

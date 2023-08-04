@@ -505,6 +505,15 @@ void PyObjSnapshot::becomeInternalizedOf(
         mPyObject = incref(val);
     }
 
+    static PyObject* lockType = staticPythonInstance("typed_python.internals", "lockType");
+
+    if (val == lockType) {
+        mKind = Kind::NamedPyObject;
+        mName = "lockType";
+        mModuleName = "typed_python.internals";
+        return;
+    }
+
     static PyObject* environType = staticPythonInstance("os", "_Environ");
 
     if (val->ob_type == (PyTypeObject*)environType) {

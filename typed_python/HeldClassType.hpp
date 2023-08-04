@@ -1041,7 +1041,7 @@ public:
         // we only have to do this if we're forward defined since the type
         // resolution process will just copy the functions over when it resolves
         // them
-        if (!m_is_forward_defined) {
+        if (m_is_forward_defined) {
             mergeOwnFunctionsIntoInheritanceTree();
         }
 

@@ -194,6 +194,13 @@ ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
     }
     if (snap->getKind() == PyObjSnapshot::Kind::ArbitraryPyObject) {
         // probably we should try to serialize it?
+        if (PyType_Check(snap->getPyObj())) {
+            throw std::runtime_error(
+                "Can't hash a PyObjSnapshot.ArbitraryPyObject for type "
+                + std::string(((PyTypeObject*)snap->getPyObj())->tp_name)
+            );
+        }
+
         throw std::runtime_error(
             "Can't hash a PyObjSnapshot.ArbitraryPyObject of type "
             + std::string(snap->getPyObj()->ob_type->tp_name)

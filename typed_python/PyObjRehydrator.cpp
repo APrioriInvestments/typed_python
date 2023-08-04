@@ -626,6 +626,9 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
     }
 
     if (snap->mKind == PyObjSnapshot::Kind::FunctionType) {
+        snap->mType = new Function();
+        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
+
         std::string name = snap->mName;
         std::string qualname = snap->mQualname;
         std::string moduleName = snap->mModuleName;
@@ -635,9 +638,6 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
         bool isNocompile = snap->mNamedInts["is_nocompile"];
 
         getNamedBundle(snap, "func_overloads", overloads);
-
-        snap->mType = new Function();
-        snap->mType->markActivelyBeingDeserialized(snap->mNamedInts["type_is_forward"]);
 
         ((Function*)snap->mType)->initializeDuringDeserialization(
             name,
@@ -923,6 +923,16 @@ void PyObjRehydrator::finalize() {
         finalizeRehydration(n);
     }
 
+    for (auto n: mSnapshots) {
+        if (n->willBeATpType()) {
+            if (!n->mType) {
+                throw std::runtime_error(
+                    "Snapshot " + n->toString() + " doesn't have a Type"
+                );
+            }
+        }
+    }
+
     std::vector<Type*> types;
     for (auto o: mSnapshots) {
         if (o->mType) {
@@ -971,17 +981,6 @@ void PyObjRehydrator::finalize() {
     for (auto t: types) {
         t->typeFinishedBeingDeserializedPhase1();
     }
-
-    // // now that we've set function globals, we need to go over all the classes and
-    // // held classes and make sure the versions of the function types they're actually
-    // // using have the new definitions. Unfortunately, Overload objects are not pointers
-    // // (maybe they should be?) and so when we merge Overloads from base/child classes
-    // // they don't get their globals replaced with the appropriate values
-    // for (auto& t: types) {
-    //     if (t && t->isHeldClass()) {
-    //         ((HeldClass*)t)->mergeOwnFunctionsIntoInheritanceTree();
-    //     }
-    // }
 
     for (auto t: types) {
         t->typeFinishedBeingDeserializedPhase2();
