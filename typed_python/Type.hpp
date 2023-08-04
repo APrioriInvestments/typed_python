@@ -604,7 +604,8 @@ public:
             case catSubclassOf:
                 return f(*(SubclassOfType*)this);
             default:
-                throw std::runtime_error("Invalid type found");
+            asm("int3");
+                throw std::runtime_error("Invalid type found: " + format((int)m_typeCategory));
         }
     }
 
@@ -942,6 +943,15 @@ public:
         return m_is_being_deserialized;
     }
 
+    bool isTypeObjReady() {
+        return m_type_obj_ready;
+    }
+
+    void markTypeObjReady() {
+        m_type_obj_ready = true;
+    }
+
+
     void typeFinishedBeingDeserializedPhase1();
     void typeFinishedBeingDeserializedPhase2();
 
@@ -963,8 +973,11 @@ protected:
             m_forward_resolves_to(nullptr),
             m_is_redundant(false),
             m_is_being_deserialized(false),
-            mSnapshot(nullptr)
+            mSnapshot(nullptr),
+            m_type_obj_ready(false)
         {}
+
+    bool m_type_obj_ready;
 
     PyObjSnapshot* mSnapshot;
 

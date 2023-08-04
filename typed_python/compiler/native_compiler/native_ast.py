@@ -661,7 +661,6 @@ Expression.define(Alternative(
     couldThrow=expr_could_throw
 ))
 
-
 Expression = resolveForwardDefinedType(Expression)
 NamedCallTarget = resolveForwardDefinedType(NamedCallTarget)
 Type = resolveForwardDefinedType(Type)
@@ -669,6 +668,10 @@ Constant = resolveForwardDefinedType(Constant)
 ExpressionIntermediate = resolveForwardDefinedType(ExpressionIntermediate)
 Teardown = resolveForwardDefinedType(Teardown)
 CallTarget = resolveForwardDefinedType(CallTarget)
+
+from typed_python._types import isForwardDefined
+print(Expression.__typed_python_category__)
+assert not isForwardDefined(Expression)
 
 
 def ensureExpr(x):

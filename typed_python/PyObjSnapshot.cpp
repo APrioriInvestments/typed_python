@@ -412,12 +412,21 @@ void PyObjSnapshot::becomeInternalizedOf(
 
         mNamedElements["cls_type"] = maker.internalize(cls->getClassType());
         mNamedElements["cls_bases"] = maker.internalize(cls->getBases());
-        mNamedElements["cls_methods"] = maker.internalize(cls->getOwnMemberFunctions());
-        mNamedElements["cls_staticmethods"] = maker.internalize(cls->getOwnStaticFunctions());
-        mNamedElements["cls_classmethods"] = maker.internalize(cls->getOwnClassMethods());
-        mNamedElements["cls_properties"] = maker.internalize(cls->getOwnPropertyFunctions());
-        mNamedElements["cls_classmembers"] = maker.internalize(cls->getOwnClassMembers());
-        mNamedElements["cls_members"] = maker.internalize(cls->getOwnMembers());
+
+        mNamedElements["cls_own_methods"] = maker.internalize(cls->getOwnMemberFunctions());
+        mNamedElements["cls_own_staticmethods"] = maker.internalize(cls->getOwnStaticFunctions());
+        mNamedElements["cls_own_classmethods"] = maker.internalize(cls->getOwnClassMethods());
+        mNamedElements["cls_own_properties"] = maker.internalize(cls->getOwnPropertyFunctions());
+        mNamedElements["cls_own_classmembers"] = maker.internalize(cls->getOwnClassMembers());
+        mNamedElements["cls_own_members"] = maker.internalize(cls->getOwnMembers());
+
+        mNamedElements["cls_methods"] = maker.internalize(cls->getMemberFunctions());
+        mNamedElements["cls_staticmethods"] = maker.internalize(cls->getStaticFunctions());
+        mNamedElements["cls_classmethods"] = maker.internalize(cls->getClassMethods());
+        mNamedElements["cls_properties"] = maker.internalize(cls->getPropertyFunctions());
+        mNamedElements["cls_classmembers"] = maker.internalize(cls->getClassMembers());
+        mNamedElements["cls_members"] = maker.internalize(cls->getMembers());
+
         mNamedInts["cls_is_final"] = cls->isFinal();
         return;
     }

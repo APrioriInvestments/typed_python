@@ -79,12 +79,17 @@ public:
         }
         size_t ix = mObjects.size();
         mObjects.insert(obj);
+        mObjectsByIndex.push_back(obj);
 
         return ix;
     }
 
     const std::unordered_set<PyObjSnapshot*>& getObjects() const {
         return mObjects;
+    }
+
+    const std::vector<PyObjSnapshot*>& getObjectsByIndex() const {
+        return mObjectsByIndex;
     }
 
     ShaHash hashFor(PyObjSnapshot* snap);
@@ -105,6 +110,8 @@ private:
 
     // all of our objects
     std::unordered_set<PyObjSnapshot*> mObjects;
+
+    std::vector<PyObjSnapshot*> mObjectsByIndex;
 
     // for each snapshot, a hash
     std::unordered_map<PyObjSnapshot*, ShaHash> mSnapToHash;

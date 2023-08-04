@@ -544,7 +544,8 @@ def extractCodeObjectNewStatementLineNumbers(codeObject):
         return res
     except Exception:
         # nasty to swallow the exception like this. At least we report it...
-        import traceback
-        traceback.print_exc()
+        print("FAILED in extractCodeObjectNewStatementLineNumbers")
+        # import traceback
+        # traceback.print_exc()
 
         return []

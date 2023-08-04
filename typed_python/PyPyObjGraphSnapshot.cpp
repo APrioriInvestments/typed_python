@@ -25,6 +25,7 @@ PyMethodDef PyPyObjGraphSnapshot_methods[] = {
     {"extractTypes", (PyCFunction)PyPyObjGraphSnapshot::extractTypes, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getObjects", (PyCFunction)PyPyObjGraphSnapshot::getObjects, METH_VARARGS | METH_KEYWORDS, NULL},
     {"internalize", (PyCFunction)PyPyObjGraphSnapshot::internalize, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"resolveForwards", (PyCFunction)PyPyObjGraphSnapshot::resolveForwards, METH_VARARGS | METH_KEYWORDS, NULL},
     {"hashToObject", (PyCFunction)PyPyObjGraphSnapshot::hashToObject, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL}  /* Sentinel */
 };
@@ -104,6 +105,23 @@ PyObject* PyPyObjGraphSnapshot::internalize(PyObject* graph, PyObject *args, PyO
 }
 
 /* static */
+PyObject* PyPyObjGraphSnapshot::resolveForwards(PyObject* graph, PyObject *args, PyObject *kwargs) {
+    PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
+
+    return translateExceptionToPyObject([&]() {
+        static const char *kwlist[] = {NULL};
+
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+            throw PythonExceptionSet();
+        }
+
+        self->mGraphSnapshot->resolveForwards();
+
+        return incref(Py_None);
+    });
+}
+
+/* static */
 PyObject* PyPyObjGraphSnapshot::extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs) {
     PyPyObjGraphSnapshot* self = (PyPyObjGraphSnapshot*)graph;
 
@@ -116,7 +134,7 @@ PyObject* PyPyObjGraphSnapshot::extractTypes(PyObject* graph, PyObject *args, Py
 
         PyObjectStealer res(PySet_New(NULL));
 
-        for (auto o: self->mGraphSnapshot->getObjects()) {
+        for (auto o: self->mGraphSnapshot->getObjectsByIndex()) {
             if (o->getType()) {
                 PySet_Add(res, (PyObject*)PyInstance::typeObj(o->getType()));
             }
@@ -137,10 +155,10 @@ PyObject* PyPyObjGraphSnapshot::getObjects(PyObject* graph, PyObject *args, PyOb
             throw PythonExceptionSet();
         }
 
-        PyObjectStealer res(PySet_New(NULL));
+        PyObjectStealer res(PyList_New(0));
 
-        for (auto o: self->mGraphSnapshot->getObjects()) {
-            PySet_Add(res, PyPyObjSnapshot::newPyObjSnapshot(o, graph));
+        for (auto o: self->mGraphSnapshot->getObjectsByIndex()) {
+            PyList_Append(res, PyPyObjSnapshot::newPyObjSnapshot(o, graph));
         }
 
         return incref(res);

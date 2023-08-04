@@ -254,6 +254,10 @@ public:
 
         m_byte_offsets.clear();
 
+        for (long k = 0; k < m_names.size(); k++) {
+            m_nameToIndex[m_names[k]] = k;
+        }
+
         for (auto t: m_types) {
             m_byte_offsets.push_back(size);
             size += t->bytecount();

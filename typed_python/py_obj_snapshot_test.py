@@ -1,6 +1,6 @@
 import numpy
 
-from typed_python import ListOf
+from typed_python import ListOf, Alternative, Forward
 from typed_python._types import PyObjSnapshot, PyObjGraphSnapshot, _enableTypeAutoresolution
 
 
@@ -280,3 +280,15 @@ def test_snapshot_of_types_with_object():
     newsnap = newGraph.hashToObject(snap.shaHash)
     assert newsnap.kind == 'ListOfType'
     assert newsnap.type.__typed_python_category__ == 'ListOf'
+
+
+def test_alternative_methods():
+    C = Forward(lambda: C)
+
+    X = Alternative("X", x={'c': C}, f=lambda self: 1)
+
+    snap = PyObjSnapshot.create(X, False)
+    snap2 = PyObjSnapshot.create(snap.pyobj, False)
+
+    assert snap.shaHash == snap2.shaHash
+    assert snap.pyobj.f.__name__ == 'f'

@@ -27,6 +27,10 @@ public:
     }
 
     void add(PyObjSnapshot* o) {
+        if (mSnapToOutGroupIx.find(o) != mSnapToOutGroupIx.end()) {
+            throw std::runtime_error("We've already seen this element");
+        }
+
         pushGroup(o);
         findAllGroups();
     }
@@ -38,6 +42,10 @@ public:
 private:
     void pushGroup(PyObjSnapshot* o) {
         if (mInAGroup.find(o) != mInAGroup.end()) {
+            return;
+        }
+
+        if (mSnapToOutGroupIx.find(o) != mSnapToOutGroupIx.end()) {
             return;
         }
 
@@ -58,7 +66,9 @@ private:
         mGroups.back()->insert(o);
 
         o->visitOutbound([&](PyObjSnapshot* snap) {
-            mGroupOutboundEdges.back()->push_back(snap);
+            if (snap->getGraph() == mGraph) {
+                mGroupOutboundEdges.back()->push_back(snap);
+            }
         });
     }
 
@@ -74,6 +84,7 @@ private:
             mOutGroups.push_back(mGroups.back());
 
             for (auto gElt: *mGroups.back()) {
+                mSnapToOutGroupIx[gElt] = mOutGroups.size() - 1;
                 mInAGroup.erase(gElt);
             }
 
@@ -127,4 +138,6 @@ private:
 
     // the final groups we ended up with
     std::vector<std::shared_ptr<std::unordered_set<PyObjSnapshot*> > > mOutGroups;
+
+    std::unordered_map<PyObjSnapshot*, size_t> mSnapToOutGroupIx;
 };

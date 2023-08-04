@@ -79,6 +79,8 @@ Instance::Instance(const Instance& other) : mLayout(other.mLayout) {
 }
 
 Instance::Instance(const InstanceRef& other) {
+    mLayout = nullptr;
+    
     Type* t = other.type();
     instance_ptr p = other.data();
 

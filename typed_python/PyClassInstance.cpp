@@ -738,7 +738,16 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyObjectStealer memberFunctions(PyDict_New());
 
     for (auto p: classT->isForwardDefined() ? classT->getOwnMemberFunctions() : classT->getMemberFunctions()) {
-        PyDict_SetItemString(memberFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+        typePtrToPyTypeRepresentation(p.second);
+        if (!p.second->isTypeObjReady()) {
+            throw std::runtime_error("TypeObj for " + p.second->name() + " is not ready");
+        }
+
+        PyDict_SetItemString(
+            memberFunctions, 
+            p.first.c_str(), 
+            typePtrToPyTypeRepresentation(p.second)
+        );
 
         if (!classT->isForwardDefined()) {
             // TODO: clean this up. I'm not sure what we are guarding against - is it
@@ -809,6 +818,13 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "StaticMemberFunctions", staticMemberFunctions);
     for (auto nameAndObj: classT->isForwardDefined() ? 
             classT->getOwnStaticFunctions() : classT->getStaticFunctions()) {
+        
+        typePtrToPyTypeRepresentation(nameAndObj.second);
+        if (!nameAndObj.second->isTypeObjReady()) {
+            asm("int3");
+            throw std::runtime_error("TypeObj for " + nameAndObj.second->name() + " is not ready");
+        }
+
         PyDict_SetItemString(
             staticMemberFunctions, 
             nameAndObj.first.c_str(), typePtrToPyTypeRepresentation(nameAndObj.second)

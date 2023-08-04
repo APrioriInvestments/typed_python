@@ -34,6 +34,8 @@ public:
 
     static PyObject* internalize(PyObject* graph, PyObject *args, PyObject *kwargs);
 
+    static PyObject* resolveForwards(PyObject* graph, PyObject *args, PyObject *kwargs);
+
     static PyObject* extractTypes(PyObject* graph, PyObject *args, PyObject *kwargs);
 
     static PyObject* getObjects(PyObject* graph, PyObject *args, PyObject *kwargs);

@@ -458,12 +458,18 @@ void Type::attemptToResolve() {
 
             Type* target = internalizedSnap->getType();
 
-            if (typeAndSnap.first->m_forward_resolves_to) {
-                if (typeAndSnap.first->m_forward_resolves_to != target) {
-                    throw std::runtime_error("This type is already resolved and not to our target!");
+            if (target && target->isForward()) {
+                target = ((Forward*)target)->getTargetTransitive();
+            }
+
+            if (target) {
+                if (typeAndSnap.first->m_forward_resolves_to) {
+                    if (typeAndSnap.first->m_forward_resolves_to != target) {
+                        throw std::runtime_error("This type is already resolved and not to our target!");
+                    }
+                } else {
+                    typeAndSnap.first->m_forward_resolves_to = target;
                 }
-            } else {
-                typeAndSnap.first->m_forward_resolves_to = target;
             }
         }
 

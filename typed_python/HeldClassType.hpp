@@ -447,6 +447,46 @@ public:
         m_classType = clsType;
     }
 
+    void initializeDuringDeserialization(
+        std::string inName,
+        const std::vector<HeldClass*>& bases,
+        bool isFinal,
+        const std::vector<MemberDefinition>& members,
+        const std::map<std::string, Function*>& memberFunctions,
+        const std::map<std::string, Function*>& staticFunctions,
+        const std::map<std::string, Function*>& propertyFunctions,
+        const std::map<std::string, PyObject*>& classMembers,
+        const std::map<std::string, Function*>& classMethods,
+
+        const std::vector<MemberDefinition>& own_members,
+        const std::map<std::string, Function*>& own_memberFunctions,
+        const std::map<std::string, Function*>& own_staticFunctions,
+        const std::map<std::string, Function*>& own_propertyFunctions,
+        const std::map<std::string, PyObject*>& own_classMembers,
+        const std::map<std::string, Function*>& own_classMethods,
+
+        Class* clsType
+    ) {
+        m_name = inName;
+        m_bases = bases;
+        m_is_final = isFinal;
+        m_own_members = own_members;
+        m_own_memberFunctions = own_memberFunctions;
+        m_own_staticFunctions = own_staticFunctions;
+        m_own_propertyFunctions = own_propertyFunctions;
+        m_own_classMembers = own_classMembers;
+        m_own_classMethods = own_classMethods;
+
+        m_members = members;
+        m_memberFunctions = memberFunctions;
+        m_staticFunctions = staticFunctions;
+        m_propertyFunctions = propertyFunctions;
+        m_classMembers = classMembers;
+        m_classMethods = classMethods;
+
+        m_classType = clsType;
+    }
+
     const char* docConcrete() {
         return HeldClass_doc;
     }
@@ -951,10 +991,20 @@ public:
     // this function can be called multiple times, which happens after the class is
     // deserialized, since we may be rebuilding the function globals.
     void mergeOwnFunctionsIntoInheritanceTree() {
+        if (m_classMembers.size() 
+            || m_memberFunctions.size()
+            || m_classMethods.size()
+            || m_propertyFunctions.size()
+            || m_staticFunctions.size()
+        ) {
+            return;
+        }
+
         m_classMembers.clear();
         m_memberFunctions.clear();
         m_classMethods.clear();
         m_propertyFunctions.clear();
+        m_staticFunctions.clear();
 
         for (HeldClass* base: m_mro) {
             for (auto nameAndObj: base->m_own_classMembers) {
@@ -987,12 +1037,17 @@ public:
             throw std::runtime_error("Somehow " + m_name + " doesn't have itself as MRO 0");
         }
 
+        // build our own method resolution table directly from our parents.
+        // we only have to do this if we're forward defined since the type
+        // resolution process will just copy the functions over when it resolves
+        // them
+        if (!m_is_forward_defined) {
+            mergeOwnFunctionsIntoInheritanceTree();
+        }
+
         if (m_is_forward_defined) {
             return;
         }
-
-        // build our own method resolution table directly from our parents.
-        mergeOwnFunctionsIntoInheritanceTree();
 
         std::set<std::string> membersSoFar;
 

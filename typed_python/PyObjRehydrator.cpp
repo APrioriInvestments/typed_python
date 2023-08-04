@@ -369,7 +369,9 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
             throw std::runtime_error("Corrupt PyObjSnapshot::Value");
         }
 
-        rehydrate(snap->mNamedElements["value_instance"]);
+        // TODO: this needs to be a proper rehydration when we are
+        // able to fully model 'instance' objects.
+        // rehydrate(snap->mNamedElements["value_instance"]);
 
         ((Value*)snap->mType)->initializeDuringDeserialization(
             snap->mNamedElements["value_instance"]->mInstance
@@ -581,6 +583,20 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
         getNamedBundle(snap, "cls_classmembers", classMembers);
         getNamedBundle(snap, "cls_classmethods", classMethods);
 
+        std::vector<MemberDefinition> own_members;
+        std::map<std::string, Function*> own_memberFunctions;
+        std::map<std::string, Function*> own_staticFunctions;
+        std::map<std::string, Function*> own_propertyFunctions;
+        std::map<std::string, PyObject*> own_classMembers;
+        std::map<std::string, Function*> own_classMethods;
+
+        getNamedBundle(snap, "cls_own_members", own_members);
+        getNamedBundle(snap, "cls_own_methods", own_memberFunctions);
+        getNamedBundle(snap, "cls_own_staticmethods", own_staticFunctions);
+        getNamedBundle(snap, "cls_own_properties", own_propertyFunctions);
+        getNamedBundle(snap, "cls_own_classmembers", own_classMembers);
+        getNamedBundle(snap, "cls_own_classmethods", own_classMethods);
+
         Type* clsType = getNamedElementType(snap, "cls_type");
         if (!clsType->isClass()) {
             throw std::runtime_error("Corrupt PyObjSnapshot.HeldClass");
@@ -596,6 +612,14 @@ void PyObjRehydrator::rehydrateTpType(PyObjSnapshot* snap) {
             propertyFunctions,
             classMembers,
             classMethods,
+
+            own_members,
+            own_memberFunctions,
+            own_staticFunctions,
+            own_propertyFunctions,
+            own_classMembers,
+            own_classMethods,
+
             (Class*)clsType
         );
         return;
@@ -948,16 +972,16 @@ void PyObjRehydrator::finalize() {
         t->typeFinishedBeingDeserializedPhase1();
     }
 
-    // now that we've set function globals, we need to go over all the classes and
-    // held classes and make sure the versions of the function types they're actually
-    // using have the new definitions. Unfortunately, Overload objects are not pointers
-    // (maybe they should be?) and so when we merge Overloads from base/child classes
-    // they don't get their globals replaced with the appropriate values
-    for (auto& t: types) {
-        if (t && t->isHeldClass()) {
-            ((HeldClass*)t)->mergeOwnFunctionsIntoInheritanceTree();
-        }
-    }
+    // // now that we've set function globals, we need to go over all the classes and
+    // // held classes and make sure the versions of the function types they're actually
+    // // using have the new definitions. Unfortunately, Overload objects are not pointers
+    // // (maybe they should be?) and so when we merge Overloads from base/child classes
+    // // they don't get their globals replaced with the appropriate values
+    // for (auto& t: types) {
+    //     if (t && t->isHeldClass()) {
+    //         ((HeldClass*)t)->mergeOwnFunctionsIntoInheritanceTree();
+    //     }
+    // }
 
     for (auto t: types) {
         t->typeFinishedBeingDeserializedPhase2();

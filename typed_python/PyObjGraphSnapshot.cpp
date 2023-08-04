@@ -58,9 +58,7 @@ void PyObjGraphSnapshot::resolveForwards() {
         if (o->getKind() == PyObjSnapshot::Kind::ForwardType) {
             o->pointForwardToFinalType();
             modified.insert(o);
-        }
-
-        if (o->willBeATpType()) {
+        } else if (o->willBeATpType()) {
             if (o->markTypeNotFwdDefined()) {
                 modified.insert(o);
             }
@@ -137,6 +135,7 @@ void PyObjGraphSnapshot::internalize(PyObjGraphSnapshot& otherGraph, bool markIn
         } catch(...) {
             // undo this since the state is somehow corrupt
             for (auto hashAndSkeleton: skeletons) {
+                mObjectsByIndex.pop_back();
                 mObjects.erase(hashAndSkeleton.second.second);
                 mHashToSnap.erase(hashAndSkeleton.first);
             }
@@ -154,6 +153,7 @@ PyObjSnapshot* PyObjGraphSnapshot::createSkeleton(ShaHash h) {
 
     mHashToSnap[h] = snap;
     mObjects.insert(snap);
+    mObjectsByIndex.push_back(snap);
     return snap;
 }
 
@@ -172,6 +172,17 @@ ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
                 + ShaHash::SHA1(
                     b->eltPtr(snap->getInstance().data(), 0),
                     b->count(snap->getInstance().data())
+                );
+        }
+        if (snap->getInstance().type()->isString()) {
+            static StringType* b = StringType::Make();
+
+            std::string s = b->toUtf8String(snap->getInstance().data());
+
+            return ShaHash(int(snap->getKind()), int(snap->getInstance().type()->getTypeCategory()))
+                + ShaHash::SHA1(
+                    &s[0],
+                    s.size()
                 );
         }
         throw std::runtime_error(
@@ -280,7 +291,8 @@ ShaHash PyObjGraphSnapshot::hashFor(PyObjSnapshot* snap) {
 void PyObjGraphSnapshot::computeHashesFor(const std::unordered_set<PyObjSnapshot*>& group) {
     PyObjSnapshot* root = pickRootFor(group);
 
-    // order our snapshots lexically
+    // order our snapshots by the order in which we would
+    // visit them
     std::unordered_map<PyObjSnapshot*, int> snapsSeen;
     std::vector<PyObjSnapshot*> snapsInOrder;
 
@@ -351,6 +363,14 @@ void PyObjGraphSnapshot::installSnapHash(PyObjSnapshot* snap, ShaHash h) {
 }
 
 PyObjSnapshot* PyObjGraphSnapshot::pickRootFor(const std::unordered_set<PyObjSnapshot*>& group) {
+    if (!group.size()) {
+        throw std::runtime_error("Can't pick a root for an empty group");
+    }
+
+    if (group.size() == 1) {
+        return *group.begin();
+    }
+
     // pick a 'root' node by computing a shallow hash and taking the first value for which
     // there is only one hash
     std::unordered_map<PyObjSnapshot*, ShaHash> curHashes;
@@ -358,6 +378,8 @@ PyObjSnapshot* PyObjGraphSnapshot::pickRootFor(const std::unordered_set<PyObjSna
     long passes = 0;
 
     while (passes < group.size() + 1) {
+        passes += 1;
+
         for (auto s: group) {
             ShaHash h = computeHashFor(s, [&](PyObjSnapshot* edge) {
                 if (group.find(edge) == group.end()) {

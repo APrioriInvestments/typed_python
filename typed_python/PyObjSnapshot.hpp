@@ -502,7 +502,28 @@ public:
     void rehydrate();
 
     std::string toString() const {
-        return "PyObjSnapshot." + kindAsString() + "(ix=" + format(mIndexInGraph) + ")";
+        std::string inner;
+        if (mType) {
+            inner = mType->name();
+        } else 
+        if (mName.size()) {
+            inner = mName;
+            if (mModuleName.size()) {
+                inner = mModuleName + "." + mName;
+            }
+        } else 
+        if (mPyObject) {
+            inner = std::string("of type ") + mPyObject->ob_type->tp_name;
+        }
+        if (inner.size()) {
+            inner = ", " + inner;
+        }
+
+        return "PyObjSnapshot." + kindAsString() + "(ix=" + format(mIndexInGraph) + inner + ")";
+    }
+
+    size_t getIndexInGraph() const {
+        return mIndexInGraph;
     }
 
     template<class T>
@@ -510,8 +531,7 @@ public:
         mKind = Kind::InternalBundle;
 
         for (auto& nameAndElt: namedElements) {
-            mNames.push_back(nameAndElt.first);
-            mElements.push_back(maker.internalize(nameAndElt.second));
+            mNamedElements[nameAndElt.first] = maker.internalize(nameAndElt.second);
         }
     }
 
@@ -646,11 +666,11 @@ public:
 
     template<class visitor_type>
     void visitOutbound(const visitor_type& v) {
-        for (auto e: mElements) {
+        for (auto& e: mElements) {
             v(e);
         }
 
-        for (auto e: mKeys) {
+        for (auto& e: mKeys) {
             v(e);
         }
 

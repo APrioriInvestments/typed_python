@@ -1543,6 +1543,7 @@ void PyInstance::finalizePyTypeObjectPhase1(Type* inType, PyTypeObject* pyType) 
     pyType->tp_methods = typeMethods(inType);
 
     PyType_Ready(pyType);
+    inType->markTypeObjReady();
 }
 
 void PyInstance::finalizePyTypeObjectPhase2(Type* inType, PyTypeObject* pyType) {
