@@ -45,7 +45,7 @@ public:
     {
     }
 
-    PyObjGraphSnapshot(Type* root, bool linkBackToOriginal=true);
+    PyObjGraphSnapshot(Type* root, bool linkBackToOriginal=true, bool linkToInternal=true);
 
     ~PyObjGraphSnapshot() {
         for (auto oPtr: mObjects) {

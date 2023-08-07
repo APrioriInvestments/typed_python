@@ -1208,7 +1208,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
             .tp_iternext = PyInstance::tp_iternext,     // iternextfunc
-            .tp_methods = 0,             // struct PyMethodDef*
+            .tp_methods = typeMethods(inType),          // struct PyMethodDef*
             .tp_members = 0,                            // struct PyMemberDef*
             .tp_getset = 0,                             // struct PyGetSetDef*
             .tp_base = 0,                               // struct _typeobject*
@@ -1259,6 +1259,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
         );
         ((PyObject*)&types[inType]->typeObj)->ob_type = incref(classMetaclass);
     }
+
+    PyType_Ready((PyTypeObject*)types[inType]);
+    inType->markTypeObjReady();
 
     if (!inType->isActivelyBeingDeserialized()) {
         finalizePyTypeObjectPhase1(inType, (PyTypeObject*)types[inType]);
@@ -1539,11 +1542,7 @@ bool PyInstance::typeCanBeSubclassed(Type* t) {
 
 // static
 void PyInstance::finalizePyTypeObjectPhase1(Type* inType, PyTypeObject* pyType) {
-    // update the type methods
-    pyType->tp_methods = typeMethods(inType);
-
-    PyType_Ready(pyType);
-    inType->markTypeObjReady();
+    //pyType->tp_name = (new std::string(inType->nameWithModule()))->c_str();
 }
 
 void PyInstance::finalizePyTypeObjectPhase2(Type* inType, PyTypeObject* pyType) {

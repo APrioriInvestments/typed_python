@@ -109,10 +109,8 @@ public:
 
     static Type* Make(Instance i);
 
-    void initializeDuringDeserialization(Instance i) {
-        mInstance = i;
-    }
-
+    void initializeDuringDeserialization(Instance i);
+    
     void postInitializeConcrete() {}
 
     Type* cloneForForwardResolutionConcrete() {

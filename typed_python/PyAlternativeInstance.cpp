@@ -795,33 +795,18 @@ PyObject* PyConcreteAlternativeInstance::altExit(PyObject* o, PyObject* args, Py
 
 // static
 PyMethodDef* PyConcreteAlternativeInstance::typeMethodsConcrete(Type* t) {
-
-    // List of magic methods that are not attached to direct function pointers in PyTypeObject.
-    //   These need to be defined by adding entries to PyTypeObject.tp_methods
-    //   and we need to avoid adding them to PyTypeObject.tp_dict ourselves.
-    //   Also, we only want to add the entry to tp_methods if they are explicitly defined.
-    const std::map<const char*, PyCFunction> special_magic_methods = {
-            {"__format__", (PyCFunction)altFormat},
-            {"__bytes__", (PyCFunction)altBytes},
-            {"__dir__", (PyCFunction)altDir},
-            {"__reversed__", (PyCFunction)altReversed},
-            {"__complex__", (PyCFunction)altComplex},
-            {"__round__", (PyCFunction)altRound},
-            {"__trunc__", (PyCFunction)altTrunc},
-            {"__floor__", (PyCFunction)altFloor},
-            {"__ceil__", (PyCFunction)altCeil},
-            {"__enter__", (PyCFunction)altEnter},
-            {"__exit__", (PyCFunction)altExit}
-        };
-
-    int cur = 0;
-    auto altMethods = ((ConcreteAlternative*)t)->getAlternative()->getMethods();
-    PyMethodDef* ret = new PyMethodDef[special_magic_methods.size() + 1];
-    for (auto m: special_magic_methods) {
-        if (altMethods.find(m.first) != altMethods.end()) {
-            ret[cur++] =  {m.first, m.second, METH_VARARGS | METH_KEYWORDS, NULL};
-        }
-    }
-    ret[cur] = {NULL, NULL};
-    return ret;
+    return new PyMethodDef [12] {
+        {"__format__", (PyCFunction)altFormat, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__bytes__", (PyCFunction)altBytes, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__dir__", (PyCFunction)altDir, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__reversed__", (PyCFunction)altReversed, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__complex__", (PyCFunction)altComplex, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__round__", (PyCFunction)altRound, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__trunc__", (PyCFunction)altTrunc, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__floor__", (PyCFunction)altFloor, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__ceil__", (PyCFunction)altCeil, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__enter__", (PyCFunction)altEnter, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__exit__", (PyCFunction)altExit, METH_VARARGS | METH_KEYWORDS, NULL},
+        {NULL, NULL}
+    };
 }

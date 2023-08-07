@@ -59,14 +59,32 @@ public:
         Uninitialized = 0,
         // a string held in mStringObject
         String,
+        // an instance of a FunctionType
+        FunctionInstance,
+        ValueInstance,
+        ClassInstance,
+        TupleInstance,
+        NamedTupleInstance,
+        TupleOfInstance,
+        ListOfInstance,
+        SetInstance,
+        DictInstance,
+        ConstDictInstance,
+        PointerToInstance,
+        RefToInstance,
+        AlternativeInstance,
+        ConcreteAlternativeInstance,
+        AlternativeMatcherInstance,
+        BoundMethodInstance,
+        TypedCellInstance,
+        // we're pointing into a TP leaf instance (a register type, none, or bytes)
+        PrimitiveInstance,
         // we're pointing to a "canonical" python object that's visible from a module
         // and that we don't want to look inside of.  mName will contain the
         // name, and mModuleName will contain the module. We will assume that this object
         // is the same across program invocations (its a C function and we can't
         // look inside of it)
         NamedPyObject,
-        // we're pointing into a TP leaf instance (a register type, an int, bytes, etc.)
-        Instance,
         // we're a primitive type (like int)
         PrimitiveType,
         // a TP ListOf type. The element type will be in element_type
@@ -185,10 +203,6 @@ public:
 
     bool isString() const {
         return mKind == Kind::String;
-    }
-
-    bool isInstance() const {
-        return mKind == Kind::Instance;
     }
 
     std::string kindAsString() const;
@@ -430,9 +444,7 @@ public:
     }
 
     bool needsHydration() const {
-        // currently, instances are 'out of band'. Eventually they'll be just like the
-        // other content.
-        if (mKind == Kind::Instance) {
+        if (mKind == Kind::PrimitiveInstance) {
             return false;
         }
 

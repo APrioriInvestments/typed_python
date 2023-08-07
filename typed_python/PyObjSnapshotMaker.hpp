@@ -34,13 +34,15 @@ public:
         std::unordered_map<Type*, PyObjSnapshot*>& inTypeMapCache,
         std::unordered_map<InstanceRef, PyObjSnapshot*>& inInstanceCache,
         PyObjGraphSnapshot* inGraph,
-        bool inLinkBackToOriginalObject
+        bool inLinkBackToOriginalObject,
+        bool linkToInternal
     ) :
         mObjMapCache(inObjMapCache),
         mTypeMapCache(inTypeMapCache),
         mInstanceCache(inInstanceCache),
         mGraph(inGraph),
-        mLinkBackToOriginalObject(inLinkBackToOriginalObject)
+        mLinkBackToOriginalObject(inLinkBackToOriginalObject),
+        mLinkToInternal(linkToInternal)
     {
     }
 
@@ -82,5 +84,6 @@ private:
     std::unordered_map<InstanceRef, PyObjSnapshot*>& mInstanceCache;
     PyObjGraphSnapshot* mGraph;
     bool mLinkBackToOriginalObject;
+    bool mLinkToInternal;
 };
 

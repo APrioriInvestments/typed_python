@@ -220,46 +220,9 @@ how to do this:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-D = Forward(lambda: X)
-
-class C:
-    MyD = D
-
-
-class D(Class):
-    MyC = C
-
-
-How should we handle this case?
-
-At some level, both C and D are 'forward defined' because 'C' has a forward reference to D and vice versa.
-
-So, now we will have a new C and a new D, triggered at the moment we constructed 'D'.
-
-Of course, if we allowed 'C' to escape then we have a problem
-
-
-
-Of course, when we define C we wont' have
-
-at the module level, we shouldn't be replacing 'C', we should be updating it?
-
-how can we tell the difference between these two?
-
-Should 'C' have been considered 'Forward Defined'?
+this is kind of working. But:
+1. we need for everything in the core type graph to be 'Instance'
+2. we need to not need to instantiate the PyTypeObject for a Type until the end
+3. we should be able to do this by insisting that we wire the Instance of PythonObjectOfType
+	at the very end
 

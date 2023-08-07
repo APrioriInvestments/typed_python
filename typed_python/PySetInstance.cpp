@@ -1403,22 +1403,24 @@ bool PySetInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyR
 }
 
 PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef[18]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, setAdd_doc},
-                              {"pop", (PyCFunction)PySetInstance::setPop, METH_VARARGS, setPop_doc},
-                              {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, setDiscard_doc},
-                              {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, setRemove_doc},
-                              {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, setClear_doc},
-                              {"copy", (PyCFunction)PySetInstance::setCopy, METH_VARARGS, setCopy_doc},
-                              {"union", (PyCFunction)PySetInstance::setUnion, METH_VARARGS, setUnion_doc},
-                              {"update", (PyCFunction)PySetInstance::setUpdate, METH_VARARGS, setUpdate_doc},
-                              {"intersection", (PyCFunction)PySetInstance::setIntersection, METH_VARARGS, setIntersection_doc},
-                              {"intersection_update", (PyCFunction)PySetInstance::setIntersectionUpdate, METH_VARARGS, setIntersectionUpdate_doc},
-                              {"difference", (PyCFunction)PySetInstance::setDifference, METH_VARARGS, setDifference_doc},
-                              {"difference_update", (PyCFunction)PySetInstance::setDifferenceUpdate, METH_VARARGS, setDifferenceUpdate_doc},
-                              {"symmetric_difference", (PyCFunction)PySetInstance::setSymmetricDifference, METH_VARARGS, setSymmetricDifference_doc},
-                              {"symmetric_difference_update", (PyCFunction)PySetInstance::setSymmetricDifferenceUpdate, METH_VARARGS, setSymmetricDifferenceUpdate_doc},
-                              {"issubset", (PyCFunction)PySetInstance::setIsSubset, METH_VARARGS, setIsSubset_doc},
-                              {"issuperset", (PyCFunction)PySetInstance::setIsSuperset, METH_VARARGS, setIsSuperset_doc},
-                              {"isdisjoint", (PyCFunction)PySetInstance::setIsDisjoint, METH_VARARGS, setIsDisjoint_doc},
-                              {NULL, NULL}};
+    return new PyMethodDef[18]{
+        {"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, setAdd_doc},
+        {"pop", (PyCFunction)PySetInstance::setPop, METH_VARARGS, setPop_doc},
+        {"discard", (PyCFunction)PySetInstance::setDiscard, METH_VARARGS, setDiscard_doc},
+        {"remove", (PyCFunction)PySetInstance::setRemove, METH_VARARGS, setRemove_doc},
+        {"clear", (PyCFunction)PySetInstance::setClear, METH_VARARGS, setClear_doc},
+        {"copy", (PyCFunction)PySetInstance::setCopy, METH_VARARGS, setCopy_doc},
+        {"union", (PyCFunction)PySetInstance::setUnion, METH_VARARGS, setUnion_doc},
+        {"update", (PyCFunction)PySetInstance::setUpdate, METH_VARARGS, setUpdate_doc},
+        {"intersection", (PyCFunction)PySetInstance::setIntersection, METH_VARARGS, setIntersection_doc},
+        {"intersection_update", (PyCFunction)PySetInstance::setIntersectionUpdate, METH_VARARGS, setIntersectionUpdate_doc},
+        {"difference", (PyCFunction)PySetInstance::setDifference, METH_VARARGS, setDifference_doc},
+        {"difference_update", (PyCFunction)PySetInstance::setDifferenceUpdate, METH_VARARGS, setDifferenceUpdate_doc},
+        {"symmetric_difference", (PyCFunction)PySetInstance::setSymmetricDifference, METH_VARARGS, setSymmetricDifference_doc},
+        {"symmetric_difference_update", (PyCFunction)PySetInstance::setSymmetricDifferenceUpdate, METH_VARARGS, setSymmetricDifferenceUpdate_doc},
+        {"issubset", (PyCFunction)PySetInstance::setIsSubset, METH_VARARGS, setIsSubset_doc},
+        {"issuperset", (PyCFunction)PySetInstance::setIsSuperset, METH_VARARGS, setIsSuperset_doc},
+        {"isdisjoint", (PyCFunction)PySetInstance::setIsDisjoint, METH_VARARGS, setIsDisjoint_doc},
+        {NULL, NULL}
+    };
 }

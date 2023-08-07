@@ -17,7 +17,7 @@
 #include "PyObjGraphSnapshot.hpp"
 #include "PyObjSnapshotGroupSearch.hpp"
 
-PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBak) :
+PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBack, bool linkToInternal) :
     mGroupsConsumed(0),
     mGroupSearch(this)
 {
@@ -34,7 +34,8 @@ PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBak) :
         typeMapCache,
         instanceCache,
         this,
-        linkBak
+        linkBack, 
+        linkToInternal
     );
 
     snapMaker.internalize(root);

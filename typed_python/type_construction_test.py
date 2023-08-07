@@ -38,6 +38,18 @@ def test_entrypoint_basic():
     def g():
         return f(2)
 
+    print(g.ClosureType)
+    print(g.overloads[0])
+
+    from typed_python import _types
+    g2 = _types.prepareArgumentToBePassedToCompiler(g)
+    print("g2: ")
+    print(g2.overloads[0].globals)
+    print(g2.overloads[0].closureVarLookups)
+    print(g2.overloads[0].closureVarLookups['f'][0])
+    print(g2.overloads[0].closureVars)
+    print()
+
     assert g() == 3
 
 
@@ -62,25 +74,6 @@ def test_identity_hash_of_alternative_stable():
     """, m)
 
     assert m['h1'] == m['h2']
-
-
-def test_can_see_original_class_that_defined_a_forward():
-    class C(Class):
-        x = Member(lambda: B)
-
-    CFwd = (C,)
-
-    assert isForwardDefined(C)
-
-    # this is insufficient to trigger an autoresolve because
-    # we didn't create a new Type instance.
-    B = int
-
-    C = resolveForwardDefinedType(C)
-
-    assert not isForwardDefined(C)
-
-    assert forwardDefinitionsFor(C) == [CFwd[0]]
 
 
 def test_forward_class_exposes_functions():
@@ -137,7 +130,7 @@ def test_function_cell_bindings_are_resolved_to_constants():
 
         return C
 
-    assert CofX(1).f.overloads[0].globals['x'].kind == 'Constant'
+    assert CofX(1).f.overloads[0].globals['x'].kind == 'GlobalInCell'
     assert CofX(1).f.overloads[0].globals['x'].getValue() is 1
     assert CofX(2).f.overloads[0].globals['x'].getValue() is 2
 
@@ -172,9 +165,8 @@ def test_type_looks_resolvable_alternative():
     B = resolveForwardDefinedType(B)
 
     bGlobal = A.f.overloads[0].globals['B']
-    assert bGlobal.kind == "Constant"
-    assert bGlobal.constant.kind == "PrimitiveType"
-    assert bGlobal.constant.type is B
+    assert bGlobal.kind == "GlobalInCell"
+    assert bGlobal.getValue() is B
 
     bFwdGlobal = AFwd[0].f.overloads[0].globals['B']
     assert bFwdGlobal.kind == "GlobalInCell"

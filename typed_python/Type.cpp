@@ -269,6 +269,7 @@ void reachableUnresolvedTypes(Type* root, std::set<Type*>& outTypes) {
         typeMapCache,
         instanceCache,
         &graph,
+        true,
         true
     );
 

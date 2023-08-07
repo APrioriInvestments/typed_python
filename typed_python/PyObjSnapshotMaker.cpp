@@ -5,7 +5,6 @@
 PyObjSnapshot* PyObjSnapshotMaker::internalize(const std::string& def) {
     PyObjSnapshot* res = new PyObjSnapshot(mGraph);
 
-
     res->becomeInternalizedOf(def, *this);
 
     return res;
@@ -177,6 +176,10 @@ PyObjSnapshot* PyObjSnapshotMaker::internalize(PyObject* val)
 /* static */
 PyObjSnapshot* PyObjSnapshotMaker::internalize(Type* val)
 {
+    if (mLinkToInternal && val->getSnapshot()) {
+        return val->getSnapshot();
+    }
+
     auto it = mTypeMapCache.find(val);
 
     if (it != mTypeMapCache.end()) {

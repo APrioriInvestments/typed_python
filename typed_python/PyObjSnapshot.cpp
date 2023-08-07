@@ -41,6 +41,57 @@ std::string PyObjSnapshot::kindAsString() const {
     if (mKind == Kind::Instance) {
         return "Instance";
     }
+    if (mKind == Kind::ValueInstance) {
+        return "ValueInstance";
+    }
+    if (mKind == Kind::FunctionInstance) {
+        return "FunctionInstance";
+    }
+    if (mKind == Kind::ClassInstance) {
+        return "ClassInstance";
+    }
+    if (mKind == Kind::TupleInstance) {
+        return "TupleInstance";
+    }
+    if (mKind == Kind::NamedTupleInstance) {
+        return "NamedTupleInstance";
+    }
+    if (mKind == Kind::TupleOfInstance) {
+        return "TupleOfInstance";
+    }
+    if (mKind == Kind::ListOfInstance) {
+        return "ListOfInstance";
+    }
+    if (mKind == Kind::SetInstance) {
+        return "SetInstance";
+    }
+    if (mKind == Kind::DictInstance) {
+        return "DictInstance";
+    }
+    if (mKind == Kind::ConstDictInstance) {
+        return "ConstDictInstance";
+    }
+    if (mKind == Kind::PointerToInstance) {
+        return "PointerToInstance";
+    }
+    if (mKind == Kind::RefToInstance) {
+        return "RefToInstance";
+    }
+    if (mKind == Kind::AlternativeInstance) {
+        return "AlternativeInstance";
+    }
+    if (mKind == Kind::ConcreteAlternativeInstance) {
+        return "ConcreteAlternativeInstance";
+    }
+    if (mKind == Kind::AlternativeMatcherInstance) {
+        return "AlternativeMatcherInstance";
+    }
+    if (mKind == Kind::BoundMethodInstance) {
+        return "BoundMethodInstance";
+    }
+    if (mKind == Kind::TypedCellInstance) {
+        return "TypedCellInstance";
+    }
     if (mKind == Kind::PrimitiveType) {
         return "PrimitiveType";
     }
@@ -490,8 +541,6 @@ void PyObjSnapshot::becomeInternalizedOf(
     throw std::runtime_error("Type of category " + t->getTypeCategoryString() + " can't be snapshotted");
 }
 
-
-
 void PyObjSnapshot::becomeInternalizedOf(
     PyObject* val,
     PyObjSnapshotMaker& maker
@@ -901,8 +950,102 @@ void PyObjSnapshot::becomeInternalizedOf(
     InstanceRef val,
     PyObjSnapshotMaker& maker
 ) {
-    mKind = Kind::Instance;
-    mInstance = val;
+    if (val.type()->isFunction()) {
+        mKind = Kind::FunctionInstance;
+        mNamedElements["type"] = maker.internalize(val.type());
+        mNamedElements["closure"] = maker.internalize(
+            InstanceRef(val.data(), ((Function*)val.type())->getClosureType())
+        );
+        return;
+    }
+
+    if (val.type()->isClass()) {
+        mKind = Kind::ClassInstance;
+        mNamedElements["type"] = maker.internalize(val.type());
+
+        // instances are supposed to hold actual classes. If we have a ListOf(Base)
+        // we expect that the "instance objects" representing a child of 'base' actually
+        // know that they are 'child'
+        Class* actual = Class::actualTypeForLayout(val.data());
+        if (actual != val.type()) {
+            throw std::runtime_error(
+                "PyObjSnapshot expected instance of " + val.type()->name() + " to not be "
+                + "a subclass"
+            );
+        }
+
+        for (long i = 0; i < actual->getMembers().size(); i++) {
+            if (actual->checkInitializationFlag(val.data(), i)) {
+                mNamedElements["member" + format(i)] = maker.internalize(
+                    InstanceRef(
+                        actual->eltPtr(val.data(), i),
+                        actual->getMembers()[i].getType()
+                    )
+                );
+            }
+        }
+
+        return;
+    }
+
+    if (val.type()->isTupleOf() || val.type()->isListOf()) {
+        if (val.type()->isTupleOf()) {
+            mKind = Kind::TupleOfInstance;
+        } else {
+            mKind = Kind::ListOfInstance;
+        }
+
+        mNamedElements["type"] = maker.internalize(val.type());
+        TupleOrListOfType* nt = (TupleOrListOfType*)val.type();
+
+        for (long i = 0; i < nt->count(val.data()); i++) {
+            mElements.push_back(
+                maker.internalize(
+                    InstanceRef(
+                        nt->eltPtr(val.data(), i),
+                        nt->getEltType()
+                    )
+                )
+            );
+        }
+
+        return;
+    }
+
+    if (val.type()->isNamedTuple() || val.type()->isTuple()) {
+        if (val.type()->isNamedTuple()) {
+            mKind = Kind::NamedTupleInstance;
+        } else {
+            mKind = Kind::TupleInstance;
+        }
+
+        mNamedElements["type"] = maker.internalize(val.type());
+        CompositeType* nt = (CompositeType*)val.type();
+
+        for (long i = 0; i < nt->getTypes().size(); i++) {
+            mElements.push_back(
+                maker.internalize(
+                    InstanceRef(
+                        nt->eltPtr(val.data(), i),
+                        nt->getTypes()[i]
+                    )
+                )
+            );
+        }
+
+        return;
+    }
+
+    if (val.type()->isNone() || val.type()->isBytes() || val.type()->isRegister()) {
+        mKind = Kind::Instance;
+        mInstance = val;
+        return;
+    }
+
+    throw std::runtime_error(
+        "Can't make a PyObjSnapshot out of an instance of type "
+        + mInstance.type()->name()
+    );
 }
 
 void PyObjSnapshot::becomeInternalizedOf(

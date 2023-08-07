@@ -50,7 +50,10 @@ PyObject* PyPyObjSnapshot::create(PyObject* self, PyObject* args, PyObject* kwar
             constantMapCacheType,
             constantMapCacheInst,
             graph,
-            linkBack
+            linkBack,
+            // don't link to the internal graph since we don't have
+            // that modeled correctly in the python wrappers yet.
+            false
         );
 
         PyObjSnapshot* object = maker.internalize(instance);

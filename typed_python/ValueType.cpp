@@ -140,6 +140,18 @@ void Value::updateInternalTypePointersConcrete(
     }
 }
 
+void Value::initializeDuringDeserialization(Instance i) {
+    mInstance = i;
+
+    mValueAsPyobj = PyInstance::extractPythonObject(mInstance);
+    
+    if (!mValueAsPyobj) {
+        PyErr_Clear();
+        throw std::runtime_error("Failed to convert an instance of type " + mInstance.type()->name() + " to a PyObject!");
+    }
+}
+
+
 void Value::initializeFromConcrete(Type* forwardDefinitionOfSelf) {
     mInstance = ((Value*)forwardDefinitionOfSelf)->mInstance.clone();
     mValueAsPyobj = PyInstance::extractPythonObject(mInstance);

@@ -1357,33 +1357,18 @@ PyObject* PyClassInstance::clsExitGeneric(PyObject* o, Type* t, instance_ptr dat
 
 // static
 PyMethodDef* PyClassInstance::typeMethodsConcrete(Type* t) {
-
-    // List of magic methods that are not attached to direct function pointers in PyTypeObject.
-    //   These need to be defined by adding entries to PyTypeObject.tp_methods
-    //   and we need to avoid adding them to PyTypeObject.tp_dict ourselves.
-    //   Also, we only want to add the entry to tp_methods if they are explicitly defined.
-    const std::map<const char*, PyCFunction> special_magic_methods = {
-            {"__format__", (PyCFunction)clsFormat},
-            {"__bytes__", (PyCFunction)clsBytes},
-            {"__dir__", (PyCFunction)clsDir},
-            {"__reversed__", (PyCFunction)clsReversed},
-            {"__complex__", (PyCFunction)clsComplex},
-            {"__round__", (PyCFunction)clsRound},
-            {"__trunc__", (PyCFunction)clsTrunc},
-            {"__floor__", (PyCFunction)clsFloor},
-            {"__ceil__", (PyCFunction)clsCeil},
-            {"__enter__", (PyCFunction)clsEnter},
-            {"__exit__", (PyCFunction)clsExit}
-        };
-
-    int cur = 0;
-    auto clsMethods = ((Class*)t)->getMemberFunctions();
-    PyMethodDef* ret = new PyMethodDef[special_magic_methods.size() + 1];
-    for (auto m: special_magic_methods) {
-        if (clsMethods.find(m.first) != clsMethods.end()) {
-            ret[cur++] =  {m.first, m.second, METH_VARARGS | METH_KEYWORDS, NULL};
-        }
-    }
-    ret[cur] = {NULL, NULL};
-    return ret;
+    return new PyMethodDef [12] {
+        {"__format__", (PyCFunction)clsFormat, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__bytes__", (PyCFunction)clsBytes, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__dir__", (PyCFunction)clsDir, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__reversed__", (PyCFunction)clsReversed, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__complex__", (PyCFunction)clsComplex, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__round__", (PyCFunction)clsRound, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__trunc__", (PyCFunction)clsTrunc, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__floor__", (PyCFunction)clsFloor, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__ceil__", (PyCFunction)clsCeil, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__enter__", (PyCFunction)clsEnter, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__exit__", (PyCFunction)clsExit, METH_VARARGS | METH_KEYWORDS, NULL},
+        {NULL, NULL}
+    };
 }

@@ -604,7 +604,6 @@ public:
             case catSubclassOf:
                 return f(*(SubclassOfType*)this);
             default:
-            asm("int3");
                 throw std::runtime_error("Invalid type found: " + format((int)m_typeCategory));
         }
     }

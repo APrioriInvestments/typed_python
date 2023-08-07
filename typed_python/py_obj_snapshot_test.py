@@ -1,6 +1,6 @@
 import numpy
 
-from typed_python import ListOf, Alternative, Forward
+from typed_python import ListOf, Alternative, Forward, Function
 from typed_python._types import PyObjSnapshot, PyObjGraphSnapshot, _enableTypeAutoresolution
 
 
@@ -292,3 +292,16 @@ def test_alternative_methods():
 
     assert snap.shaHash == snap2.shaHash
     assert snap.pyobj.f.__name__ == 'f'
+
+
+def test_snapshot_of_function():
+    closureVar = 10
+
+    @Function
+    def f():
+        return closureVar
+    
+    snap = PyObjSnapshot.create(type(f), False)
+    snap2 = PyObjSnapshot.create(snap.pyobj, False)
+
+    assert snap.shaHash == snap2.shaHash
