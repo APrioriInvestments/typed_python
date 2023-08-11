@@ -37,6 +37,7 @@ public:
     {
         m_is_forward_defined = true;
         m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
+        m_module_name = m_alternative->moduleName();
     }
 
     void initializeDuringDeserialization(int64_t which, Alternative* base) {
@@ -46,7 +47,7 @@ public:
     }
 
     const char* docConcrete() {
-        return m_alternative->doc();
+        return Alternative_doc;
     }
 
     std::string computeRecursiveNameConcrete(TypeStack& typeStack) {
@@ -91,18 +92,6 @@ public:
 
         m_size = size;
         m_is_default_constructible = is_default_constructible;
-    }
-
-    std::string nameWithModuleConcrete() {
-        if (m_alternative->moduleName().size() == 0) {
-            return m_name;
-        }
-
-        return m_alternative->moduleName() + "." + m_name;
-    }
-
-    std::string moduleNameConcrete() {
-        return m_alternative->moduleName();
     }
 
     void deepcopyConcrete(

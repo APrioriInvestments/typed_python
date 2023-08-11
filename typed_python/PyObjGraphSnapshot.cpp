@@ -34,7 +34,7 @@ PyObjGraphSnapshot::PyObjGraphSnapshot(Type* root, bool linkBack, bool linkToInt
         typeMapCache,
         instanceCache,
         this,
-        linkBack, 
+        linkBack,
         linkToInternal
     );
 
@@ -102,6 +102,19 @@ void PyObjGraphSnapshot::resolveForwards() {
     }
 }
 
+void PyObjGraphSnapshot::recomputeNames() {
+    for (auto o: mObjects) {
+        mGroupSearch.add(o, false);
+    }
+
+    for (auto& group: mGroupSearch.getGroups()) {
+        for (auto elt: *group) {
+            if (elt->willBeATpType()) {
+                elt->recomputeRecursiveName(*group);
+            }
+        }
+    }
+}
 
 void PyObjGraphSnapshot::internalize() {
     internal().internalize(*this, false);
@@ -161,7 +174,7 @@ PyObjSnapshot* PyObjGraphSnapshot::createSkeleton(ShaHash h) {
 
 template<class compute_type>
 ShaHash computeHashFor(PyObjSnapshot* snap, const compute_type& compute) {
-    if (snap->getKind() == PyObjSnapshot::Kind::Instance) {
+    if (snap->getKind() == PyObjSnapshot::Kind::PrimitiveInstance) {
         if (snap->getInstance().type()->isPOD()) {
             return ShaHash(int(snap->getKind()), int(snap->getInstance().type()->getTypeCategory()))
                 + ShaHash::SHA1(snap->getInstance().data(), snap->getInstance().type()->bytecount());

@@ -26,9 +26,13 @@ public:
     {
     }
 
-    void add(PyObjSnapshot* o) {
+    void add(PyObjSnapshot* o, bool insistNew=false) {
         if (mSnapToOutGroupIx.find(o) != mSnapToOutGroupIx.end()) {
-            throw std::runtime_error("We've already seen this element");
+            if (insistNew) {
+                throw std::runtime_error("We've already seen this element");
+            } else {
+                return;
+            }
         }
 
         pushGroup(o);

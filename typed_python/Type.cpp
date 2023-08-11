@@ -441,6 +441,10 @@ void Type::attemptToResolve() {
         // type that it came from.
         graph.resolveForwards();
 
+        // recompute the names of all the recursive types in here, which we have to do before
+        // rehydrating anything
+        graph.recomputeNames();
+
         // now take every non-forward node and make a version of it in the internal graph,
         // if it doesn't already exist.  Then rehydrate it. At this point, we have an interned
         // copy of every single type and pyobject that was present in this graph.

@@ -58,11 +58,11 @@ public:
         mIsNocompile(isNocompile),
         mRootName(inName),
         mQualname(qualname),
-        mModulename(moduleName),
         mClosureType(closureType)
     {
         m_is_forward_defined = true;
         m_name = mRootName;
+        m_module_name = moduleName;
     }
 
     void initializeDuringDeserialization(
@@ -76,23 +76,11 @@ public:
     ) {
         mRootName = inName;
         mQualname = qualname;
-        mModulename = moduleName;
+        m_module_name = moduleName;
         mOverloads = overloads;
         mClosureType = closureType;
         mIsEntrypoint = isEntrypoint;
         mIsNocompile = isNocompile;
-    }
-
-    std::string moduleNameConcrete() {
-        if (mModulename.size() == 0) {
-            return "builtins";
-        }
-
-        return mModulename;
-    }
-
-    std::string nameWithModuleConcrete() {
-        return moduleNameConcrete() + "." + (mQualname.size() ? mQualname : mRootName);
     }
 
     // does this function have any of its globals that are not
@@ -151,7 +139,7 @@ public:
         mIsNocompile = fwdFunc->mIsNocompile;
         mRootName = fwdFunc->mRootName;
         mQualname = fwdFunc->mQualname;
-        mModulename = fwdFunc->mModulename;
+        m_module_name = fwdFunc->m_module_name;
     }
 
     Type* cloneForForwardResolutionConcrete() {
@@ -253,7 +241,7 @@ public:
         v.visitName(m_name);
         v.visitName(mRootName);
         v.visitName(mQualname);
-        v.visitName(mModulename);
+        v.visitName(m_module_name);
 
         v.visitTopo(mClosureType);
 
@@ -297,7 +285,7 @@ public:
             return Function::Make(
                 f1->mRootName,
                 f1->mQualname,
-                f1->mModulename,
+                f1->m_module_name,
                 overloads,
                 Tuple::Make(types),
                 f1->isEntrypoint() || f2->isEntrypoint(),
@@ -448,7 +436,7 @@ public:
 
     Function* withEntrypoint(bool isEntrypoint) const {
         Function* f = Function::Make(
-            mRootName, mQualname, mModulename, mOverloads, mClosureType, isEntrypoint, mIsNocompile
+            mRootName, mQualname, m_module_name, mOverloads, mClosureType, isEntrypoint, mIsNocompile
         );
 
         if (f->isForwardDefined() && !isForwardDefined()) {
@@ -459,7 +447,7 @@ public:
 
     Function* withNocompile(bool isNocompile) const {
         Function* f = Function::Make(
-            mRootName, mQualname, mModulename, mOverloads, mClosureType, mIsEntrypoint, isNocompile
+            mRootName, mQualname, m_module_name, mOverloads, mClosureType, mIsEntrypoint, isNocompile
         );
         if (f->isForwardDefined() && !isForwardDefined()) {
             return (Function*)f->forwardResolvesTo();
@@ -529,11 +517,11 @@ public:
     // }
 
     Function* replaceClosure(Type* closureType) const {
-        return Function::Make(mRootName, mQualname, mModulename, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, m_module_name, mOverloads, closureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloads(const std::vector<FunctionOverload>& overloads) const {
-        return Function::Make(mRootName, mQualname, mModulename, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, m_module_name, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 
     Function* replaceOverloadVariableBindings(long index, const std::map<std::string, ClosureVariableBinding>& bindings) {
@@ -544,7 +532,7 @@ public:
 
         overloads[index] = overloads[index].withClosureBindings(bindings);
 
-        return Function::Make(mRootName, mQualname, mModulename, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
+        return Function::Make(mRootName, mQualname, m_module_name, overloads, mClosureType, mIsEntrypoint, mIsNocompile);
     }
 
     std::string qualname() const {
@@ -553,10 +541,6 @@ public:
         }
 
         return m_name;
-    }
-
-    std::string moduleName() const {
-        return mModulename;
     }
 
 private:
@@ -568,5 +552,5 @@ private:
 
     bool mIsNocompile;
 
-    std::string mRootName, mQualname, mModulename;
+    std::string mRootName, mQualname;
 };

@@ -137,7 +137,6 @@ public:
 
     void setName(std::string newName) {
         m_name = newName;
-        m_stripped_name = "";
     }
 
     void setCellOrDict(PyObject* newCellOrDict) {

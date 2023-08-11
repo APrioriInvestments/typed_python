@@ -704,6 +704,9 @@ int PyInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject* v) {
 PyTypeObject* PyInstance::typeObj(Type* inType) {
     if (!inType->getTypeRep()) {
         inType->setTypeRep(typeObjInternal(inType));
+        if (!typeObjInternal(inType)) {
+            throw std::runtime_error("Somehow, typeObjInternal didn't produce a type.");
+        }
     }
 
     return inType->getTypeRep();

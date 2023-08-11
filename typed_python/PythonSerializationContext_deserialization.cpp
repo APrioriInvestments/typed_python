@@ -645,7 +645,7 @@ Type* PythonSerializationContext::constructBlankSubclassOfTypeCategory(Type::Typ
     }
 
     if (result) {
-        result->markActivelyBeingDeserialized(isForwardDefined);
+        result->markActivelyBeingDeserialized(isForwardDefined, "Unknown", "Unknown");
         return result;
     }
 

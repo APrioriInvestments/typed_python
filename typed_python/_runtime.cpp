@@ -478,7 +478,7 @@ extern "C" {
     }
 
     StringType::layout* np_typePtrToName(Type* t) {
-        return StringType::createFromString(t->name(true));
+        return StringType::createFromString(t->name());
     }
 
     StringType::layout* np_typePtrToQualName(Type* t) {

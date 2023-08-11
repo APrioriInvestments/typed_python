@@ -66,6 +66,8 @@ public:
     // internalize a graph into ourselves
     void internalize(PyObjGraphSnapshot& graph, bool markInternalized);
 
+    void recomputeNames();
+
     // get the "internal" graph snapshot, which is responsible for holding all the objects
     // that are actually interned inside the system.
     static PyObjGraphSnapshot& internal() {

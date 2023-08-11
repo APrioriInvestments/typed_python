@@ -30,7 +30,7 @@ public:
 
     PyObject* pyobjFor(PyObjSnapshot* snapshot);
 
-    void finalize();
+    void rehydrateAll();
 
     PyObject* getNamedElementPyobj(
         PyObjSnapshot* snapshot,
@@ -172,10 +172,13 @@ public:
     }
 
 private:
-
     void rehydrate(PyObjSnapshot* snapshot);
 
+    void buildTypeSkeleton(PyObjSnapshot* snap);
+
     void rehydrateTpType(PyObjSnapshot* snap);
+
+    void buildPyobjForTpType(PyObjSnapshot* s);
 
     void finalizeRehydration(PyObjSnapshot* snap);
 

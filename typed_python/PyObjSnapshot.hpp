@@ -21,6 +21,7 @@
 #include "Instance.hpp"
 #include "PythonTypeInternals.hpp"
 #include "PyObjSnapshotMaker.hpp"
+#include "TypeStack.hpp"
 
 class PyObjGraphSnapshot;
 class PyObjSnapshot;
@@ -28,6 +29,9 @@ class FunctionGlobal;
 class FunctionOverload;
 class PyObjRehydrator;
 class PyObjSnapshotMaker;
+
+typedef PtrStack<PyObjSnapshot> SnapshotStack;
+typedef PushPtrStack<PyObjSnapshot> PushSnapshotStack;
 
 /*********************************
 PyObjSnapshot
@@ -361,11 +365,15 @@ public:
         return mNamedElements.find(s) != mNamedElements.end();
     }
 
-    PyObjSnapshot* getNamedElement(std::string s) const {
+    PyObjSnapshot* getNamedElement(std::string s, bool allowEmpty = true) const {
         auto it = mNamedElements.find(s);
 
         if (it != mNamedElements.end()) {
             return it->second;
+        }
+
+        if (!allowEmpty) {
+            throw std::runtime_error("Can't find element named '" + s + "'.");
         }
 
         return nullptr;
@@ -502,7 +510,7 @@ public:
             return mPyObject;
         }
 
-        if (mKind == Kind::Instance) {
+        if (mKind == Kind::PrimitiveInstance) {
             mPyObject = PyInstance::extractPythonObject(mInstance);
             return mPyObject;
         }
@@ -517,13 +525,13 @@ public:
         std::string inner;
         if (mType) {
             inner = mType->name();
-        } else 
+        } else
         if (mName.size()) {
             inner = mName;
             if (mModuleName.size()) {
                 inner = mModuleName + "." + mName;
             }
-        } else 
+        } else
         if (mPyObject) {
             inner = std::string("of type ") + mPyObject->ob_type->tp_name;
         }
@@ -577,7 +585,7 @@ public:
             if (mKind == Kind::PrimitiveType) {
                 context.serializeNativeType(mType, buffer, 2);
             } else
-            if (mKind == Kind::Instance) {
+            if (mKind == Kind::PrimitiveInstance) {
                 buffer.writeBeginCompound(3);
                 context.serializeNativeType(mInstance.type(), buffer, 0);
                 mInstance.type()->serialize(mInstance.data(), buffer, 1);
@@ -662,7 +670,7 @@ public:
 
     void clearCache() {
         if (mKind == Kind::ArbitraryPyObject
-            || mKind == Kind::Instance
+            || mKind == Kind::PrimitiveInstance
             || mKind == Kind::PrimitiveType
         ) {
             throw std::runtime_error("Can't clear the cache of a leaf node.");
@@ -724,6 +732,14 @@ public:
         return updated;
     }
 
+    std::string getNameByIx(long ix) {
+        if (ix < 0 || ix >= mNames.size()) {
+            throw std::runtime_error("NameIndex out of bounds.");
+        }
+
+        return mNames[ix];
+    }
+
     PyObjSnapshot* computeForwardTarget() {
         if (mKind != Kind::ForwardType) {
             return nullptr;
@@ -746,6 +762,10 @@ public:
     }
 
     PyObjSnapshot* computeForwardTargetTransitive();
+
+    std::string computeRecursiveName(SnapshotStack& stack, const std::unordered_set<PyObjSnapshot*>& group);
+
+    void recomputeRecursiveName(const std::unordered_set<PyObjSnapshot*>& group);
 
 private:
     void markInternalizedOnType() {

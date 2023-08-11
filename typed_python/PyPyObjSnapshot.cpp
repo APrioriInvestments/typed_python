@@ -157,10 +157,6 @@ PyObject* PyPyObjSnapshot::tp_getattro(PyObject* selfObj, PyObject* attrName) {
             return incref((PyObject*)PyInstance::typeObj(obj->getType()));
         }
 
-        if (attr == "instance" && obj->isInstance()) {
-            return PyInstance::fromInstance(obj->getInstance());
-        }
-
         if (attr == "stringValue" && obj->isString()) {
             return PyUnicode_FromString(obj->getStringValue().c_str());
         }

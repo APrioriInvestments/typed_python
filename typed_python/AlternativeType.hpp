@@ -109,7 +109,7 @@ public:
         m_is_forward_defined = true;
 
         m_name = name;
-        m_moduleName = moduleName;
+        m_module_name = moduleName;
 
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
@@ -128,7 +128,7 @@ public:
         const std::vector<Type*>& subtypes_concrete
     ) {
         m_name = name;
-        m_moduleName = moduleName;
+        m_module_name = moduleName;
         m_methods = methods;
         m_subtypes = types;
         m_subtypes_concrete = subtypes_concrete;
@@ -142,7 +142,7 @@ public:
         Alternative* selfT = (Alternative*)forwardDefinitionOfSelf;
 
         m_name = selfT->m_name;
-        m_moduleName = selfT->m_moduleName;
+        m_module_name = selfT->m_module_name;
         m_hasGetAttributeMagicMethod = selfT->m_hasGetAttributeMagicMethod;
         m_methods = selfT->m_methods;
         m_subtypes = selfT->m_subtypes;
@@ -207,22 +207,6 @@ public:
         for (auto& nameAndSub: m_methods) {
             updateTypeRefFromGroupMap(nameAndSub.second, groupMap);
         }
-    }
-
-    std::string nameWithModuleConcrete() {
-        if (m_moduleName.size() == 0) {
-            return m_name;
-        }
-
-        return m_moduleName + "." + m_name;
-    }
-
-    std::string moduleNameConcrete() {
-        if (m_moduleName.size() == 0) {
-            return "builtins";
-        }
-
-        return m_moduleName;
     }
 
     bool hasGetAttributeMagicMethod() const {
@@ -401,7 +385,7 @@ public:
     );
 
     Alternative* renamed(std::string newName) {
-        return Make(newName, m_moduleName, m_subtypes, m_methods);
+        return Make(newName, m_module_name, m_subtypes, m_methods);
     }
 
     const std::vector<std::pair<std::string, NamedTuple*> >& subtypes() const {
@@ -432,8 +416,6 @@ private:
     void initializeConcreteSubclasses();
 
     //name of the module in which this Alternative was defined.
-    std::string m_moduleName;
-
     bool m_all_alternatives_empty;
 
     int m_default_construction_ix;

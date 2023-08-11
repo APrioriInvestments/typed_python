@@ -25,10 +25,10 @@ class Type;
 // is above us in the stack and if so, how many levels up, using 'indexOf'
 // and push new types to the stack using PushTypeStack. The stack can't have
 // duplicates.
-
-class TypeStack {
+template<class T>
+class PtrStack {
 public:
-    long indexOf(Type* t) {
+    long indexOf(T* t) {
         auto it = mTypeIndices.find(t);
 
         if (it == mTypeIndices.end()) {
@@ -38,7 +38,7 @@ public:
         return mTypeIndices.size() - it->second - 1;
     }
 
-    void push(Type* t) {
+    void push(T* t) {
         if (mTypeIndices.find(t) != mTypeIndices.end()) {
             throw std::runtime_error("Type is already in the type stack");
         }
@@ -47,26 +47,32 @@ public:
         mTypeIndices[t] = s;
     }
 
-    void pop(Type* t) {
+    void pop(T* t) {
         mTypeIndices.erase(t);
     }
 
 private:
-    std::map<Type*, long> mTypeIndices;
+    std::map<T*, long> mTypeIndices;
 };
 
+typedef PtrStack<Type> TypeStack;
 
-class PushTypeStack {
+
+template<class T>
+class PushPtrStack {
 public:
-    PushTypeStack(TypeStack& stack, Type* t) : mStack(stack), mT(t) {
+    PushPtrStack(PtrStack<T>& stack, T* t) : mStack(stack), mT(t) {
         stack.push(mT);
     }
 
-    ~PushTypeStack() {
+    ~PushPtrStack() {
         mStack.pop(mT);
     }
 
 private:
-    TypeStack& mStack;
-    Type* mT;
+    PtrStack<T>& mStack;
+    T* mT;
 };
+
+
+typedef PushPtrStack<Type> PushTypeStack;

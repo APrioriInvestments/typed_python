@@ -25,7 +25,7 @@ void PyObjSnapshot::rehydrate() {
     PyObjRehydrator rehydrator;
 
     rehydrator.start(this);
-    rehydrator.finalize();
+    rehydrator.rehydrateAll();
 }
 
 std::string PyObjSnapshot::kindAsString() const {
@@ -38,8 +38,8 @@ std::string PyObjSnapshot::kindAsString() const {
     if (mKind == Kind::NamedPyObject) {
         return "NamedPyObject";
     }
-    if (mKind == Kind::Instance) {
-        return "Instance";
+    if (mKind == Kind::PrimitiveInstance) {
+        return "PrimitiveInstance";
     }
     if (mKind == Kind::ValueInstance) {
         return "ValueInstance";
@@ -285,6 +285,8 @@ void PyObjSnapshot::becomeInternalizedOf(
     }
 
     mNamedInts["type_is_forward"] = t->isForwardDefined() ? 1 : 0;
+    mName = t->name();
+    mModuleName = t->moduleName();
 
     if (t->isListOf()) {
         mKind = Kind::ListOfType;
@@ -799,18 +801,18 @@ void PyObjSnapshot::becomeInternalizedOf(
     }
 
     if (val == Py_None) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
         return;
     }
 
     if (PyBool_Check(val)) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
         mInstance = Instance::create(val == Py_True);
         return;
     }
 
     if (PyLong_Check(val)) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
 
         try {
             mInstance = Instance::create((int64_t)PyLong_AsLongLong(val));
@@ -823,7 +825,7 @@ void PyObjSnapshot::becomeInternalizedOf(
     }
 
     if (PyFloat_Check(val)) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
         mInstance = Instance::create(PyFloat_AsDouble(val));
         return;
     }
@@ -851,7 +853,7 @@ void PyObjSnapshot::becomeInternalizedOf(
     }
 
     if (PyBytes_Check(val)) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
         mInstance = Instance::createAndInitialize(
             BytesType::Make(),
             [&](instance_ptr i) {
@@ -1036,15 +1038,21 @@ void PyObjSnapshot::becomeInternalizedOf(
         return;
     }
 
+    if (val.type()->isString()) {
+        mKind = Kind::String;
+        mStringValue = ((StringType*)val.type())->toUtf8String(val.data());
+        return;
+    }
+
     if (val.type()->isNone() || val.type()->isBytes() || val.type()->isRegister()) {
-        mKind = Kind::Instance;
+        mKind = Kind::PrimitiveInstance;
         mInstance = val;
         return;
     }
 
     throw std::runtime_error(
         "Can't make a PyObjSnapshot out of an instance of type "
-        + mInstance.type()->name()
+        + val.type()->name()
     );
 }
 
@@ -1226,3 +1234,173 @@ PyObjSnapshot* PyObjSnapshot::computeForwardTargetTransitive() {
     }
 }
 
+
+void PyObjSnapshot::recomputeRecursiveName(const std::unordered_set<PyObjSnapshot*>& group) {
+    SnapshotStack stack;
+
+    mName = computeRecursiveName(stack, group);
+}
+
+std::string PyObjSnapshot::computeRecursiveName(SnapshotStack& stack, const std::unordered_set<PyObjSnapshot*>& group) {
+    if (mKind == Kind::PrimitiveType) {
+        return mType->name();
+    }
+
+    // if we're not in the group, then we will have a name computed already
+    if (group.find(this) == group.end()) {
+        return mName;
+    }
+
+    // the names of these classes can't change - they are given to us
+    if (mKind == Kind::ClassType || mKind == Kind::HeldClassType || mKind == Kind::AlternativeType) {
+        return mName;
+    }
+
+    long index = stack.indexOf(this);
+    if (index != -1) {
+        return "^" + format(index);
+    }
+
+    PushSnapshotStack push(stack, this);
+
+    if (mKind == Kind::PythonObjectOfTypeType) {
+        return "PythonObjectOfType(" + getNamedElement("element_type", false)->computeRecursiveName(stack, group) + ")";
+    }
+
+    if (mKind == Kind::AlternativeMatcherType) {
+        return "AlternativeMatcher(" + getNamedElement("alternative", false)->computeRecursiveName(stack, group) + ")";
+    }
+
+    if (mKind == Kind::ConcreteAlternativeType) {
+        return getNamedElement("alternative", false)->computeRecursiveName(stack, group) + "." +
+            getNamedElement("alternative", false)->getNameByIx(mNamedInts["which"]);
+    }
+
+    if (mKind == Kind::BoundMethodType) {
+        if (mNames.size() != 1) {
+            throw std::runtime_error("Corrupt PyObjSnapshot.BoundMethodType: no name");
+        }
+
+        return "BoundMethod(" + getNamedElement("self_type", false)->computeRecursiveName(stack, group) + ", " + mNames[0] + ")";
+    }
+
+    if (mKind == Kind::NamedTupleType) {
+        std::string name = "NamedTuple(";
+
+        for (long k = 0; k < mElements.size() && k < mNames.size(); k++) {
+            if (k) {
+                name += ", ";
+            }
+            name += mNames[k] + "=" + mElements[k]->computeRecursiveName(stack, group);
+        }
+
+        name += ")";
+        return name;
+    }
+
+    if (mKind == Kind::TupleType) {
+        std::string name = "Tuple(";
+
+        for (long k = 0; k < mElements.size() && k < mNames.size(); k++) {
+            if (k) {
+                name += ", ";
+            }
+            name += mElements[k]->computeRecursiveName(stack, group);
+        }
+
+        name += ")";
+        return name;
+    }
+
+    if (mKind == Kind::DictType) {
+        return "Dict("
+            + getNamedElement("key_type", false)->computeRecursiveName(stack, group)
+            + ", "
+            + getNamedElement("value_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::ConstDictType) {
+        return "ConstDict("
+            + getNamedElement("key_type", false)->computeRecursiveName(stack, group)
+            + ", "
+            + getNamedElement("value_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::ListOfType) {
+        return "ListOf("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::SetType) {
+        return "Set("
+            + getNamedElement("key_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::TypedCellType) {
+        return "TypedCell("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::TupleOfType) {
+        return "TupleOf("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::PointerToType) {
+        return "PointerTo("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::SubclassOfTypeType) {
+        return "SubclassOf("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::RefToType) {
+        return "RefTo("
+            + getNamedElement("element_type", false)->computeRecursiveName(stack, group)
+            + ")";
+    }
+
+    if (mKind == Kind::OneOfType) {
+        std::string name = "mElements(";
+
+        for (long k = 0; k < mElements.size(); k++) {
+            if (k) {
+                name += ", ";
+            }
+            name += mElements[k]->computeRecursiveName(stack, group);
+        }
+
+        name += ")";
+        return name;
+    }
+
+    if (mKind == Kind::OneOfType) {
+        std::string name = "mElements(";
+
+        for (long k = 0; k < mElements.size(); k++) {
+            if (k) {
+                name += ", ";
+            }
+            name += mElements[k]->computeRecursiveName(stack, group);
+        }
+
+        name += ")";
+        return name;
+    }
+
+    if (mKind == Kind::ForwardType) {
+        return mName;
+    }
+
+    return "<PyObjSnapshot of kind " + kindAsString() + ">";
+}

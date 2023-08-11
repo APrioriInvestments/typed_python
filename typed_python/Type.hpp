@@ -317,35 +317,20 @@ public:
             );
     }
 
-    const std::string& name(bool stripQualname=false) const {
-        if (stripQualname) {
-            if (!m_stripped_name.size()) {
-                m_stripped_name = qualname_to_name(m_name);
-            }
-
-            return m_stripped_name;
-        }
+    const std::string& name() const {
         return m_name;
     }
 
     std::string moduleName() {
-        return this->check([&](auto& subtype) {
-            return subtype.moduleNameConcrete();
-        });
-    }
-
-    std::string moduleNameConcrete() {
-        return "builtins";
+        return m_module_name;
     }
 
     std::string nameWithModule() {
-        return this->check([&](auto& subtype) {
-            return subtype.nameWithModuleConcrete();
-        });
-    }
+        if (m_module_name.size()) {
+            return m_module_name + "." + m_name;
+        }
 
-    std::string nameWithModuleConcrete() {
-        return name();
+        return m_name;
     }
 
     const char* doc() {
@@ -933,9 +918,11 @@ public:
         m_is_forward_defined = isForwardDefined;
     }
 
-    void markActivelyBeingDeserialized(bool isForwardDefined) {
+    void markActivelyBeingDeserialized(bool isForwardDefined, std::string inModuleName, std::string inName) {
         m_is_being_deserialized = true;
         m_is_forward_defined = isForwardDefined;
+        m_name = inName;
+        m_module_name = inModuleName;
     }
 
     bool isActivelyBeingDeserialized() {
@@ -989,11 +976,9 @@ protected:
 
     bool m_is_default_constructible;
 
-    std::string m_recursive_name;
-
     std::string m_name;
 
-    mutable std::string m_stripped_name;
+    std::string m_module_name;
 
     PyTypeObject* mTypeRep;
 
@@ -1102,7 +1087,6 @@ public:
     void recomputeName() {
         TypeStack stack;
         m_name = computeRecursiveName(stack);
-        m_stripped_name = "";
     }
 
     void internalize();
