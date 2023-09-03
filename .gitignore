@@ -15,6 +15,7 @@ object_database/web/content/dist
 # Emacs
 \#*
 \.#*
+**/*~
 
 # leading slash means only match at repo-root level
 /.python-version
@@ -25,6 +26,13 @@ object_database/web/content/dist
 /.env*
 /.test_venv
 /dist/
+/wheels/
 /pip-wheel-metadata/
 /testcert.cert
 /testcert.key
+
+.idea/
+
+# build_scripts sets up temporary symlinks so don't accidentally check them in
+Pipfile
+Pipfile.lock
