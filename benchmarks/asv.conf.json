@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "project": "typed_python",
+    "project_url": "typed-python.readthedocs.io",
+    "repo": "..",
+    "branches": ["dev"],
+    "dvcs": "git",
+    "show_commit_url": "https://github.com/APrioriInvestments/typed_python/commit/",
+    "benchmark_dir": "benchmarks",
+    "build_cache_size": 8,
+    "build_command": ["pip install numpy",
+         "python setup.py build",
+         "PIP_NO_BUILD_ISOLATION=false python -mpip wheel --no-deps --no-index -w {build_cache_dir} {build_dir}"
+     ],
+    "environment_type": "conda",
+    "env_dir": ".asv/env",
+    "results_dir": ".asv/results",
+    "html_dir": ".asv/html"
+}
