@@ -176,6 +176,7 @@ def checkConversionToType(x, TargetType, expectedSuccessLevel):
                 )
 
 
+@pytest.mark.group_one
 def test_register_conversion_semantics():
     checkConversionToType(False, bool, ConversionLevel.Signature)
     checkConversionToType(False, UInt16, ConversionLevel.Upcast)
@@ -208,10 +209,12 @@ def test_register_conversion_semantics():
     checkConversionToType("0", str, ConversionLevel.Signature)
 
 
+@pytest.mark.group_one
 def test_int_to_list_of_int():
     checkConversionToType(1, ListOf(int), None)
 
 
+@pytest.mark.group_one
 def test_untyped_dict_conversion_semantics():
     aDict = {1: 2}
     checkConversionToType(aDict, Dict(int, int), ConversionLevel.ImplicitContainers)
@@ -228,6 +231,7 @@ def test_untyped_dict_conversion_semantics():
     checkConversionToType(aDict, Set(float), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_untyped_list_of_conversion_semantics():
     aList = [1, 2]
 
@@ -239,6 +243,7 @@ def test_untyped_list_of_conversion_semantics():
     checkConversionToType(aList, Set(float), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_untyped_tuple_of_conversion_semantics():
     aTup = (1, 2)
 
@@ -250,6 +255,7 @@ def test_untyped_tuple_of_conversion_semantics():
     checkConversionToType(aTup, Set(float), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_typed_dict_conversion_semantics():
     aDict = Dict(int, float)({1: 2, 3: 4.5})
 
@@ -261,6 +267,7 @@ def test_typed_dict_conversion_semantics():
     checkConversionToType(aDict, TupleOf(str), None)
 
 
+@pytest.mark.group_one
 def test_numpy_scalar_conversion():
     checkConversionToType(numpy.int64(1), int, ConversionLevel.Signature)
     checkConversionToType(numpy.int64(1), float, ConversionLevel.Upcast)
@@ -278,6 +285,7 @@ def test_numpy_scalar_conversion():
     checkConversionToType(numpy.int32(1), str, ConversionLevel.New)
 
 
+@pytest.mark.group_one
 def test_convert_things_to_object():
     checkConversionToType(test_convert_things_to_object, object, ConversionLevel.Signature)
     checkConversionToType(str, object, ConversionLevel.Signature)
@@ -292,16 +300,19 @@ def test_convert_things_to_object():
     checkConversionToType(Set(int)(), object, ConversionLevel.Signature)
 
 
+@pytest.mark.group_one
 def test_list_of_conversion_semantics():
     checkConversionToType(ListOf(int)([1, 2]), Set(int), ConversionLevel.ImplicitContainers)
     checkConversionToType(ListOf(float)([1, 2]), Set(int), ConversionLevel.New)
     checkConversionToType(ListOf(int)([1, 2]), Set(float), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_typed_set_conversion_semantics():
     checkConversionToType({1}, Set(int), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_convert_containers_to_oneof():
     checkConversionToType(ListOf(int)(), OneOf(None, ListOf(int)), ConversionLevel.Signature)
     checkConversionToType(ListOf(int)(), OneOf(None, ListOf(float)), ConversionLevel.ImplicitContainers)
@@ -309,19 +320,23 @@ def test_convert_containers_to_oneof():
     checkConversionToType(ListOf(str)(["1.0"]), OneOf(None, ListOf(float)), None)
 
 
+@pytest.mark.group_one
 def test_convert_to_bytes():
     checkConversionToType("hi", bytes, None)
     checkConversionToType(ListOf(int)([1, 2, 3]), bytes, ConversionLevel.New)
 
 
+@pytest.mark.group_one
 def test_convert_numpy_to_listof():
     checkConversionToType(numpy.array([1, 2]), ListOf(int), ConversionLevel.ImplicitContainers)
 
 
+@pytest.mark.group_one
 def test_convert_type_to_type():
     checkConversionToType(str, type, ConversionLevel.Signature)
 
 
+@pytest.mark.group_one
 def test_convert_untyped_classes():
     class C1:
         pass
@@ -333,6 +348,7 @@ def test_convert_untyped_classes():
     checkConversionToType(C1(), C2, None)
 
 
+@pytest.mark.group_one
 def test_convert_to_named_tuple():
     checkConversionToType(NamedTuple(x=int)(x=1), NamedTuple(x=float), ConversionLevel.Upcast)
     checkConversionToType(NamedTuple(x=OneOf(int, float))(x=1), NamedTuple(x=int), ConversionLevel.Upcast)

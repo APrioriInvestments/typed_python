@@ -36,6 +36,7 @@ def externalCallTarget(name, output, *inputs):
 
 
 class TestNativeAstToLlvm(unittest.TestCase):
+    @pytest.mark.group_one
     def test_teardowns(self):
         converter = native_ast_to_llvm.Converter()
 

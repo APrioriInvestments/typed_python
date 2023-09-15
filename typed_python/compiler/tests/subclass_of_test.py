@@ -13,6 +13,7 @@ class C(B, Final):
     pass
 
 
+@pytest.mark.group_one
 def test_can_cast_subclass_of_correctly():
     @Function
     def f(c: SubclassOf(C)):

@@ -19,6 +19,7 @@ import unittest
 
 
 class TestIsinstanceCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic_isinstance(self):
         @Entrypoint
         def isInt(x):
@@ -28,6 +29,7 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertFalse(isInt(1.0))
         self.assertFalse(isInt("hi"))
 
+    @pytest.mark.group_one
     def test_isinstance_with_oneof(self):
         @Entrypoint
         def isIntOneOf(x: OneOf(int, float)):
@@ -36,6 +38,7 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertTrue(isIntOneOf(0))
         self.assertFalse(isIntOneOf(1.0))
 
+    @pytest.mark.group_one
     def test_isinstance_with_oneof_and_str(self):
         @Entrypoint
         def isStrOneOf(x: OneOf(int, str)):
@@ -44,6 +47,7 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertFalse(isStrOneOf(0))
         self.assertTrue(isStrOneOf("1.0"))
 
+    @pytest.mark.group_one
     def test_isinstance_with_value(self):
         @Entrypoint
         def isIntValue(x: OneOf(0, 1.0)):
@@ -52,6 +56,7 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertTrue(isIntValue(0))
         self.assertFalse(isIntValue(1.0))
 
+    @pytest.mark.group_one
     def test_isinstance_complex(self):
         @Entrypoint
         def isTupleOfInt(x):
@@ -61,6 +66,7 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertFalse(isTupleOfInt((1, 2)))
         self.assertTrue(isTupleOfInt(TupleOf(int)((1, 2))))
 
+    @pytest.mark.group_one
     def test_isinstance_typeof_none(self):
         @Entrypoint
         def isNone(x):

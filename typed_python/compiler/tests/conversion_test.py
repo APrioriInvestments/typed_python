@@ -110,6 +110,7 @@ repeat_test_compiled = Entrypoint(repeat_test)
 
 
 class TestCompilationStructures(unittest.TestCase):
+    @pytest.mark.group_one
     def test_dispatch_order_independent(self):
         class AClass(Class):
             pass
@@ -137,6 +138,7 @@ class TestCompilationStructures(unittest.TestCase):
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))
 
+    @pytest.mark.group_one
     def test_simple_loop(self):
         def f(x: int) -> int:
             y = 0
@@ -147,12 +149,14 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_returning(self):
         def f(x: int) -> int:
             return x
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_basic_arithmetic(self):
         def f(x: int) -> int:
             y = x+1
@@ -160,6 +164,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_boolean_and(self):
         @Compiled
         def f(x: int, y: int, z: int) -> bool:
@@ -174,6 +179,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1, 1, 0), False)
         self.assertEqual(f(1, 1, 1), True)
 
+    @pytest.mark.group_one
     def test_boolean_or(self):
         @Compiled
         def f(x: int, y: int, z: int) -> bool:
@@ -188,6 +194,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1, 1, 0), True)
         self.assertEqual(f(1, 1, 1), True)
 
+    @pytest.mark.group_one
     def test_boolean_operators(self):
         @Compiled
         def f(x: int, y: int, z: float) -> bool:
@@ -196,6 +203,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(0, 1, 1.5), False)
         self.assertEqual(f(1, 1, 1.5), True)
 
+    @pytest.mark.group_one
     def test_boolean_operators_with_side_effects(self):
         # a function that appends 'effect' onto a list of effects
         # and then returns result, so that we can track when we
@@ -232,6 +240,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f_or(1, 0, ""), ["x", "y"])
         self.assertEqual(f_or(1, 1, ""), ["x", "y", "z"])
 
+    @pytest.mark.group_one
     def test_object_to_int_conversion(self):
         @Function
         def toObject(o: object):
@@ -243,6 +252,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(10), 10)
 
+    @pytest.mark.group_one
     def test_variable_type_changes_make_sense(self):
         @Compiled
         def f(x: int) -> float:
@@ -252,6 +262,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(10), 1.2)
 
+    @pytest.mark.group_one
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
             return x+1
@@ -261,6 +272,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_call_untyped_function(self):
         @Compiled
         def f(x: object):
@@ -270,6 +282,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertIs(f(x), x)
 
+    @pytest.mark.group_one
     def test_call_other_untyped_function(self):
         def g(x):
             return x
@@ -282,6 +295,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertIs(f(x), x)
 
+    @pytest.mark.group_one
     def test_integers_in_closures(self):
         y = 2
 
@@ -290,6 +304,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_loop_variable_changing_type(self):
         @Compiled
         def f(top: float) -> OneOf(int, float):
@@ -303,6 +318,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(3.5), 10.0)
 
+    @pytest.mark.group_one
     def test_unassigned_variables(self):
         @Compiled
         def f(switch: int, t: TupleOf(int)) -> TupleOf(int):
@@ -315,6 +331,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "local variable 'x' referenced before assignment"):
             self.assertEqual(f(0, (1, 2, 3)), (1, 2, 3))
 
+    @pytest.mark.group_one
     def test_return_from_function_without_return_value_specified(self):
         @Compiled
         def f(t: TupleOf(int)):
@@ -322,6 +339,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f((1, 2, 3)), (1, 2, 3))
 
+    @pytest.mark.group_one
     def test_return_from_function_with_bad_convert_throws(self):
         @Compiled
         def f(t: TupleOf(int)) -> None:
@@ -331,6 +349,7 @@ class TestCompilationStructures(unittest.TestCase):
             f((1, 2, 3))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_of_mutually_recursive_untyped_functions(self):
         def q(x):
             return x-1
@@ -366,6 +385,7 @@ class TestCompilationStructures(unittest.TestCase):
 
             print("for ", input, " speedup is ", speedup)
 
+    @pytest.mark.group_one
     def test_call_typed_function(self):
         @Function
         def f(x):
@@ -377,6 +397,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(10), 11)
 
+    @pytest.mark.group_one
     def test_adding_with_nones_throws(self):
         @Compiled
         def g():
@@ -385,6 +406,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             g()
 
+    @pytest.mark.group_one
     def test_exception_before_return_propagated(self):
         @Compiled
         def g():
@@ -394,6 +416,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             g()
 
+    @pytest.mark.group_one
     def test_call_function_with_none(self):
         @Compiled
         def g(x: None):
@@ -401,6 +424,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(None), None)
 
+    @pytest.mark.group_one
     def test_call_other_function_with_none(self):
         def f(x):
             return x
@@ -411,6 +435,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(1), None)
 
+    @pytest.mark.group_one
     def test_interleaving_nones(self):
         def f(x, y, z):
             x+z
@@ -428,6 +453,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type None"):
             throws(1)
 
+    @pytest.mark.group_one
     def test_return_none(self):
         def f(x):
             return x
@@ -439,6 +465,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(g.resultTypeFor().typeRepresentation, type(None))
         self.assertEqual(g(), None)
 
+    @pytest.mark.group_one
     def test_assign_with_none(self):
         def f(x):
             return x
@@ -451,6 +478,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(1), None)
 
+    @pytest.mark.group_one
     def test_nonexistent_variable(self):
         @Compiled
         def f():
@@ -460,6 +488,7 @@ class TestCompilationStructures(unittest.TestCase):
             f()
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_iterating(self):
         @Compiled
         def sumDirectly(x: int):
@@ -489,6 +518,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
         self.assertLess((t1-t0), (t2 - t1) * 1.2)
 
+    @pytest.mark.group_one
     def test_read_invalid_variables(self):
         @Compiled
         def readNonexistentVariable(readIt: bool):
@@ -502,6 +532,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(readNonexistentVariable(False), 0)
 
+    @pytest.mark.group_one
     def test_append_float_to_int_rules_same(self):
         def f():
             x = ListOf(int)()
@@ -510,6 +541,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(), Compiled(f)())
 
+    @pytest.mark.group_one
     def test_multiple_assignments(self):
         @Entrypoint
         def f(iterable):
@@ -533,6 +565,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "too many"):
             f(Tuple(int, int, int, int)((1, 2, 3, 4)))
 
+    @pytest.mark.group_one
     def test_print_oneof(self):
         @Compiled
         def f(x: OneOf(float, str), y: OneOf(float, str)):
@@ -541,6 +574,7 @@ class TestCompilationStructures(unittest.TestCase):
         f("hi", "hi")
         f(1.0, "hi")
 
+    @pytest.mark.group_one
     def test_type_oneof(self):
         @Compiled
         def f(x: OneOf(float, int)):
@@ -549,6 +583,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1), str(int))
         self.assertEqual(f(1.0), str(float))
 
+    @pytest.mark.group_one
     def test_can_raise_exceptions(self):
         @Compiled
         def aFunctionThatRaises(x: object):
@@ -565,6 +600,7 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertIn('conversion_test', trace)
             self.assertIn('aFunctionThatRaises', trace)
 
+    @pytest.mark.group_one
     def test_stacktraces_show_up(self):
         def f2(x):
             return f3(x)
@@ -589,6 +625,7 @@ class TestCompilationStructures(unittest.TestCase):
             self.assertIn("f4", trace)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_of_inlined_functions_doesnt_degrade(self):
         def f1(x):
             return f2(x)
@@ -639,6 +676,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertLessEqual(ratio, 1.2)
         print(f"Deeper call tree code was {ratio} times slow.")
 
+    @pytest.mark.group_one
     def test_exception_handling_preserves_refcount(self):
         @Entrypoint
         def f(x, shouldThrow):
@@ -660,6 +698,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aList), 1)
 
+    @pytest.mark.group_one
     def test_assert(self):
         @Entrypoint
         def assertNoMessage(x):
@@ -678,6 +717,7 @@ class TestCompilationStructures(unittest.TestCase):
         assertNoMessage(1)
         assertWithMessage(1, "message")
 
+    @pytest.mark.group_one
     def test_assert_false(self):
         @Entrypoint
         def check(x):
@@ -689,6 +729,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check(10)
 
+    @pytest.mark.group_one
     def test_conditional_eval_or(self):
         @Compiled
         def f1(x: float, y: int):
@@ -723,6 +764,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f3(3, 1.5, ""), 3)
         self.assertEqual(f3(3, 1.5, "one"), 3)
 
+    @pytest.mark.group_one
     def test_conditional_eval_and(self):
         @Compiled
         def f1(x: float, y: int):
@@ -757,6 +799,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(3, "one", 0.0), 0.0)
         self.assertEqual(f(3, "one", 1.5), 1.5)
 
+    @pytest.mark.group_one
     def test_conversion_of_deeply_nested_functions(self):
         def g_0():
             return 0
@@ -812,6 +855,7 @@ class TestCompilationStructures(unittest.TestCase):
             if identity not in oldTimesCalculated:
                 self.assertLessEqual(timesCalculated, 6, identity)
 
+    @pytest.mark.group_one
     def test_converting_break_in_while(self):
         def testBreak(x):
             res = 0
@@ -827,6 +871,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(10), Entrypoint(testBreak)(10))
 
+    @pytest.mark.group_one
     def test_converting_break_in_while_with_try_outside_of_loop(self):
         def testBreak():
             res = 0
@@ -843,6 +888,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(), Entrypoint(testBreak)())
 
+    @pytest.mark.group_one
     def test_converting_break_in_while_with_try_inside_of_loop(self):
         def testBreak():
             res = 0
@@ -860,6 +906,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(), Entrypoint(testBreak)())
 
+    @pytest.mark.group_one
     def test_converting_break_through_nested_try_finally(self):
         def testBreak():
             res = 0
@@ -883,6 +930,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(), Entrypoint(testBreak)())
 
+    @pytest.mark.group_one
     def test_converting_continue_through_multiple_nested_try_finally(self):
         def testBreak():
             res = 0
@@ -912,6 +960,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testBreak(), Entrypoint(testBreak)())
 
+    @pytest.mark.group_one
     def test_converting_continue_in_while(self):
         def testContinue(x):
             res = 0
@@ -929,6 +978,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(testContinue(10), Entrypoint(testContinue)(10))
 
+    @pytest.mark.group_one
     def test_converting_break_in_foreach(self):
         def testBreak(x):
             res = 0
@@ -942,6 +992,7 @@ class TestCompilationStructures(unittest.TestCase):
         for thing in [ListOf(int)(range(10)), Tuple(int, int, int, int)((1, 2, 3, 4))]:
             self.assertEqual(testBreak(thing), Entrypoint(testBreak)(thing))
 
+    @pytest.mark.group_one
     def test_converting_continue_in_foreach(self):
         def testContinue(x):
             res = 0
@@ -955,6 +1006,7 @@ class TestCompilationStructures(unittest.TestCase):
         for thing in [ListOf(int)(range(10)), Tuple(int, int, int, int)((1, 2, 3, 4))]:
             self.assertEqual(testContinue(thing), Entrypoint(testContinue)(thing))
 
+    @pytest.mark.group_one
     def test_call_function_with_wrong_number_of_arguments(self):
         def f(x, y):
             return x + y
@@ -966,6 +1018,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callIt(1)
 
+    @pytest.mark.group_one
     def test_call_function_with_default_arguments(self):
         def f(x, y=1):
             return x + y
@@ -976,6 +1029,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(10), f(10))
 
+    @pytest.mark.group_one
     def test_call_function_with_named_args_ordering(self):
         def f(x, y):
             return x
@@ -986,6 +1040,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callWithArgsReversed(2, 3), 2)
 
+    @pytest.mark.group_one
     def test_call_function_with_named_args(self):
         def f(x=1, y=10):
             return x + y
@@ -1007,6 +1062,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callWithY(2), callWithYCompiled(2))
         self.assertEqual(callWithXY(2, 3), callWithXYCompiled(2, 3))
 
+    @pytest.mark.group_one
     def test_call_function_with_star_args(self):
         def f(*args):
             return args
@@ -1017,6 +1073,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(1, 2.5, "hi"), Tuple(int, float, str)((1, 2.5, "hi")))
 
+    @pytest.mark.group_one
     def test_call_function_with_kwargs(self):
         def f(**kwargs):
             return kwargs
@@ -1027,6 +1084,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(1, 2.5, "hi"), dict(x=1, y=2.5, z="hi"))
 
+    @pytest.mark.group_one
     def test_call_function_with_excess_named_arg(self):
         def f(x=1, y=2):
             return x + y
@@ -1038,6 +1096,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "annot find a valid over"):
             callIt(1, 2, 3)
 
+    @pytest.mark.group_one
     def test_star_arg_call_function(self):
         def f(x, y):
             return x + y
@@ -1048,6 +1107,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(Tuple(int, int)((1, 2))), 3)
 
+    @pytest.mark.group_one
     def test_star_kwarg_type(self):
         def f(**kwargs):
             return type(kwargs)
@@ -1058,6 +1118,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(), dict)
 
+    @pytest.mark.group_one
     def test_star_kwarg_as_dict(self):
         def f(**kwargs):
             return kwargs
@@ -1068,6 +1129,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(), dict(x=10, y=20))
 
+    @pytest.mark.group_one
     def test_star_kwarg_call_function(self):
         def f(x, y):
             return x + y
@@ -1082,6 +1144,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callIt(1, 2), 3)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_of_star_kwarg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
@@ -1124,6 +1187,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertTrue(.7 <= elapsedF / elapsedG <= 1.3, elapsedF / elapsedG)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_of_star_arg_intermediate_is_fast(self):
         def f(x, y):
             return x + y
@@ -1165,6 +1229,7 @@ class TestCompilationStructures(unittest.TestCase):
         # check that the extra call to 'g' doesn't introduce any overhead
         self.assertTrue(.65 <= elapsedF / elapsedG <= 1.35, elapsedF / elapsedG)
 
+    @pytest.mark.group_one
     def test_star_args_type(self):
         def f(*args):
             return type(args)
@@ -1175,6 +1240,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callF(), tuple)
 
+    @pytest.mark.group_one
     def test_typed_functions_with_star_args(self):
         @Function
         def f(x: int):
@@ -1195,6 +1261,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callF1(0), 1)
         self.assertEqual(callF2(0, 1), 2)
 
+    @pytest.mark.group_one
     def test_typed_functions_with_kwargs(self):
         @Function
         def f(x, **kwargs):
@@ -1226,6 +1293,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callF4(0, 1)
 
+    @pytest.mark.group_one
     def test_typed_functions_with_typed_kwargs(self):
         @Function
         def f(**kwargs: int):
@@ -1249,6 +1317,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callF(x=1.5), "int")
         self.assertEqual(callF(x="1"), "str")
 
+    @pytest.mark.group_one
     def test_typed_functions_dispatch_based_on_names(self):
         @Function
         def f(x):
@@ -1274,6 +1343,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callFWithX(10), "x")
         self.assertEqual(callFWithY(10), "y")
 
+    @pytest.mark.group_one
     def test_typed_functions_with_oneof(self):
         @Function
         def f(x: OneOf(int, float)):
@@ -1296,6 +1366,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, r"annot find a valid overload"):
             callF2("h")
 
+    @pytest.mark.group_one
     def test_can_call_function_with_typed_function_as_argument(self):
         @Function
         def add(x: int, y: int):
@@ -1313,6 +1384,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "annot find a valid overload"):
             callIt(1, g)
 
+    @pytest.mark.group_one
     def test_check_type_of_method_conversion(self):
         @Entrypoint
         def g(x: OneOf(None, TupleOf(int))):
@@ -1321,6 +1393,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(g((1, 2, 3)), TupleOf(int))
         self.assertEqual(g(None), type(None))
 
+    @pytest.mark.group_one
     def test_check_is_on_unlike_things(self):
         @Entrypoint
         def g(x, y):
@@ -1330,6 +1403,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertTrue(g(None, None))
         self.assertFalse(g(ListOf(int)(), TupleOf(int)()))
 
+    @pytest.mark.group_one
     def test_if_condition_throws(self):
         def throws():
             raise Exception("Boo")
@@ -1347,6 +1421,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Couldn't initialize type int"):
             shouldThrow()
 
+    @pytest.mark.group_one
     def test_if_with_return_types(self):
         @Entrypoint
         def popCheck(d, x):
@@ -1355,6 +1430,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         popCheck(Dict(int, int)(), 1)
 
+    @pytest.mark.group_one
     def test_assign_to_arguments_with_typechange(self):
         @Entrypoint
         def f(x, y: object):
@@ -1362,6 +1438,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         f(1, 1)
 
+    @pytest.mark.group_one
     def test_unassigned_variable_access(self):
         @Compiled
         def reduce2(aList: ListOf(int)):
@@ -1372,6 +1449,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "ame 'r' is not defined"):
             reduce2([1, 2, 3])
 
+    @pytest.mark.group_one
     def test_iterate_closures(self):
         x = ListOf(int)((1, 2, 3))
 
@@ -1384,6 +1462,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(), [1, 2, 3])
 
+    @pytest.mark.group_one
     def test_function_not_returning_returns_none(self):
         @Entrypoint
         def f(l, i, y):
@@ -1391,6 +1470,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(ListOf(int), int, int).typeRepresentation, type(None))
 
+    @pytest.mark.group_one
     def test_method_not_returning_returns_none(self):
         class NoPythonObjectTypes(RuntimeEventVisitor):
             def onNewFunction(
@@ -1425,6 +1505,7 @@ class TestCompilationStructures(unittest.TestCase):
         with NoPythonObjectTypes():
             f(ListOf(int)([1, 2, 3]), 0, 2)
 
+    @pytest.mark.group_one
     def test_try_simple(self):
 
         def f0(x: int) -> str:
@@ -1778,6 +1859,7 @@ class TestCompilationStructures(unittest.TestCase):
                 self.assertEqual(r1, r2, (str(f), v))
 
     @flaky(max_runs=5, min_passes=1)
+    @pytest.mark.group_one
     def test_try_general(self):
         def g1(a: int, b: int, c: int, d: int) -> str:
             ret = "start "
@@ -2011,6 +2093,7 @@ class TestCompilationStructures(unittest.TestCase):
                             r2 = result_or_exception_tb(c_f, a, b, c, d)
                             self.assertEqual(r1, r2, (str(f), a, b, c, d))
 
+    @pytest.mark.group_one
     def test_try_nested(self):
 
         def n1(x: int, y: int) -> str:
@@ -2109,6 +2192,7 @@ class TestCompilationStructures(unittest.TestCase):
                     r2 = result_or_exception_tb(c_f, a, b)
                     self.assertEqual(r1, r2, (str(f), a, b))
 
+    @pytest.mark.group_one
     def test_compile_chained_context_managers(self):
         class CM(Class, Final):
             lst = Member(ListOf(int))
@@ -2133,6 +2217,7 @@ class TestCompilationStructures(unittest.TestCase):
         chainTwoOfThem()
         Entrypoint(chainTwoOfThem)()
 
+    @pytest.mark.group_one
     def test_try_reraise(self):
 
         # Test reraise directly in exception handler
@@ -2213,6 +2298,7 @@ class TestCompilationStructures(unittest.TestCase):
                 self.assertEqual(r1, r2, (a, b))
                 self.assertEqual(r3, r4, (a, b))
 
+    @pytest.mark.group_one
     def test_context_manager_refcounts(self):
         class ContextManaer(Class, Final):
             def __enter__(self):
@@ -2231,6 +2317,7 @@ class TestCompilationStructures(unittest.TestCase):
         f(a)
         assert _types.refcount(a) == 1
 
+    @pytest.mark.group_one
     def test_try_finally_refcounts(self):
         @Entrypoint
         def f(x):
@@ -2244,6 +2331,7 @@ class TestCompilationStructures(unittest.TestCase):
         f(a)
         assert _types.refcount(a) == 1
 
+    @pytest.mark.group_one
     def test_context_manager_functionality(self):
 
         class ConMan1():
@@ -2559,6 +2647,7 @@ class TestCompilationStructures(unittest.TestCase):
                                         self.assertEqual(t1, t2, (a, b, c, d, e, f, g, h))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_context_manager_perf(self):
 
         class ConMan1():
@@ -2658,6 +2747,7 @@ class TestCompilationStructures(unittest.TestCase):
 
             self.assertLessEqual(m3 - m2, m1 - m0 + 1024, (f1.__name__, a))
 
+    @pytest.mark.group_one
     def test_context_manager_assignment(self):
         class ConMan(Class, Final):
             a = Member(int)
@@ -2721,6 +2811,7 @@ class TestCompilationStructures(unittest.TestCase):
                         self.assertEqual(r1, r2, (a, b, c, d))
                         self.assertEqual(t1, t2, (a, b, c, d))
 
+    @pytest.mark.group_one
     def test_catch_definite_exception(self):
         @Entrypoint
         def g():
@@ -2735,6 +2826,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(1), None)
 
+    @pytest.mark.group_one
     def test_catch_definite_exception_propagate_but_catch(self):
         @Entrypoint
         def g():
@@ -2752,6 +2844,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(1), None)
 
+    @pytest.mark.group_one
     def test_catch_definite_exception_propagate(self):
         @Entrypoint
         def g():
@@ -2767,6 +2860,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Boo again"):
             f(1)
 
+    @pytest.mark.group_one
     def test_catch_possible_exception(self):
         @Entrypoint
         def g():
@@ -2784,6 +2878,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1), None)
         self.assertEqual(f(-1), 0)
 
+    @pytest.mark.group_one
     def test_many_mutually_interesting_functions(self):
         def f0(x):
             pass
@@ -2819,6 +2914,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         Entrypoint(f6)(10)
 
+    @pytest.mark.group_one
     def test_not_compiled_called_from_compiled(self):
         @NotCompiled
         def f():
@@ -2832,6 +2928,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(), "OK")
 
+    @pytest.mark.group_one
     def test_not_compiled_lambdas(self):
         @Entrypoint
         def callIt(f):
@@ -2839,6 +2936,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(callIt(NotCompiled(lambda x: x + 1, int)), 2)
 
+    @pytest.mark.group_one
     def test_same_code_with_different_globals(self):
         def call(x):
             return f(x)  # noqa
@@ -2855,6 +2953,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(callFunc(f1, 10.5), "10.5")
         self.assertEqual(callFunc(f2, 10.5), 10)
 
+    @pytest.mark.group_one
     def test_reconstructed_code_has_same_identity_hash(self):
         def call(x):
             return x
@@ -2869,6 +2968,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert identityHash(call.__code__) == identityHash(newCall.__code__)
 
+    @pytest.mark.group_one
     def test_code_with_nested_listcomp(self):
         def call(x):
             return [[(i, 0, 0) for i in y] for y in x]
@@ -2877,6 +2977,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
 
+    @pytest.mark.group_one
     def test_code_with_nested_setcomp(self):
         def call(x):
             return {[(i, 0, 0) for i in y] for y in x}
@@ -2885,6 +2986,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
 
+    @pytest.mark.group_one
     def test_code_with_nested_dictcomp(self):
         def call(x):
             return {0: [(i, 0, 0) for i in y] for y in x}
@@ -2893,6 +2995,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         evaluateFunctionDefWithLocalsInCells(ast, {'f': str}, {})
 
+    @pytest.mark.group_one
     def test_closure_grabs_global_typed_object(self):
         def countIt(x):
             res = 0
@@ -2922,6 +3025,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("took ", time.time() - t0)
         self.assertLess(time.time() - t0, .1)
 
+    @pytest.mark.group_one
     def test_closure_can_grab_and_modify_global_typed_object(self):
         aModuleLevelDict['modify_count'] = 0
 
@@ -2955,6 +3059,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("took ", time.time() - t0)
         self.assertLess(time.time() - t0, .1)
 
+    @pytest.mark.group_one
     def test_can_compile_after_compilation_failure(self):
         class ThrowsCompilerExceptions(CompilableBuiltin):
             def __eq__(self, other):
@@ -2982,6 +3087,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(), 3)
 
+    @pytest.mark.group_one
     def test_converting_where_type_alternates(self):
         def add(x, y):
             return x if y is None else y if x is None else x + y
@@ -3019,6 +3125,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert v == [0.0, 2.0, 2.0, 3.0]
         assert p == [False, True, True, True]
 
+    @pytest.mark.group_one
     def test_convert_not_on_ints_and_floats(self):
         def check():
             y = ListOf(int)()
@@ -3035,6 +3142,7 @@ class TestCompilationStructures(unittest.TestCase):
             check(), Entrypoint(check)()
         )
 
+    @pytest.mark.group_one
     def test_compiler_can_see_type_members_of_instances(self):
         @Entrypoint
         def eltTypeOf(x):
@@ -3043,6 +3151,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert eltTypeOf(ListOf(int)) == int
         assert eltTypeOf(ListOf(int)()) == int
 
+    @pytest.mark.group_one
     def test_function_entrypoint_multithreaded(self):
         def makeAFunction(x):
             T = OneOf(None, x)
@@ -3073,6 +3182,7 @@ class TestCompilationStructures(unittest.TestCase):
 
             assert len(overloads) == 2
 
+    @pytest.mark.group_one
     def test_double_assignment(self):
         def doubleAssign():
             x = y = ListOf(int)() # noqa
@@ -3081,6 +3191,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert len(doubleAssign()) == 0
         assert len(Entrypoint(doubleAssign)()) == 0
 
+    @pytest.mark.group_one
     def test_double_nested_assignment(self):
         def doubleAssign():
             x = (y, z) = (1, 2)
@@ -3092,6 +3203,7 @@ class TestCompilationStructures(unittest.TestCase):
         doubleAssign()
         Entrypoint(doubleAssign)()
 
+    @pytest.mark.group_one
     def test_double_nested_assignment_with_failure(self):
         def doubleAssign():
             try:
@@ -3105,6 +3217,7 @@ class TestCompilationStructures(unittest.TestCase):
         doubleAssign()
         Entrypoint(doubleAssign)()
 
+    @pytest.mark.group_one
     def test_slice_objects(self):
         @Entrypoint
         def createSlice(start, stop, step):
@@ -3112,6 +3225,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert isinstance(createSlice(1, 2, 3), slice)
 
+    @pytest.mark.group_one
     def test_slice_objects_are_fast(self):
         def count(start, stop, step):
             res = 0.0
@@ -3136,6 +3250,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         print("speedup is ", speedup)
 
+    @pytest.mark.group_one
     def test_type_and_repr_of_slice_objects(self):
         @Entrypoint
         def typeOf():
@@ -3155,6 +3270,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert reprOf() == repr(slice(1, 2, 3))
 
+    @pytest.mark.group_one
     def test_class_interaction_with_slice_is_fast(self):
         class C(Class, Final):
             def __getitem__(self, x) -> int:
@@ -3183,6 +3299,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         print("speedup is ", speedup)
 
+    @pytest.mark.group_one
     def test_class_interaction_with_slice_pairs(self):
         class C(Class, Final):
             def __getitem__(self, x) -> int:
@@ -3211,6 +3328,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         print("speedup is ", speedup)
 
+    @pytest.mark.group_one
     def test_chained_comparisons(self):
         def f1(x, y, z):
             return x < y < z
@@ -3261,6 +3379,7 @@ class TestCompilationStructures(unittest.TestCase):
 
                         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_variable_restriction_is_correct(self):
         @Entrypoint
         def toTypedDict(x: dict):
@@ -3269,6 +3388,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert toTypedDict({1: 2}) == {1: 2}
 
+    @pytest.mark.group_one
     def test_function_return_conversion_level_is_ImplicitContainers(self):
         @Function
         def toList(x) -> ListOf(int):
@@ -3280,6 +3400,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert toList([1, 2]) == toListC([1, 2]) == ListOf(int)([1, 2])
 
+    @pytest.mark.group_one
     def test_iterate_with_multiple_variable_targets(self):
         @Entrypoint
         def iterate(iterable):
@@ -3293,6 +3414,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "not enough values to unpack"):
             iterate(ListOf(ListOf(int))([[1, 2], [3]]))
 
+    @pytest.mark.group_one
     def test_iterate_constant_expression_multiple(self):
         @Entrypoint
         def iterate():
@@ -3303,6 +3425,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert iterate() == 6
 
+    @pytest.mark.group_one
     def test_iterate_oneof(self):
         @Entrypoint
         def iterate(x: OneOf(ListOf(int), ListOf(float))):
@@ -3315,6 +3438,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert iterate.resultTypeFor(ListOf(int)).typeRepresentation == OneOf(float, int)
 
+    @pytest.mark.group_one
     def test_iterate_oneof_segregates_variables(self):
         @Entrypoint
         def iterate(x: OneOf(ListOf(int), ListOf(str))):
@@ -3328,6 +3452,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert iterate(ListOf(int)([1, 2])) is int
         assert iterate(ListOf(str)(["2"])) is str
 
+    @pytest.mark.group_one
     def test_iterate_oneof_variable_types_join(self):
         @Entrypoint
         def iterate(x: OneOf(ListOf(int), ListOf(str))):
@@ -3342,6 +3467,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert iterate(ListOf(int)([1, 2])) is OneOf(None, int, str)
         assert iterate(ListOf(str)(["2"])) is OneOf(None, int, str)
 
+    @pytest.mark.group_one
     def test_check_isinstance_on_oneof(self):
         @Entrypoint
         def doIt(var: OneOf(int, float)):
@@ -3353,6 +3479,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert doIt(1.0) is float
         assert doIt(1) is int
 
+    @pytest.mark.group_one
     def test_check_one_of_type(self):
         @Entrypoint
         def doIt(var: OneOf(int, float)):
@@ -3363,6 +3490,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert doIt(1.0) is float
         assert doIt(1) is int
 
+    @pytest.mark.group_one
     def test_check_subtype(self):
         class Base(Class):
             pass
@@ -3387,6 +3515,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert doIt(Child3()) is Base
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_check_one_of_type_perf_difference(self):
         @Entrypoint
         def accumulate(var: OneOf(int, float), times: int):
@@ -3442,6 +3571,7 @@ class TestCompilationStructures(unittest.TestCase):
         print("float speedup is", speedup)
         assert speedup > 2.0
 
+    @pytest.mark.group_one
     def test_compile_annotated_assignment(self):
         def f():
             x: int = 20
@@ -3450,6 +3580,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert f() == Entrypoint(f)()
 
+    @pytest.mark.group_one
     def test_with_exception(self):
         class SimpleCM1():
             def __enter__(self):
@@ -3487,6 +3618,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(r2, 0)
         self.assertEqual(r3, 1)
 
+    @pytest.mark.group_one
     def test_context_manager_corruption(self):
         class CM():
             def __enter__(self):
@@ -3521,6 +3653,7 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaises(ZeroDivisionError):
             repeat_b(1000)
 
+    @pytest.mark.group_one
     def test_context_manager_multiple_on_one_line1(self):
         class ConMan1():
             def __enter__(self):
@@ -3548,6 +3681,7 @@ class TestCompilationStructures(unittest.TestCase):
         # Former problem: c_f raises RuntimeError 'No active exception to reraise'
         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_context_manager_multiple_on_one_line2(self):
         class ConMan():
             def __init__(self, a, b, c, t):
@@ -3603,6 +3737,7 @@ class TestCompilationStructures(unittest.TestCase):
                                     self.assertEqual(r1, r2, (a, b, c, d, e, f, g))
                                     self.assertEqual(t1, t2, (a, b, c, d, e, f, g))
 
+    @pytest.mark.group_one
     def test_import_module(self):
         @Entrypoint
         def importSomething():
@@ -3612,6 +3747,7 @@ class TestCompilationStructures(unittest.TestCase):
 
         assert importSomething() is sys
 
+    @pytest.mark.group_one
     def test_import_nonexistent_module(self):
         def importSomething(doIt):
             if doIt:
@@ -3636,6 +3772,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert type(nativeException) == type(compiledException)
         assert nativeException.args == compiledException.args
 
+    @pytest.mark.group_one
     def test_import_from(self):
         @Entrypoint
         def importSomething():
@@ -3651,6 +3788,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert importedPath is os.path
         assert importedExit is os._exit
 
+    @pytest.mark.group_one
     def test_import_from_invalid_name(self):
         def importSomething(doIt):
             if doIt:
@@ -3675,6 +3813,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert type(nativeException) == type(compiledException)
         assert nativeException.args == compiledException.args
 
+    @pytest.mark.group_one
     def test_class_as_context_manager(self):
         class SimpleCM1():
             def __enter__(self):
@@ -3709,6 +3848,7 @@ class TestCompilationStructures(unittest.TestCase):
         assert testCM(SimpleCM2()) == 0
         assert testCM(SimpleCM3()) == 1
 
+    @pytest.mark.group_one
     def test_access_oneof_variable(self):
         @Entrypoint
         def f(x) -> object:
@@ -3735,6 +3875,7 @@ class TestCompilationStructures(unittest.TestCase):
         loop1()
         loop2()
 
+    @pytest.mark.group_one
     def test_notcompiled_lambda_closure_refcounts(self):
         x = ListOf(int)()
 
@@ -3765,6 +3906,7 @@ class TestCompilationStructures(unittest.TestCase):
         closure = None
         assert refcount(x) == 1
 
+    @pytest.mark.group_one
     def test_map_large_named_tuples(self):
         def getNamedTupleOfLists(n):
             nameToList = {"a" + str(i): ListOf(str)([str(i)]) for i in range(n)}

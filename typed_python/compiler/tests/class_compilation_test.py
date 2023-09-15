@@ -135,6 +135,7 @@ class AClassWithInit(Class):
 
 
 class TestClassCompilationCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_initializes_correctly(self):
         ShouldInitializeMembers().x
 
@@ -144,6 +145,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         f().x
 
+    @pytest.mark.group_one
     def test_class_attribute(self):
         a = AClass(x=10, y=20.5, z=(1, 2, 3))
 
@@ -163,6 +165,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(getY(a), a.y)
         self.assertEqual(getZ(a), a.z)
 
+    @pytest.mark.group_one
     def test_class_set_attribute(self):
         a = AClass()
 
@@ -202,6 +205,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTupleOfInt), 1)
 
+    @pytest.mark.group_one
     def test_class_uninitialized_attribute(self):
         @Compiled
         def set(ac: AClassWithAnotherClass, a: AClass) -> None:
@@ -247,6 +251,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(ac2), 2)
         self.assertEqual(get(anAWithAClass).x, 2)
 
+    @pytest.mark.group_one
     def test_call_method_basic(self):
         @Compiled
         def g(c: AClass):
@@ -259,6 +264,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(g(c2), c2.g())
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_call_method_dispatch_perf(self):
         @Compiled
         def addCaller(c: AClass, count: int):
@@ -286,6 +292,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         # tun this test. Note that we generate two entrypoints (one for float, one for int)
         self.assertTrue(0.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
 
+    @pytest.mark.group_one
     def test_compile_class_method(self):
         c = AClass(x=20)
 
@@ -306,6 +313,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         print("speedup is ", speedup)  # I get about 75
 
+    @pytest.mark.group_one
     def test_dispatch_up_to_class_method(self):
         class TestClass(Class, Final):
             def f(self, x: OneOf(int, float)):
@@ -318,6 +326,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(compiled(TestClass(), 123), 124.0)
         self.assertEqual(compiled(TestClass(), 123.5), 124.5)
 
+    @pytest.mark.group_one
     def test_compile_class_init(self):
         @Compiled
         def f(x: int) -> AClassWithInit:
@@ -326,6 +335,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f(10).x, 10)
         self.assertEqual(f(10).y, 22.0)
 
+    @pytest.mark.group_one
     def test_compile_class_init_with_defaults(self):
         @Compiled
         def f() -> AClassWithDefaults:
@@ -334,6 +344,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f().x, 123)
         self.assertEqual(f().y, 0)
 
+    @pytest.mark.group_one
     def test_compile_class_repr_and_str(self):
         class RegularClassWithReprAndString:
             def __repr__(self):
@@ -366,6 +377,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(callRepr(ClassWithReprAndStr()), "repr")
         self.assertEqual(callStr(ClassWithReprAndStr()), "str")
 
+    @pytest.mark.group_one
     def test_class_str_without_override(self):
         class NoStr(Class):
             x = Member(int)
@@ -379,6 +391,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert str(n) == callStr(n)
 
+    @pytest.mark.group_one
     def test_compiled_class_subclass_layout(self):
         class BaseClass(Class):
             x = Member(int)
@@ -396,6 +409,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(fCompiled(c), f(c))
 
+    @pytest.mark.group_one
     def test_class_subclass_destructors(self):
         class BaseClass(Class):
             pass
@@ -414,6 +428,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aListOfInt), 1)
 
+    @pytest.mark.group_one
     def test_class_subclass_destructors_compiled(self):
         class BaseClass(Class):
             pass
@@ -437,6 +452,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aListOfInt), 1)
 
+    @pytest.mark.group_one
     def test_dispatch_with_multiple_overloads(self):
         # check that we can dispatch appropriately
         class TestClass(Class):
@@ -473,6 +489,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(callWithStr(TestClass(), ""), TestClass().f(""))
         self.assertEqual(callWithStr(TestClass(), "hi"), TestClass().f("hi"))
 
+    @pytest.mark.group_one
     def test_multiple_child_dispatches(self):
         # child specializations should get to look at an argument
         # of type 'OneOf(int, float)' and get to decide if they want to handle it.
@@ -500,6 +517,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(call(ChildClass(), 1), "child: int")
         self.assertEqual(call(ChildClass(), 1.0), "child: float")
 
+    @pytest.mark.group_one
     def test_multiple_child_dispatches_with_arg_dispatch(self):
         # the child specializations should get to look at an argument
         # of type 'OneOf(int, float)' and get to decide if they want to handle it.
@@ -530,6 +548,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(call1(ChildClass(), 1), 11)
         self.assertEqual(call2(ChildClass(), 1, 2), 12)
 
+    @pytest.mark.group_one
     def test_dispatch_to_none_works(self):
         class BaseClass(Class):
             def f(self, x) -> int:
@@ -546,6 +565,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(call(BaseClass(), 1), 1)
         self.assertEqual(call(ChildClass(), 1), 2)
 
+    @pytest.mark.group_one
     def test_dispatch_to_subclass_from_list(self):
         class BaseClass(Class):
             def f(self) -> int:
@@ -604,6 +624,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertGreater(speedup, 20)
 
+    @pytest.mark.group_one
     def test_convert_up_in_compiled_code(self):
         class BaseClass(Class):
             def f(self) -> int:
@@ -629,6 +650,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(dispatchUp(ChildChildClass()), ChildChildClass().f())
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_of_dispatch_with_final_is_fast(self):
         class BaseClass(Class):
             def f(self) -> float:
@@ -662,6 +684,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertGreater(speedup, 1.2)
 
+    @pytest.mark.group_one
     def test_dispatch_with_different_types(self):
         class BaseClass(Class, Final):
             def f(self, x: int) -> str:
@@ -677,6 +700,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f(BaseClass(), 0), "int")
         self.assertEqual(f(BaseClass(), 1.0), "float")
 
+    @pytest.mark.group_one
     def test_dispatch_with_different_output_types(self):
         class BaseClass(Class, Final):
             def f(self, x: int) -> int:
@@ -694,6 +718,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(OneOf(int, float)).typeRepresentation, OneOf(float, int))
         self.assertEqual(f.resultTypeFor(object).typeRepresentation, OneOf(float, int))
 
+    @pytest.mark.group_one
     def test_dispatch_with_no_specified_output_types(self):
         class BaseClass(Class):
             def f(self, x: int) -> object:
@@ -722,6 +747,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(fFinal.resultTypeFor(int).typeRepresentation, int)
         self.assertEqual(fFinal.resultTypeFor(float).typeRepresentation, float)
 
+    @pytest.mark.group_one
     def test_classes_with_lots_of_members(self):
         class BaseClass(Class):
             x00 = Member(int)
@@ -756,6 +782,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f(c), 10)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_class_member_perf_with_final(self):
         class BaseClass(Class):
             x0 = Member(float)
@@ -790,6 +817,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertTrue(0.7 < speedup < 1.3, speedup)
 
+    @pytest.mark.group_one
     def test_class_return_self(self):
         class C(Class):
             def e(self) -> object:
@@ -802,6 +830,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         c_f = Compiled(f)
         self.assertIsInstance(c_f(C()), C)
 
+    @pytest.mark.group_one
     def test_compile_class_magic_methods(self):
         class C(Class, Final):
             s = Member(str)
@@ -1037,6 +1066,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             r2 = compiled_f(C(""))
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_reverse_methods(self):
         class C(Class, Final):
             s = Member(str)
@@ -1126,6 +1156,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 r2 = compiled_f(v, C())
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_format(self):
         class C1(Class, Final):
             pass
@@ -1178,6 +1209,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             r2 = specialized_format(v)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_bytes(self):
         class C(Class, Final):
             __bytes__ = lambda self: b"my bytes"
@@ -1191,6 +1223,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         r2 = c_f(v)
         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_delitem(self):
         class C(Class, Final):
             deleted = Member(int)
@@ -1206,6 +1239,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         delIt(c, 10)
         assert c.deleted == 10
 
+    @pytest.mark.group_one
     def test_compile_class_attr(self):
         class C(Class, Final):
             d = Member(Dict(str, str))
@@ -1306,6 +1340,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             with self.assertRaises(KeyError):
                 c_getattr2(v)
 
+    @pytest.mark.group_one
     def test_compile_class_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,
         # when __floor__ and __ceil__ are not defined
@@ -1362,6 +1397,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             r2 = compiled_f(C2())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_dir(self):
         # The interpreted dir() calls __dir__() and sorts the result.
         # I expected the compiled dir() to do the same thing, but it doesn't sort.
@@ -1416,6 +1452,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertTrue(finalMem < initMem + 2)
 
+    @pytest.mark.group_one
     def test_compile_class_comparison_defaults(self):
         class C(Class, Final):
             i = Member(int)
@@ -1458,6 +1495,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 r2 = result_or_exception(compiled_f, v)
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_comparison_to_other_types(self):
         class C(Class, Final):
             x = Member(int)
@@ -1472,6 +1510,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertTrue(isEqObj(C(x=10), C(x=10)))
         self.assertTrue(isEqObj(C(x=10), makeNamedTuple(x=10)))
 
+    @pytest.mark.group_one
     def test_compile_class_comparison_methods(self):
         class C(Class, Final):
             i = Member(int)
@@ -1534,6 +1573,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
                 r2 = compiled_f(v)
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_class_hash_special_value(self):
         class C(Class, Final):
             i = Member(int)
@@ -1550,6 +1590,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f_hash(C(i=-1)), -2)
         self.assertEqual(c_hash(C(i=-1)), -2)
 
+    @pytest.mark.group_one
     def test_compile_class_getsetitem(self):
         class C(Class, Final):
             d = Member(Dict(int, int))
@@ -1584,6 +1625,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.assertEqual(f_getitem(c, i), i + 200)
             self.assertEqual(c_getitem(c, i), i + 200)
 
+    @pytest.mark.group_one
     def test_compile_class_float_conv(self):
         class C0(Class, Final):
             __int__ = lambda self: 123
@@ -1610,6 +1652,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             c_g(C0())
 
+    @pytest.mark.group_one
     def test_compile_class_missing_inplace_fallback(self):
         class ClassWithoutInplaceOp(Class, Final):
             s = Member(str)
@@ -1692,6 +1735,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         r2 = Compiled(inplace)(v)
         self.assertEqual(r2.s, expected.s)
 
+    @pytest.mark.group_one
     def test_defining_float_doesnt_allow_implicit_conversion(self):
         aList = ListOf(float)()
 
@@ -1727,6 +1771,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
     def compileCheck(self, f):
         self.assertEqual(f(), Compiled(f)())
 
+    @pytest.mark.group_one
     def test_class_can_override_default_args(self):
         class B(Class):
             def f(self, x=10) -> int:
@@ -1750,6 +1795,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.compileCheck(lambda: D().f(10))
         self.compileCheck(lambda: D().f(20))
 
+    @pytest.mark.group_one
     def test_class_methods_and_named_arguments(self):
         class B(Class):
             def f(self, **kwargs: int) -> int:
@@ -1774,6 +1820,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.compileCheck(lambda: B().f(x=10, y=20))
         self.compileCheck(lambda: C().f(x=10, y=20))
 
+    @pytest.mark.group_one
     def test_class_method_star_arg_type_dispatch(self):
         class B(Class):
             def f(self, *args: int, **kwargs: int) -> int:
@@ -1782,6 +1829,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(B().f(1.5, x=2.5), 0)
         self.compileCheck(lambda: B().f(1.5, x=2.5))
 
+    @pytest.mark.group_one
     def test_class_method_star_arg_type_dispatch_unknown(self):
         class B(Class):
             def f(self, *args: int, **kwargs: int) -> str:
@@ -1797,6 +1845,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert callBWith(1.0) == "float"
         assert callBWith(1) == "int"
 
+    @pytest.mark.group_one
     def test_class_methods_obey_star_arg_type_assignments(self):
         class B(Class):
             def f(self, *args, **kwargs) -> int:
@@ -1843,6 +1892,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             self.compileCheck(lambda: T().f(1, y="2"))
             self.compileCheck(lambda: T().f(1, y="2"))
 
+    @pytest.mark.group_one
     def test_class_with_global_closure_variables(self):
         def makeInt():
             return 10
@@ -1894,6 +1944,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(takeLen(), 10)
 
+    @pytest.mark.group_one
     def test_pass_child_to_function_expecting_base_and_kwargs(self):
         class X(Class):
             def f(self, **kwargs) -> str:
@@ -1918,6 +1969,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         done()
 
+    @pytest.mark.group_one
     def test_compile_class_properties(self):
         class X(Class, Final):
             @property
@@ -1932,6 +1984,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(callIt(), 10)
 
+    @pytest.mark.group_one
     def test_compile_class_properties_with_subclasses(self):
         class X(Class):
             @property
@@ -1953,6 +2006,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(callIt(X()), 10)
         self.assertEqual(callIt(Child()), 20)
 
+    @pytest.mark.group_one
     def test_overloading_operators(self):
         class X(Class, Final):
             def __add__(self, other: int):
@@ -1971,6 +2025,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(add(X(), 1), 1)
         self.assertEqual(add(X(), 1.5), 2)
 
+    @pytest.mark.group_one
     def test_default_initialize_class_with_type_members(self):
         class C(Class, Final):
             t = Member(Value(float))
@@ -1983,6 +2038,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert callIt().t is float
 
+    @pytest.mark.group_one
     def test_can_compile_against_base_class_and_pass_child(self):
         class C(Class):
             t = Member(float)
@@ -2024,6 +2080,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         clearList(aList)
         assert _types.refcount(theB) == 1
 
+    @pytest.mark.group_one
     def test_class_member_assign_is_implicit_containers(self):
         class C(Class, Final):
             x = Member(ListOf(ListOf(int)))
@@ -2036,6 +2093,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assignX(C(), [ListOf(int)([1, 2, 3])])
 
+    @pytest.mark.group_one
     def test_kwarg_initialize_class(self):
         @Entrypoint
         def makeAClass(x, y, z):
@@ -2043,6 +2101,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert makeAClass(1, 2, (3, 4)).z == TupleOf(int)((3, 4))
 
+    @pytest.mark.group_one
     def test_class_assign_invalid_member(self):
         @Entrypoint
         def assignInvalid(c):
@@ -2051,6 +2110,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "no attribute 'invalidMember'"):
             assignInvalid(AClass())
 
+    @pytest.mark.group_one
     def test_kwarg_initialize_class_invalid_arg(self):
         def makeAClass(x, y, z):
             return AClass(x=x, invalidMember=z, y=y)
@@ -2061,6 +2121,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "has no attribute 'invalidMember'"):
             Entrypoint(makeAClass)(1, 2, (3, 4))
 
+    @pytest.mark.group_one
     def test_kwarg_initialize_method(self):
         def initializeAClass(**kwargs):
             return AClassWithInit(**kwargs)
@@ -2073,6 +2134,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         checkEqual(Entrypoint(initializeAClass)(x=1), initializeAClass(x=1))
         checkEqual(Entrypoint(initializeAClass)(x=1, y=2), initializeAClass(x=1, y=2))
 
+    @pytest.mark.group_one
     def test_pointer_to_member(self):
         class C(Class, Final):
             x = Member(int)
@@ -2085,6 +2147,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert f(c) == pointerTo(c).x
 
+    @pytest.mark.group_one
     def test_type_of_subclass(self):
         class Base(Class):
             pass
@@ -2104,6 +2167,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert f(Child()) is Child
         assert fKnowsChild(Child()) is Child
 
+    @pytest.mark.group_one
     def test_isinstance_on_subclass(self):
         class Base(Class):
             pass
@@ -2118,6 +2182,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert not isinstanceCompiled(Base())
         assert isinstanceCompiled(Child())
 
+    @pytest.mark.group_one
     def test_isinstance_on_two_subclasses(self):
         class Base(Class):
             pass
@@ -2134,6 +2199,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert isinstanceCompiled(Child(), Child())
         assert not isinstanceCompiled(Base(), Child())
 
+    @pytest.mark.group_one
     def test_downcast_in_compiled_code(self):
         class Base(Class):
             pass
@@ -2154,6 +2220,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             g(Base())
 
+    @pytest.mark.group_one
     def test_downcast_in_compiled_code_adjacent(self):
         class Base(Class):
             def baseFun(self) -> int:
@@ -2240,6 +2307,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         # to cross call it
         assert callFromBase1(callAsBase2, Child()) == 3
 
+    @pytest.mark.group_one
     def test_class_nonempty(self):
         class CNonempty(Class, Final):
             x = Member(str, nonempty=True)
@@ -2288,6 +2356,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         setX(cE, "hihi")
         assert getX(cE) == "hihi"
 
+    @pytest.mark.group_one
     def test_class_nonempty_forces_construction(self):
         class SomeOtherClass(Class):
             pass
@@ -2313,6 +2382,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Attribute 'x' is not initialized"):
             callIt(CEmpty).x
 
+    @pytest.mark.group_one
     def test_class_hierarchy(self):
         class Base(Class):
             def f(self) -> int:
@@ -2333,6 +2403,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert callG(C1()) == Entrypoint(callG)(C1())
 
+    @pytest.mark.group_one
     def test_convert_refTo(self):
         class C(Class, Final):
             x = Member(int)
@@ -2350,6 +2421,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert doIt() == 10
 
+    @pytest.mark.group_one
     def test_call_overridden_fun(self):
         class C(Class):
             def getIt(self) -> int:
@@ -2365,6 +2437,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         f(C())
 
+    @pytest.mark.group_one
     def test_isinstance_perf(self):
         class C(Class):
             pass
@@ -2410,6 +2483,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         # an exactly known type.
         assert elapsed < 0.01
 
+    @pytest.mark.group_one
     def test_unresolved_forwards_in_class_type_signatures(self):
         UnresolvedForward = Forward("UnresolvedForward")
 
@@ -2424,6 +2498,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "unresolved forwards"):
             tryToCallF()
 
+    @pytest.mark.group_one
     def test_unresolved_forwards_in_function_type_signatures(self):
         UnresolvedForward = Forward("UnresolvedForward")
 
@@ -2438,6 +2513,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "has unresolved forwards"):
             tryToCallF()
 
+    @pytest.mark.group_one
     def test_could_be_instance_of(self):
         class A(Class):
             pass
@@ -2522,6 +2598,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         class ActualSubclass(TF1(int), TF2(float)):
             pass
 
+    @pytest.mark.group_one
     def test_super(self):
         class B(Class):
             def f(self, x):
@@ -2537,6 +2614,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert callIt(C(), 10) == 11
 
+    @pytest.mark.group_one
     def test_super_with_diamond(self):
         class B(Class):
             def f(self, x: ListOf(str)):
@@ -2571,6 +2649,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert lst == ['E', 'C', 'D', 'B']
 
+    @pytest.mark.group_one
     def test_super_with_no_superclass(self):
         class B(Class):
             def f(self):
@@ -2586,6 +2665,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, r"'super' object has no attribute 'f'"):
             callIt(B())
 
+    @pytest.mark.group_one
     def test_super_in_init(self):
         class B(Class):
             x = Member(int)
@@ -2608,6 +2688,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         check()
         Entrypoint(check)()
 
+    @pytest.mark.group_one
     def test_compile_classmethods(self):
         class Normal:
             @classmethod
@@ -2629,6 +2710,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         checkIt()
         Entrypoint(checkIt)()
 
+    @pytest.mark.group_one
     def test_compile_classmethod_on_subclass_multi(self):
         class B(Class):
             @classmethod
@@ -2653,6 +2735,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert callIt(C(), 1) == 2
         assert callIt(C(), 1.0) == 1.5
 
+    @pytest.mark.group_one
     def test_compile_staticmethod_on_subclass_multi(self):
         class B(Class):
             @staticmethod
@@ -2677,6 +2760,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert callIt(C(), 1) == 2
         assert callIt(C(), 1.0) == 1.5
 
+    @pytest.mark.group_one
     def test_compile_classmethod_on_subclass(self):
         class BPy(object):
             @classmethod
@@ -2760,6 +2844,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         print("compiled virtual dispatch on instances ", speedup, "times faster")
         print("compiled virtual dispatch on type ", speedupType, "times faster")
 
+    @pytest.mark.group_one
     def test_compile_staticmethod_on_subclass(self):
         class B(Class):
             @staticmethod
@@ -2791,6 +2876,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert callItAs(B)(B(), 1000000) == 1000000
         assert callItAs(B)(C(), 1000000) == 2000000
 
+    @pytest.mark.group_one
     def test_class_dispatch_on_type(self):
         class B(Class):
             @classmethod
@@ -2804,6 +2890,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert call.resultTypeFor(SubclassOf(B)).typeRepresentation is int
         assert call(B) == 0
 
+    @pytest.mark.group_one
     def test_interpreter_can_see_class_members(self):
         class B(Class):
             X = int
@@ -2819,6 +2906,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert callType.resultTypeFor(SubclassOf(B)).typeRepresentation.Value is int
         assert callInst.resultTypeFor(B).typeRepresentation.Value is int
 
+    @pytest.mark.group_one
     def test_class_init_is_virtual(self):
         B = Forward("B")
 
@@ -2857,6 +2945,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert constructOne(C, 0, 1000000) == C(0).f() * 1000000
         print(time.time() - t0)
 
+    @pytest.mark.group_one
     def test_implicit_conversion_to_bool(self):
         class C(Class):
             def __len__(self) -> int:
@@ -2870,6 +2959,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         check(C())
 
+    @pytest.mark.group_one
     def test_del_during_unwind_works(self):
         class C(Class):
             def f(self):
@@ -2900,6 +2990,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         except Exception:
             pass
 
+    @pytest.mark.group_one
     def test_del_works(self):
         delType = ListOf(type)()
 
@@ -2922,6 +3013,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         assert len(delType) == 2
         assert delType[1] == Held(C)
 
+    @pytest.mark.group_one
     def test_del_swallows_exception(self):
         class C(Class):
             def __del__(self):
@@ -2933,6 +3025,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         doIt()
         Entrypoint(doIt)()
 
+    @pytest.mark.group_one
     def test_class_hasattr(self):
         class C(Class):
             x = Member(int)
@@ -2970,6 +3063,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         compiledDel()
 
+    @pytest.mark.group_one
     def test_class_hasattr_perf(self):
         class C(Class):
             x = Member(float)
@@ -3002,6 +3096,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         assert .6 < elapsedWithout / elapsedWith < 1.4
 
+    @pytest.mark.group_one
     def test_virtual_dispatch_with_none(self):
         class C(Class):
             def f(self, x, y):

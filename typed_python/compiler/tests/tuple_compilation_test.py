@@ -23,6 +23,7 @@ from typed_python import Entrypoint, makeNamedTuple, Function
 
 
 class TestTupleCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_tuple_passing(self):
         T = Tuple(float, int, str)
 
@@ -34,6 +35,7 @@ class TestTupleCompilation(unittest.TestCase):
         t = T((0.0, 1, "hi"))
         self.assertEqual(f(t), t)
 
+    @pytest.mark.group_one
     def test_named_tuple_passing(self):
         NT = NamedTuple(a=float, b=int, c=str)
 
@@ -45,6 +47,7 @@ class TestTupleCompilation(unittest.TestCase):
         nt = NT(a=0.0, b=1, c="hi")
         self.assertEqual(f(nt), nt)
 
+    @pytest.mark.group_one
     def test_named_tuple_getattr(self):
         NT = NamedTuple(a=float, b=int, c=str)
 
@@ -55,6 +58,7 @@ class TestTupleCompilation(unittest.TestCase):
         nt = NT(a=0.0, b=1, c="hi")
         self.assertEqual(f(nt), "hihi")
 
+    @pytest.mark.group_one
     def test_named_tuple_assignment_refcounting(self):
         class C(Class):
             x = Member(int)
@@ -72,6 +76,7 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(res.x, 20)
         self.assertEqual(_types.refcount(res), 2)
 
+    @pytest.mark.group_one
     def test_indexing(self):
         T = Tuple(int, str)
 
@@ -93,6 +98,7 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(getIx(T((1, '2')), 0), 1)
         self.assertEqual(getIx(T((1, '2')), 1), '2')
 
+    @pytest.mark.group_one
     def test_iterating(self):
         @Entrypoint
         def tupToString(x):
@@ -106,6 +112,7 @@ class TestTupleCompilation(unittest.TestCase):
             ["0", "a"]
         )
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_error(self):
         """We should have errors for all the field names passed to the replacing function,
         if the fields are not in the tuple definition.
@@ -127,6 +134,7 @@ class TestTupleCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "The arguments list contain names 'c, d, e' which are not in the tuple definition."):
             f2(n1)
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_function(self):
         NT = NamedTuple(a=int, b=str)
         n1 = NT(a=1, b='x')
@@ -150,6 +158,7 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(n3.a, 123)
         self.assertEqual(n3.b, '345')
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_refcount(self):
         N = NamedTuple(x=ListOf(int))
         N = NamedTuple(x=ListOf(int))
@@ -162,6 +171,7 @@ class TestTupleCompilation(unittest.TestCase):
         nt = None
         self.assertEqual(_types.refcount(aList), 1)
 
+    @pytest.mark.group_one
     def test_named_tuple_construction(self):
         NT = NamedTuple(x=ListOf(int), y=float)
 
@@ -189,6 +199,7 @@ class TestTupleCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Couldn't initialize type ListOf.int. from float"):
             makeNtX(1.2)
 
+    @pytest.mark.group_one
     def test_compile_make_named_tuple(self):
         @Entrypoint
         def makeNt(x, y):
@@ -197,6 +208,7 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(makeNt(1, 2), makeNamedTuple(x=1, y=2))
         self.assertEqual(makeNt(1, "2"), makeNamedTuple(x=1, y="2"))
 
+    @pytest.mark.group_one
     def test_compiled_tuple_construction(self):
         def makeNamed(x, y):
             return NamedTuple(x=type(x), y=type(y))((x, y))
@@ -216,6 +228,7 @@ class TestTupleCompilation(unittest.TestCase):
         check(makeUnnamed, 1, 2)
         check(makeUnnamed, 1, "2")
 
+    @pytest.mark.group_one
     def test_compare_tuples(self):
         ClassWithCompare = Forward("ClassWithCompare")
 
@@ -277,6 +290,7 @@ class TestTupleCompilation(unittest.TestCase):
                 check(lambda: t1 == t2)
                 check(lambda: t1 != t2)
 
+    @pytest.mark.group_one
     def test_negative_indexing(self):
         @Entrypoint
         def sliceAt(tup, ix):
@@ -307,6 +321,7 @@ class TestTupleCompilation(unittest.TestCase):
 
         self.assertIs(Function(lambda tup: sliceAt(tup, -2)).resultTypeFor(type(tup)).interpreterTypeRepresentation, OneOf(A, B))
 
+    @pytest.mark.group_one
     def test_construct_named_tuple_with_other_named_tuple(self):
         # we should be matching the names up correctly
         T1 = NamedTuple(x=int, y=str)
@@ -330,6 +345,7 @@ class TestTupleCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             secondCheck()
 
+    @pytest.mark.group_one
     def test_construct_named_tuple_with_incorrect_number_of_arguments(self):
         # we should be matching the names up correctly
         NT = NamedTuple(z=float, y=str, x=int)
@@ -340,6 +356,7 @@ class TestTupleCompilation(unittest.TestCase):
 
         assert checkIt().y == ""
 
+    @pytest.mark.group_one
     def test_cant_construct_named_tuple_with_non_default_initializable(self):
         # we should be matching the names up correctly
         C = Forward("C")
@@ -360,6 +377,7 @@ class TestTupleCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Can't default initialize member 'c'"):
             checkIt()
 
+    @pytest.mark.group_one
     def test_create_tuple_uses_implicit_containers(self):
         def f():
             res = Dict(object, object)({1: 2, 3: 4})
@@ -368,6 +386,7 @@ class TestTupleCompilation(unittest.TestCase):
 
         assert f() == Entrypoint(f)()
 
+    @pytest.mark.group_one
     def test_compile_in(self):
         for entrypoint in [
             lambda x: x,
@@ -382,6 +401,7 @@ class TestTupleCompilation(unittest.TestCase):
             assert checkIn('a', NamedTuple(x=str, y=str)(x='a', y='b'))
             assert not checkIn('c', NamedTuple(x=str, y=str)(x='a', y='b'))
 
+    @pytest.mark.group_one
     def test_compile_in_on_constant(self):
         @Entrypoint
         def checkIn(x):
@@ -390,6 +410,7 @@ class TestTupleCompilation(unittest.TestCase):
         assert checkIn('1')
         assert not checkIn('c')
 
+    @pytest.mark.group_one
     def test_compile_in_all_constant(self):
         @Entrypoint
         def checkIn():

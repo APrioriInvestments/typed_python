@@ -28,6 +28,7 @@ from typed_python.compiler.type_wrappers.hash_table_implementation import Native
 
 
 class TestAlternativeCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_could_be_instance_of(self):
         A = Alternative("A", A=dict(x=int), B=dict(x=int))
         B = Alternative("A", A=dict(x=int), B=dict(x=int))
@@ -45,6 +46,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         assert classCouldBeInstanceOf(A.A, A) == True  # noqa
         assert classCouldBeInstanceOf(A.A, A.A) == True  # noqa
 
+    @pytest.mark.group_one
     def test_default_constructor(self):
         @Entrypoint
         def setIt(d, x):
@@ -56,6 +58,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         assert setIt(Dict(int, Simple)(), 10).matches.A
         assert setIt(Dict(int, Complex)(), 10).matches.A
 
+    @pytest.mark.group_one
     def test_simple_alternative_passing(self):
         Simple = Alternative("Simple", A={}, B={}, C={})
 
@@ -68,6 +71,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(Simple.B()), Simple.B())
         self.assertEqual(f(Simple.C()), Simple.C())
 
+    @pytest.mark.group_one
     def test_complex_alternative_passing(self):
         Complex = Forward("Complex")
         Complex = Complex.define(Alternative(
@@ -91,6 +95,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(c), 2)
         self.assertEqual(_types.refcount(c2), 1)
 
+    @pytest.mark.group_one
     def test_construct_alternative(self):
         A = Alternative("A", X={'x': int})
 
@@ -101,6 +106,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertTrue(f().matches.X)
         self.assertEqual(f().x, 10)
 
+    @pytest.mark.group_one
     def test_alternative_matches(self):
         A = Alternative("A", X={'x': int}, Y={'x': int})
 
@@ -111,6 +117,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertTrue(f(A.X()))
         self.assertFalse(f(A.Y()))
 
+    @pytest.mark.group_one
     def test_alternative_member_homogenous(self):
         A = Alternative("A", X={'x': int}, Y={'x': int})
 
@@ -121,6 +128,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(A.X(x=10)), 10)
         self.assertEqual(f(A.Y(x=10)), 10)
 
+    @pytest.mark.group_one
     def test_alternative_member_diverse(self):
         A = Alternative("A", X={'x': int}, Y={'x': float})
 
@@ -131,6 +139,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(A.X(x=10)), 10)
         self.assertEqual(f(A.Y(x=10.5)), 10.5)
 
+    @pytest.mark.group_one
     def test_alternative_member_distinct(self):
         A = Alternative("A", X={'x': int}, Y={'y': float})
 
@@ -144,6 +153,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(A.X(x=10)), 10)
         self.assertEqual(f(A.Y(y=10.5)), 10.5)
 
+    @pytest.mark.group_one
     def test_matching_recursively(self):
         @TypeFunction
         def Tree(T):
@@ -184,6 +194,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         speedup = (t1-t0)/(t2-t1)
         self.assertGreater(speedup, 20)  # I get about 50
 
+    @pytest.mark.group_one
     def test_compile_alternative_magic_methods(self):
 
         A = Alternative("A", a={'a': int}, b={'b': str},
@@ -380,6 +391,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 print("mismatch")
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_reverse_methods(self):
 
         A = Alternative("A", a={'a': int}, b={'b': str},
@@ -449,6 +461,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r2 = compiled_f(v, A.a())
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_format(self):
         A1 = Alternative("A1", a={'a': int}, b={'b': str})
         A2 = Alternative("A2", a={'a': int}, b={'b': str},
@@ -501,6 +514,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = specialized_format(v)
             self.assertEqual(r1, r2, type(v))
 
+    @pytest.mark.group_one
     def test_compile_alternative_bytes(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __bytes__=lambda self: b'my bytes'
@@ -515,6 +529,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         r2 = c_f(v)
         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_attr(self):
 
         def A_getattr(self, n):
@@ -618,6 +633,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             with self.assertRaises(KeyError):
                 c_getattr2(v)
 
+    @pytest.mark.group_one
     def test_compile_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,
         # when __floor__ and __ceil__ are not defined
@@ -676,6 +692,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(B.a())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_dir(self):
         # The interpreted dir() calls __dir__() and sorts the result.
         # I expected the compiled dir() to do the same thing, but it doesn't sort.
@@ -724,6 +741,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         self.assertTrue(finalMem < initMem + 2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_comparison_defaults(self):
 
         B = Alternative("B", a={'a': int}, b={'b': str})
@@ -766,6 +784,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r2 = compiled_f(v)
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_comparison_methods(self):
 
         C = Alternative("C", a={'a': int}, b={'b': str},
@@ -807,6 +826,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_getsetitem(self):
 
         def A2_getitem(self, i):
@@ -844,6 +864,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(f_getitem(a, i), i + 200)
             self.assertEqual(c_getitem(a, i), i + 200)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_magic_methods(self):
 
         A = Alternative("A", a={}, b={},
@@ -1040,6 +1061,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_reverse_methods(self):
 
         A = Alternative("A", a={}, b={},
@@ -1109,6 +1131,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r2 = compiled_f(v, A.a())
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_format(self):
         A1 = Alternative("A1", a={}, b={})
         A2 = Alternative("A2", a={}, b={},
@@ -1161,6 +1184,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = specialized_format(v)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_bytes(self):
         A = Alternative("A", a={}, b={},
                         __bytes__=lambda self: b'my bytes'
@@ -1178,6 +1202,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     # I think this would require nonlocal data
     @pytest.mark.skip(reason="not supported")
+    @pytest.mark.group_one
     def test_compile_simple_alternative_attr(self):
         def A_getattr(self, n):
             return self.d[n]
@@ -1280,6 +1305,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             with self.assertRaises(TypeError):
                 c_getattr2(v)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,
         # when __floor__ and __ceil__ are not defined
@@ -1338,6 +1364,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(B.a())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_simple_dir(self):
         # The interpreted dir() calls __dir__() and sorts the result.
         # I expected the compiled dir() to do the same thing, but it doesn't sort.
@@ -1386,6 +1413,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         self.assertTrue(finalMem < initMem + 2)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_comparison_defaults(self):
         B = Alternative("B", a={}, b={})
 
@@ -1428,6 +1456,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r2 = compiled_f(v)
                 self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_simple_alternative_comparison_methods(self):
         C = Alternative("C", a={}, b={},
                         __eq__=lambda self, other: True,
@@ -1468,6 +1497,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_compile_alternative_float_conv(self):
 
         A0 = Alternative("A0", a={}, b={},
@@ -1497,6 +1527,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             c_g(A0.a())
 
+    @pytest.mark.group_one
     def test_compile_alternative_missing_inplace_fallback(self):
         def A_add(self, other):
             return A.b(" add" + other.b)
@@ -1588,6 +1619,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         r2 = Compiled(inplace)(v)
         self.assertEqual(r2, expected)
 
+    @pytest.mark.group_one
     def test_compile_alternative_methods(self):
         def method(self, x):
             return self.y + x
@@ -1615,6 +1647,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         )
 
     @pytest.mark.skip(reason="not supported")
+    @pytest.mark.group_one
     def test_context_manager(self):
 
         def A_enter(self):
@@ -1676,6 +1709,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 r1 = c_fn(v)
                 self.assertEqual(r0, r1)
 
+    @pytest.mark.group_one
     def test_matches_on_alternative(self):
         A = Alternative("A", X=dict(x=int))
 
@@ -1685,6 +1719,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert checkMatchesX(A.X())
 
+    @pytest.mark.group_one
     def test_matches_on_oneof_alternative(self):
         A = Alternative("A", X=dict(x=int))
         B = Alternative("B", Y=dict(y=int))
@@ -1696,6 +1731,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         assert checkMatchesX(A.X())
         assert not checkMatchesX(B.Y())
 
+    @pytest.mark.group_one
     def test_can_cast_simple_alternative_down(self):
         A = Alternative("A", X=dict())
 
@@ -1711,6 +1747,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert g(A.X()) == 1
 
+    @pytest.mark.group_one
     def test_can_cast_alternative_down(self):
         A = Alternative("A", X=dict(x=int))
 
@@ -1726,12 +1763,14 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         assert g(A.X(x=10)) == 10
 
+    @pytest.mark.group_one
     def test_alternative_hashing(self):
         A = Alternative("A", A=dict(a=int))
 
         assert NativeHash.callHash(A.A, A.A(a=12)) == hash(A.A(a=12))
         assert NativeHash.callHash(A, A.A(a=12)) == hash(A.A(a=12))
 
+    @pytest.mark.group_one
     def test_alternative_equality(self):
         AB = Alternative("AB", A=dict(a=int), B=dict(b=str))
 
@@ -1755,6 +1794,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         assert eqMixed(AB.A(a=1), AB.A(a=1))
         assert eqConcrete(AB.A(a=1), AB.A(a=1))
 
+    @pytest.mark.group_one
     def test_compiled_attribute_access(self):
         A = Alternative(
             "A",

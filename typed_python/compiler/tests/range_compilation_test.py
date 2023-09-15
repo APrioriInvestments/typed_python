@@ -18,6 +18,7 @@ import unittest
 
 
 class TestRangeCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_construct_range(self):
         @Entrypoint
         def buildRange(x: int):
@@ -25,6 +26,7 @@ class TestRangeCompilation(unittest.TestCase):
 
         assert buildRange(10) == 10
 
+    @pytest.mark.group_one
     def test_sum_with_range(self):
         @Compiled
         def sumWithRange(x: int):
@@ -36,6 +38,7 @@ class TestRangeCompilation(unittest.TestCase):
         for i in range(10):
             self.assertEqual(sumWithRange(i), sum(range(i+1)))
 
+    @pytest.mark.group_one
     def test_range_with_two_values(self):
         @Compiled
         def sumWithRangePair(x: int, y: int):
@@ -48,6 +51,7 @@ class TestRangeCompilation(unittest.TestCase):
             for i2 in range(30):
                 self.assertEqual(sumWithRangePair(i, i2), sum(range(i, i2)))
 
+    @pytest.mark.group_one
     def test_range_repeat(self):
         @Compiled
         def repeat(array: ListOf(int), times: int):
@@ -74,6 +78,7 @@ class TestRangeCompilation(unittest.TestCase):
         self.assertEqual(repeat(aList, 2), aList + aList)
         self.assertEqual(repeat(aList, 3), aList + aList + aList)
 
+    @pytest.mark.group_one
     def test_range_type_str(self):
         def f(x):
             return str(type(x))
@@ -84,6 +89,7 @@ class TestRangeCompilation(unittest.TestCase):
         r2 = Entrypoint(f)(x)
         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_range_with_step(self):
         def f(start, stop, step):
             res = ListOf(int)()
@@ -115,6 +121,7 @@ class TestRangeCompilation(unittest.TestCase):
         ]:
             assert fCompiled(*args) == f(*args), args
 
+    @pytest.mark.group_one
     def test_range_perf(self):
         @Entrypoint
         def sumRangeAsInts(x):

@@ -35,11 +35,13 @@ class TestPythonAstAnalysis(unittest.TestCase):
             set(readVars)
         )
 
+    @pytest.mark.group_one
     def test_free_vars_basic(self):
         self.freeVarCheck(lambda: x, ['x'], [])  # noqa
         self.freeVarCheck(lambda: x + y, ['x', 'y'], [])  # noqa
         self.freeVarCheck(lambda: f(*args), ['f', 'args'], [])  # noqa
 
+    @pytest.mark.group_one
     def test_assignment_shows_up(self):
         def f():
             x = 10
@@ -47,6 +49,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['x'], ['x'])
 
+    @pytest.mark.group_one
     def test_assigned_only_once(self):
         def f():
             x = 10
@@ -80,6 +83,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
         self.assertEqual(sorted(assignedOnce), ["g", "h", "h1", "y"])
         self.assertEqual(assignmentCount, dict(x=2, y=1, f=2, g=1, h=1, h1=1))
 
+    @pytest.mark.group_one
     def test_read_by_closures(self):
         def f():
             def f1():
@@ -101,6 +105,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.assertEqual(sorted(readByClosures), ["x", "y", "z"])
 
+    @pytest.mark.group_one
     def test_func_def_masking_self(self):
         def f():
             class C:
@@ -113,12 +118,14 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.assertEqual(sorted(readByClosures), ["func"])
 
+    @pytest.mark.group_one
     def test_multi_assignment_shows_up(self):
         def f():
             x, y = (1, 2)  # noqa
 
         self.freeVarCheck(f, [], ['x', 'y'])
 
+    @pytest.mark.group_one
     def test_for_loops(self):
         def f():
             for i in 10:
@@ -126,6 +133,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, [], ['i'])
 
+    @pytest.mark.group_one
     def test_function_defs(self):
         def f():
             def aFun(x):
@@ -136,6 +144,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['y'], ['aFun', 'aFun2'])
 
+    @pytest.mark.group_one
     def test_class_defs(self):
         def f():
             class AClass:
@@ -147,6 +156,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['z'], ['AClass'])
 
+    @pytest.mark.group_one
     def test_function_default_args(self):
         SomeVar = None
 
@@ -156,6 +166,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['SomeVar'], ['someFunc'])
 
+    @pytest.mark.group_one
     def test_function_annotations(self):
         Something = None
 
@@ -177,6 +188,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['Something'], ['someFunc'])
 
+    @pytest.mark.group_one
     def test_iterators_in_generators_not_assigned(self):
         something = None
         z = None
@@ -186,6 +198,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['something', 'z'], ['x'])
 
+    @pytest.mark.group_one
     def test_iterators_in_generators_masking(self):
         # this does read from 'y' even though it masks the 'y' inside
         y = None
@@ -216,6 +229,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         self.freeVarCheck(f, ['something', 'z'], ['x'])
 
+    @pytest.mark.group_one
     def test_import_aliases(self):
         def f():
             import a.b  # noqa
@@ -225,6 +239,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
         assert python_ast_analysis.computeAssignedVariables(pyast.body) == {'a', 'blah'}
 
+    @pytest.mark.group_one
     def test_variables_read_perf(self):
         evaluator = CodeEvaluator()
 

@@ -49,6 +49,7 @@ class AClass(Class):
 
 class TestMultithreading(unittest.TestCase):
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_gil_is_released(self):
         @Compiled
         def f(x: int):
@@ -81,6 +82,7 @@ class TestMultithreading(unittest.TestCase):
         else:
             self.assertTrue(ratio >= .9 and ratio < 1.1, ratio)
 
+    @pytest.mark.group_one
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
             pass
@@ -113,6 +115,7 @@ class TestMultithreading(unittest.TestCase):
 
         self.assertEqual(_types.refcount(instance), 1)
 
+    @pytest.mark.group_one
     def test_serialize_is_parallel(self):
         if os.environ.get('TRAVIS_CI', None):
             return
@@ -146,6 +149,7 @@ class TestMultithreading(unittest.TestCase):
         # expect the ratio to be close to 1, but have some error margin
         self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
 
+    @pytest.mark.group_one
     def test_can_access_locks_in_compiler_with_locks_as_obj(self):
         lock = threading.Lock()
         recursiveLock = threading.RLock()
@@ -161,6 +165,7 @@ class TestMultithreading(unittest.TestCase):
 
         self.assertFalse(lock.locked())
 
+    @pytest.mark.group_one
     def test_can_access_locks_in_compiler_with_typed_locks(self):
         lock = threading.Lock()
         recursiveLock = threading.RLock()
@@ -183,6 +188,7 @@ class TestMultithreading(unittest.TestCase):
         self.assertFalse(lock.locked())
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_lock_perf(self):
         lock = threading.Lock()
         recursiveLock = threading.RLock()
@@ -213,6 +219,7 @@ class TestMultithreading(unittest.TestCase):
         self.assertLess(t1 - t0, .1)
         self.assertLess(t2 - t1, .1)
 
+    @pytest.mark.group_one
     def test_lock_works(self):
         lock = threading.Lock()
 
@@ -238,6 +245,7 @@ class TestMultithreading(unittest.TestCase):
         self.assertEqual(ct * 4, aList[0])
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_lock_with_separate_locks_perf(self):
         @Entrypoint
         def loopWithLock(l, aList, count):

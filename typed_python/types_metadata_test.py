@@ -19,6 +19,7 @@ from typed_python import (
 
 
 class TypesMetadataTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_type_relationships(self):
         assert issubclass(ListOf, Type)
 
@@ -38,6 +39,7 @@ class TypesMetadataTest(unittest.TestCase):
 
         assert issubclass(A, Class)
 
+    @pytest.mark.group_one
     def test_tupleOf(self):
         self.assertEqual(TupleOf(int), TupleOf(int))
         self.assertEqual(TupleOf(int).ElementType, int)
@@ -48,17 +50,21 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(TupleOf(object).ElementType, object)
         self.assertEqual(TupleOf(10).ElementType.__typed_python_category__, "Value")
 
+    @pytest.mark.group_one
     def test_tuple(self):
         self.assertEqual(Tuple(int, int, OneOf(10, 20)).ElementTypes, (int, int, OneOf(10, 20)))
 
+    @pytest.mark.group_one
     def test_named_tuple(self):
         self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes, (int, int, OneOf(10, 20)))
         self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementNames, ('x', 'y', 'z'))
 
+    @pytest.mark.group_one
     def test_const_dict(self):
         self.assertEqual(ConstDict(str, int).KeyType, str)
         self.assertEqual(ConstDict(str, int).ValueType, int)
 
+    @pytest.mark.group_one
     def test_alternatives(self):
         X = Forward("X")
         X = X.define(Alternative(
@@ -79,6 +85,7 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
         self.assertEqual(Right.ElementType.ElementTypes, (X, int))
 
+    @pytest.mark.group_one
     def test_oneof(self):
         someInts = TupleOf(int)((1, 2))
 

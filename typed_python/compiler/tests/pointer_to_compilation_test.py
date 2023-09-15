@@ -18,6 +18,7 @@ import unittest
 
 
 class TestPointerToCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_pointer_operations(self):
         T = ListOf(int)
 
@@ -48,6 +49,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(l1[3], 21)
         self.assertEqual(l1[4], 0x3ff0000000000000)  # hex representation of 64 bit float 1.0
 
+    @pytest.mark.group_one
     def test_bytecount(self):
         def testfun(x):
             return _types.bytecount(type(x))
@@ -66,6 +68,7 @@ class TestPointerToCompilation(unittest.TestCase):
         check(ListOf(int)([10]))
         check(Tuple(int, int, int)((10, 10, 10)))
 
+    @pytest.mark.group_one
     def test_pointer_subtraction(self):
         T = ListOf(int)
 
@@ -79,6 +82,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(testfun(T()), 1)
         self.assertEqual(compiledFun(T()), 1)
 
+    @pytest.mark.group_one
     def test_pointer_bool(self):
         T = ListOf(int)
 
@@ -92,6 +96,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(testfun(T([1])), True)
         self.assertEqual(compiledFun(T([1])), True)
 
+    @pytest.mark.group_one
     def test_pointer_to_addition(self):
         aList = ListOf(int)()
         aList.resize(10)
@@ -109,6 +114,7 @@ class TestPointerToCompilation(unittest.TestCase):
 
         self.assertEqual(iadd(p, 1), Entrypoint(iadd)(p, 1))
 
+    @pytest.mark.group_one
     def test_pointer_setitem_works(self):
         def f():
             x = ListOf(int)([1, 2, 3])
@@ -120,6 +126,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(f(), 3)
         self.assertEqual(Entrypoint(f)(), 3)
 
+    @pytest.mark.group_one
     def test_initialize_with_unlike_type(self):
         def f(T, v):
             x = ListOf(T)()
@@ -130,6 +137,7 @@ class TestPointerToCompilation(unittest.TestCase):
 
         self.assertEqual(f(int, 2.5), Entrypoint(f)(int, 2.5))
 
+    @pytest.mark.group_one
     def test_initialize_with_class_without_default_init(self):
         def f(T, v):
             x = ListOf(T)()
@@ -158,6 +166,7 @@ class TestPointerToCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Cannot implicitly convert an object of type int to an instance of C"):
             f(C, 2)
 
+    @pytest.mark.group_one
     def test_pointer_destroy_in_interpreter(self):
         aList = ListOf(str)(["a", "b"])
 
@@ -173,6 +182,7 @@ class TestPointerToCompilation(unittest.TestCase):
 
         assert aList[0] == ""
 
+    @pytest.mark.group_one
     def test_pointer_to_named_tuple(self):
         NT = NamedTuple(x=int, y=float)
         Lst = ListOf(NT)
@@ -189,6 +199,7 @@ class TestPointerToCompilation(unittest.TestCase):
         assert lst.pointerUnsafe(0).x.get() == 10
         assert ptrToX(lst.pointerUnsafe(0)).get() == 10
 
+    @pytest.mark.group_one
     def test_type_of_element_of_pointer_to_set(self):
         P = PointerTo(Set(int))
 

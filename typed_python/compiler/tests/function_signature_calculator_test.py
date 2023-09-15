@@ -32,6 +32,7 @@ def anyIsBad(types):
     return False
 
 
+@pytest.mark.group_one
 def test_basic():
     class A(Class):
         pass
@@ -102,6 +103,7 @@ def test_basic():
     assert calc.returnTypeFor([ChildClassWithBadOverride, Both], {}) is SomeInvalidClassReturnType
 
 
+@pytest.mark.group_one
 def test_override_diamond():
     class BaseClass(Class):
         def f(self, x) -> int:
@@ -126,6 +128,7 @@ def test_override_diamond():
     assert not calc.overloadInvalidSignatures(0, [ChildChildClass, int], {})
 
 
+@pytest.mark.group_one
 def test_understands_more_specific_types():
     @Function
     def f(x: int) -> lambda X: X:
@@ -136,6 +139,7 @@ def test_understands_more_specific_types():
     assert calc.returnTypeFor([OneOf(int, float)], {}) is int
 
 
+@pytest.mark.group_one
 def test_convert_subclass_of_trivially():
     class C(Class):
         pass

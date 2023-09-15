@@ -3,11 +3,13 @@ import numpy
 import numpy.linalg
 
 
+@pytest.mark.group_one
 def test_convert_list_to_numpy_array():
     aList = ListOf(int)(range(20))
     assert isinstance(aList.toArray(), numpy.ndarray)
 
 
+@pytest.mark.group_one
 def test_can_add_numpy_arrays_in_compiled_code():
     @Entrypoint
     def add(x):
@@ -16,6 +18,7 @@ def test_can_add_numpy_arrays_in_compiled_code():
     assert isinstance(add(numpy.ones(10)), numpy.ndarray)
 
 
+@pytest.mark.group_one
 def test_can_call_numpy_builtins_from_compiled_code():
     @Entrypoint
     def callSin(x):
@@ -30,6 +33,7 @@ def test_can_call_numpy_builtins_from_compiled_code():
     assert isinstance(callF(numpy.sin, numpy.ones(10).cumsum()), numpy.ndarray)
 
 
+@pytest.mark.group_one
 def test_can_call_numpy_matrix_funs():
     @Entrypoint
     def callDiagonal(x):
@@ -39,6 +43,7 @@ def test_can_call_numpy_matrix_funs():
     assert callDiagonal(10).tolist() == [1 for _ in range(10)]
 
 
+@pytest.mark.group_one
 def test_listof_from_sliced_numpy_array():
     x = numpy.array((0, 1, 2))
     y = x[::2]

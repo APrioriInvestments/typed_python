@@ -48,6 +48,7 @@ FloatList = ListOf(float)
 
 
 class TestCompileSpecializedEntrypoints(unittest.TestCase):
+    @pytest.mark.group_one
     def test_entrypoint_functions_work(self):
         @Entrypoint
         def f(x: TupleOf(int)):
@@ -55,6 +56,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(object).typeRepresentation, TupleOf(int))
 
+    @pytest.mark.group_one
     def test_specialized_entrypoint(self):
         compiledAdd = Entrypoint(add)
 
@@ -64,10 +66,12 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(compiledAdd(IntList([1, 2, 3]), 1), add(IntList([1, 2, 3]), 1))
         self.assertEqual(compiledAdd(FloatList([1, 2, 3]), 1), add(FloatList([1, 2, 3]), 1))
 
+    @pytest.mark.group_one
     def test_specialized_entrypoint_on_staticmethod(self):
         compiled = Entrypoint(AClass.aMethod)
         self.assertEqual(compiled(10), 11)
 
+    @pytest.mark.group_one
     def test_specialized_entrypoint_doesnt_recompile(self):
         def add(x, y):
             return x + y
@@ -85,6 +89,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(Runtime.singleton().timesCompiled - compileCount, 2)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_specialized_entrypoint_dispatch_perf(self):
         def add(x, y):
             return x + y
@@ -100,6 +105,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertTrue(time.time() - t0 < 5.0, time.time() - t0)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_specialized_entrypoint_perf_difference(self):
         compiledAdd = Entrypoint(add)
 
@@ -118,6 +124,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
             print("speedup for ", T, " is ", speedup)  # I get about 70x
 
+    @pytest.mark.group_one
     def test_many_threads_compiling_same_specialization(self):
         @Entrypoint
         def sumFun(a, b):
@@ -156,6 +163,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         assert not failed
 
+    @pytest.mark.group_one
     def test_specialization_noniterable_after_iterable(self):
 
         class AClass():
@@ -174,6 +182,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             r = specialized_f(x)
             self.assertTrue(r)
 
+    @pytest.mark.group_one
     def test_can_pass_types_as_values(self):
         @Entrypoint
         def append(T, x):
@@ -183,6 +192,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(append(int, 1.5), [1])
 
+    @pytest.mark.group_one
     def test_can_use_entrypoints_from_functions(self):
         @Entrypoint
         def f(x):
@@ -198,6 +208,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(100), 100)
 
+    @pytest.mark.group_one
     def test_can_use_entrypoints_on_class_methods(self):
         class ARandomPythonClass:
             def __init__(self, x=10):
@@ -219,6 +230,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(ARandomPythonClass(23).f(10), 33)
 
+    @pytest.mark.group_one
     def test_can_use_entrypoints_on_typed_class_methods(self):
         class AClass(Class, Final):
             x = Member(int)
@@ -251,6 +263,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(AClass(x=23).g2(10, 20.5), 30.5)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_can_pass_functions_as_objects(self):
         def addsOne(x):
             return x + 1
@@ -295,6 +308,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_sequential_append_performance(self):
         @Entrypoint
         def cumSum1(x):
@@ -327,6 +341,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_nocompile_works(self):
         thisWouldNotBeVisible = set()
 
@@ -356,6 +371,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertLess(time.time() - t0, .4)
 
+    @pytest.mark.group_one
     def test_disable_compiled_code(self):
         @Entrypoint
         def sum(x: int):
@@ -397,6 +413,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         # this should be fast again
         self.assertLess(t5 - t4, (t1 - t0) * 2)
 
+    @pytest.mark.group_one
     def test_call_entrypoint_with_default_argument(self):
         @Entrypoint
         def f(x, y=1, z=2):
@@ -405,6 +422,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(f(1), 4)
         self.assertEqual(f(1, 4), 7)
 
+    @pytest.mark.group_one
     def test_event_visitors(self):
         out = {}
 
@@ -444,6 +462,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertTrue(out['f'][3])
         assert type(out['f'][3][0]).__name__ == 'TypedCallTarget'
 
+    @pytest.mark.group_one
     def test_star_args_on_entrypoint(self):
         @Entrypoint
         def argCount(*args):
@@ -452,6 +471,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(argCount(1, 2, 3), 3)
         self.assertEqual(argCount(1, 2, 3, 4), 4)
 
+    @pytest.mark.group_one
     def test_star_args_on_entrypoint_typed(self):
         @Entrypoint
         def argCount():
@@ -474,6 +494,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(argCount.resultTypeFor(int, int, str), None)
 
+    @pytest.mark.group_one
     def test_entrypoint_no_coercion(self):
         @Entrypoint
         def f(x):
@@ -482,6 +503,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(f(1.5), float)
         self.assertEqual(f(1), int)
 
+    @pytest.mark.group_one
     def test_entrypoint_and_static_recursion_untyped_classes(self):
         class X:
             @staticmethod
@@ -493,6 +515,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(X.sum(10), sum(range(11)))
 
+    @pytest.mark.group_one
     def test_entrypoint_and_static_recursion_typed_classes(self):
         class X(Class):
             @staticmethod
@@ -504,6 +527,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(X.sum(10), sum(range(11)))
 
+    @pytest.mark.group_one
     def test_is_compiled(self):
         @Entrypoint
         def callIsCompiled():
@@ -514,6 +538,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         with DisableCompiledCode():
             self.assertFalse(callIsCompiled())
 
+    @pytest.mark.group_one
     def test_entrypoint_always_compiles_when_called_with_numpy_array(self):
         @Entrypoint
         def f(x: ListOf(int)):
@@ -528,6 +553,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(a), a.sum())
 
+    @pytest.mark.group_one
     def test_can_compile_deserialized_functions(self):
         @Entrypoint
         def callIt(f, x):
@@ -542,6 +568,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(callIt(aFun2, 10), aFun2(10))
 
+    @pytest.mark.group_one
     def test_can_serialize_entrypoints(self):
         @Entrypoint
         def f(x):
@@ -555,6 +582,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(10), f2(10))
 
+    @pytest.mark.group_one
     def test_can_serialize_nocompile(self):
         @NotCompiled
         def f(x):
@@ -568,6 +596,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(f(10), f2(10))
 
+    @pytest.mark.group_one
     def test_can_serialize_functions_with_multiple_overloads(self):
         @Entrypoint
         def f(x):
@@ -584,6 +613,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         self.assertEqual(f(10), f2(10))
         self.assertEqual(f(10, 11), f2(10, 11))
 
+    @pytest.mark.group_one
     def test_can_serialize_closures(self):
         x = 10
 
@@ -598,6 +628,7 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(adder(10), adder2(10))
 
+    @pytest.mark.group_one
     def test_not_compiled_references_work(self):
         @NotCompiled
         def simple():

@@ -1,0 +1,16 @@
+# used for generating the container that runs and lists the python tests. Docker is smart enough to
+# invalidate the cache when pyproject.toml changes.
+FROM python:3.10
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+# install the dependencies
+RUN pip install -r requirements.txt
+# RUN pip install toml && \
+#     python -c "import toml; deps = toml.load('pyproject.toml')['project']['dependencies']; print('\n'.join(deps))" > requirements.txt \
+#     && pip install --no-cache-dir -r requirements.txt
+
+
+ENTRYPOINT ["/bin/bash", "-c"]

@@ -114,6 +114,7 @@ def formatDatetimes(datetimes: ListOf(datetime)):
 
 
 class TestTimestamp(unittest.TestCase):
+    @pytest.mark.group_one
     def test_demo_usage(self):
 
         # create timestamp from unixtime
@@ -142,6 +143,7 @@ class TestTimestamp(unittest.TestCase):
         ts = Timestamp.make(time.time())
         ts.format(format="%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_eq(self):
         # The following commented block of code sometimes unexpectedly errors with something like
         # AssertionError: assert Held(Timestamp)(ts=2,) == Held(Timestamp)(ts=2,)
@@ -159,6 +161,7 @@ class TestTimestamp(unittest.TestCase):
 
         inner()
 
+    @pytest.mark.group_one
     def test_ge(self):
         # The following commented block of unexpectedly errors with something like
         # AssertionError: assert Held(Timestamp)(ts=1.6694e+09,) >= Held(Timestamp)(ts=1.6694e+09,)
@@ -177,12 +180,14 @@ class TestTimestamp(unittest.TestCase):
 
         inner()
 
+    @pytest.mark.group_one
     def test_gt(self):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
         ts2 = Timestamp.make(unixtime - 1)
         assert ts1 > ts2
 
+    @pytest.mark.group_one
     def test_le(self):
         # See comments in test_ge above
         @Entrypoint
@@ -196,6 +201,7 @@ class TestTimestamp(unittest.TestCase):
 
         inner()
 
+    @pytest.mark.group_one
     def test_lt(self):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
@@ -203,6 +209,7 @@ class TestTimestamp(unittest.TestCase):
 
         assert ts1 < ts2
 
+    @pytest.mark.group_one
     def test_ne(self):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
@@ -212,6 +219,7 @@ class TestTimestamp(unittest.TestCase):
         assert ts1 != ts2
         assert ts1 != ts3
 
+    @pytest.mark.group_one
     def test_add(self):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
@@ -219,6 +227,7 @@ class TestTimestamp(unittest.TestCase):
         ts3 = ts1 + ts2.ts
         assert ts3.ts == unixtime + 5
 
+    @pytest.mark.group_one
     def test_sub(self):
         unixtime = time.time()
         ts1 = Timestamp.make(unixtime)
@@ -226,6 +235,7 @@ class TestTimestamp(unittest.TestCase):
         ts3 = ts1 - ts2
         assert ts3 == unixtime - 5
 
+    @pytest.mark.group_one
     def test_format_default(self):
         # Just a superficial test. format proxies to DateFormatter.format
         # which has more extensive testing
@@ -234,6 +244,7 @@ class TestTimestamp(unittest.TestCase):
         dt = datetime.fromtimestamp(unixtime)
         assert dt.isoformat(timespec="seconds").replace("T", " ") == timestamp.format()
 
+    @pytest.mark.group_one
     def test_format(self):
         # Just a superficial test. format proxies to  DateFormatter.format
         # which has more extensive testing
@@ -244,6 +255,7 @@ class TestTimestamp(unittest.TestCase):
             format="%Y-%m-%dT%H:%M:%S"
         )
 
+    @pytest.mark.group_one
     def test_parse(self):
         unixtime = time.time()
         timestamp = Timestamp.make(unixtime)
@@ -253,16 +265,19 @@ class TestTimestamp(unittest.TestCase):
 
         assert int(timestamp) == int(parsed_timestamp)
 
+    @pytest.mark.group_one
     def test_parse_ampm(self):
         res = Timestamp.parse_nyc('2019/08/04 6:59 PM').ts
         expected = pytz.timezone('America/New_York').localize(datetime(2019, 8, 4, 18, 59, 0, 0)).timestamp()
         assert res == expected
 
+    @pytest.mark.group_one
     def test_parse_single_digit_day(self):
         res = Timestamp.parse_nyc('2020/12/1  14:15').ts
         expected = pytz.timezone('America/New_York').localize(datetime(2020, 12, 1, 14, 15, 0)).timestamp()
         assert res == expected
 
+    @pytest.mark.group_one
     def test_compare_timestamp_datetime_from_unixtime(self):
         runs = 10000000
 
@@ -290,6 +305,7 @@ class TestTimestamp(unittest.TestCase):
 
         # assert speedup > 30 and speedup < 40, speedup
 
+    @pytest.mark.group_one
     def test_compare_timestamp_datetime_from_string(self):
         runs = 100000
         date_strings = make_list_of_iso_datestrings(runs)
@@ -324,6 +340,7 @@ class TestTimestamp(unittest.TestCase):
         )
         # assert speedup > 7 and speedup < 8
 
+    @pytest.mark.group_one
     def test_compare_timestamp_datetime_format(self):
         runs = 1000000
         timestamps = listOfTimestamps(runs)
@@ -361,6 +378,7 @@ class TestTimestamp(unittest.TestCase):
 
         assert dtTime > tsTime and (speedup > 1 and speedup <= 4)
 
+    @pytest.mark.group_one
     def test_compare_timestamp_nyc_datetime_from_string(self):
         runs = 100000
         date_strings = make_list_of_iso_datestrings(runs)

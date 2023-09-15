@@ -18,6 +18,7 @@ from typed_python import (
 import time
 
 
+@pytest.mark.group_one
 def test_knows_its_a_float():
     @Entrypoint
     def callTime():
@@ -29,6 +30,7 @@ def test_knows_its_a_float():
     assert abs(callTime() - time.time()) < 0.001
 
 
+@pytest.mark.group_one
 def test_call_perf():
     @Entrypoint
     def callTimeNTimes(times):

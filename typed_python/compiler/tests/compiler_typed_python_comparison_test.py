@@ -754,42 +754,54 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
 
         return [Scenario(op, argTypes, values, actualTypes)]
 
+    @pytest.mark.group_one
     def test_add(self):
         self.checkOperation(ArithmeticOperation("add"))
 
+    @pytest.mark.group_one
     def test_mul(self):
         self.checkOperation(ArithmeticOperation("mul"))
 
+    @pytest.mark.group_one
     def test_sub(self):
         self.checkOperation(ArithmeticOperation("sub"))
 
+    @pytest.mark.group_one
     def test_truediv(self):
         self.checkOperation(ArithmeticOperation("truediv"))
 
+    @pytest.mark.group_one
     def test_floordiv(self):
         self.checkOperation(ArithmeticOperation("floordiv"))
 
+    @pytest.mark.group_one
     def test_mod(self):
         self.checkOperation(ArithmeticOperation("mod"))
 
     # we are not currently getting the types of 'pow' right. int ** int should be int.
     @pytest.mark.skip
+    @pytest.mark.group_one
     def test_pow(self):
         self.checkOperation(ArithmeticOperation("pow"))
 
+    @pytest.mark.group_one
     def test_lshift(self):
         self.checkOperation(ArithmeticOperation("lshift"))
 
     # we have numerous failures here
     @pytest.mark.skip
+    @pytest.mark.group_one
     def test_rshift(self):
         self.checkOperation(ArithmeticOperation("rshift"))
 
+    @pytest.mark.group_one
     def test_and(self):
         self.checkOperation(ArithmeticOperation("and"))
 
+    @pytest.mark.group_one
     def test_or(self):
         self.checkOperation(ArithmeticOperation("or"))
 
+    @pytest.mark.group_one
     def test_xor(self):
         self.checkOperation(ArithmeticOperation("xor"))

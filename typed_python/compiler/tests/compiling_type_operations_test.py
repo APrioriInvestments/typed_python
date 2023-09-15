@@ -18,6 +18,7 @@ import unittest
 
 
 class TestCompilingTypeOperations(unittest.TestCase):
+    @pytest.mark.group_one
     def test_can_make_new_types(self):
         @Entrypoint
         def f(x):
@@ -30,6 +31,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
             OneOf(None, int)
         )
 
+    @pytest.mark.group_one
     def test_stringification_of_type(self):
         @Entrypoint
         def f(x):
@@ -44,6 +46,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
         ]:
             check(typ)
 
+    @pytest.mark.group_one
     def test_type_of(self):
         @Entrypoint
         def f(x):
@@ -53,6 +56,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
         self.assertEqual(f(10.5), float)
         self.assertEqual(f(Int32(10)), Int32)
 
+    @pytest.mark.group_one
     def test_type_of_list_of_int(self):
         def f(x):
             return type(x).ElementType is int
@@ -60,6 +64,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
         self.assertTrue(f(ListOf(int)()))
         self.assertTrue(Entrypoint(f)(ListOf(int)()))
 
+    @pytest.mark.group_one
     def test_type_invalid_member_accesses(self):
         @Entrypoint
         def f():
@@ -68,6 +73,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "has no attribute 'notAMember'"):
             f()
 
+    @pytest.mark.group_one
     def test_type_invalid_unbound_member_call(self):
         @Entrypoint
         def f():
@@ -76,6 +82,7 @@ class TestCompilingTypeOperations(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "requires a '.*' object but received"):
             f()
 
+    @pytest.mark.group_one
     def test_type_valid_unbound_member_call(self):
         @Entrypoint
         def f(x):

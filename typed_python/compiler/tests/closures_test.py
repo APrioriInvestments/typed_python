@@ -59,6 +59,7 @@ class DidCompileVisitor(RuntimeEventVisitor):
 
 
 class TestCompilingClosures(unittest.TestCase):
+    @pytest.mark.group_one
     def test_closure_of_untyped_function(self):
         x = 10
 
@@ -69,6 +70,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(f.ClosureType.ElementTypes[0].ElementTypes[0], PyCell)
         self.assertTrue('x' in f.overloads[0].closureVarLookups)
 
+    @pytest.mark.group_one
     def test_lambda_with_same_code_doesnt_retrigger_compile(self):
         def makeAdder():
             def add(x, y):
@@ -95,6 +97,7 @@ class TestCompilingClosures(unittest.TestCase):
         # we shouldn't have triggered compilation.
         self.assertFalse(vis.didCompile)
 
+    @pytest.mark.group_one
     def test_closure_grabbing_types(self):
         T = int
 
@@ -107,6 +110,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(f(1.5), 1)
         self.assertEqual(bytecount(f.ClosureType), 8)
 
+    @pytest.mark.group_one
     def test_closure_grabbing_closures(self):
         x = 10
 
@@ -120,6 +124,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(g(), x)
 
+    @pytest.mark.group_one
     def test_calling_closure_with_bound_args(self):
         x = 10
 
@@ -133,6 +138,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callIt(20), 30)
 
+    @pytest.mark.group_one
     def test_passing_closures_as_arguments(self):
         x = 10
 
@@ -147,6 +153,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(callIt(f, 20), 30)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_calling_closures_perf(self):
         ct = 1000000
 
@@ -198,6 +205,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertLess(elapsedCompiled * 60, elapsedNontyped)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_assigning_closures_as_values(self):
         ct = 100000
 
@@ -274,6 +282,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertTrue(elapsedCompiled * 2 < elapsedNontyped)
 
     @pytest.mark.skip(reason="compiled code can't call closures holding untyped cells yet.")
+    @pytest.mark.group_one
     def test_closure_in_listof(self):
         def makeAdder(x):
             @Function
@@ -302,6 +311,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(resUncompiled, resCompiled)
 
+    @pytest.mark.group_one
     def test_mutually_recursive_closures(self):
         @Function
         def f(x):
@@ -318,6 +328,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(f(10), 0)
 
+    @pytest.mark.group_one
     def test_typed_cell(self):
         T = TypedCell(int)
 
@@ -344,12 +355,14 @@ class TestCompilingClosures(unittest.TestCase):
         with self.assertRaises(Exception):
             t.get()
 
+    @pytest.mark.group_one
     def test_typed_cell_in_tuple(self):
         TC = TypedCell(int)
 
         aTup = NamedTuple(x=TC)(x=TC())
         aTup.x.set(1)
 
+    @pytest.mark.group_one
     def test_typed_cell_with_forwards(self):
         Tup = Forward("Tup")
         Tup = Tup.define(NamedTuple(cell=TypedCell(Tup), x=int))
@@ -367,6 +380,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(t1.cell.get().cell.get().x, 1)
         self.assertEqual(t2.cell.get().cell.get().x, 2)
 
+    @pytest.mark.group_one
     def test_function_overload_with_closures(self):
         @Function
         def f():
@@ -402,6 +416,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(combo(1, 2), 30)
         self.assertEqual(combo(1, 2, 3), 40)
 
+    @pytest.mark.group_one
     def test_pass_untyped_function_to_entrypoint_ignores_signature(self):
         @Entrypoint
         def callWithFloat(f):
@@ -413,6 +428,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(callWithFloat(f), 1.5)
         self.assertEqual(callWithFloat(Function(f)), 1)
 
+    @pytest.mark.group_one
     def test_pass_untyped_function_to_entrypoint(self):
         @Entrypoint
         def returnIt(f):
@@ -423,6 +439,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         returnIt(f)
 
+    @pytest.mark.group_one
     def test_pass_typed_function_to_entrypoint(self):
         @Entrypoint
         def returnIt(f):
@@ -434,6 +451,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(returnIt(f)(10), 11)
 
+    @pytest.mark.group_one
     def test_access_untyped_function(self):
         @Entrypoint
         def callIt(x):
@@ -445,6 +463,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callIt(10), 11)
 
+    @pytest.mark.group_one
     def test_access_untyped_function_with_string_in_closure(self):
         y = "hi"
 
@@ -458,6 +477,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callIt("10"), "10hi")
 
+    @pytest.mark.group_one
     def test_pass_function_with_bound_variable(self):
         @Entrypoint
         def returnIt(f):
@@ -485,6 +505,7 @@ class TestCompilingClosures(unittest.TestCase):
         # different from python but unavoidable
         self.assertNotEqual(fRes(), fRes2())
 
+    @pytest.mark.group_one
     def test_pass_function_holding_function(self):
         @Entrypoint
         def returnIt(f):
@@ -512,6 +533,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(fRes.withEntrypoint(True)(), x)
 
+    @pytest.mark.group_one
     def test_pass_mutually_recursive_functions(self):
         @Entrypoint
         def returnIt(f):
@@ -547,6 +569,7 @@ class TestCompilingClosures(unittest.TestCase):
         # for each function call.
         print("took ", time.time() - t0, " to do 100k closure conversions")
 
+    @pytest.mark.group_one
     def test_no_recompile_for_same_function_body(self):
         def makeAdder(x):
             def adder(y):
@@ -569,6 +592,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertFalse(vis.didCompile)
 
+    @pytest.mark.group_one
     def test_pass_closures_from_compiled_code_with_no_capture(self):
         def doIt():
             def f():
@@ -581,6 +605,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(doIt(), Entrypoint(doIt)())
 
+    @pytest.mark.group_one
     def test_call_mutually_recursive_closures_from_compiled_code(self):
         def doIt(count):
             def f(x):
@@ -597,6 +622,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(doIt(100), compiledDoIt(100))
 
+    @pytest.mark.group_one
     def test_closure_in_compiled_code_with_variable(self):
         def doIt():
             x = 10
@@ -608,6 +634,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(doIt(), Entrypoint(doIt)())
 
+    @pytest.mark.group_one
     def test_closure_in_compiled_code_with_variable_that_changes(self):
         def doIt():
             x = 10
@@ -625,12 +652,14 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(doIt(), Entrypoint(doIt)())
 
+    @pytest.mark.group_one
     def test_lambdas_in_compiled_code(self):
         def doIt(x):
             return (lambda y: x + y)(x)
 
         self.assertEqual(Entrypoint(doIt)(10), doIt(10))
 
+    @pytest.mark.group_one
     def test_closure_in_compiled_code_bind_pod_arg(self):
         def doIt(x):
             def f(y):
@@ -640,6 +669,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(Entrypoint(doIt)(10), doIt(10))
 
+    @pytest.mark.group_one
     def test_closure_in_compiled_code_refcounts(self):
         def doIt(tup):
             def f(y):
@@ -654,6 +684,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(refcount(aTup), 1)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_closure_var_lookup_speed(self):
         def sum(count, f):
             res = 0.0
@@ -693,6 +724,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertTrue(.8 <= closureTime / directTime <= 1.2, closureTime / directTime)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_if_statement_def(self):
         def callIt(x):
             if x % 2:
@@ -723,6 +755,7 @@ class TestCompilingClosures(unittest.TestCase):
         print("speedup is ", speedup)  # I get about 80
         self.assertGreater(speedup, 60)
 
+    @pytest.mark.group_one
     def test_assign_functions_with_closure_works(self):
         def callIt(x):
             y = 10.0
@@ -746,6 +779,7 @@ class TestCompilingClosures(unittest.TestCase):
             self.assertEqual(callItE(i), callIt(i))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_assign_functions_with_closure_perf(self):
         def callIt(x):
             y = 10.0
@@ -778,6 +812,7 @@ class TestCompilingClosures(unittest.TestCase):
         print("speedup is ", speedup)  # I get about 8
         self.assertGreater(speedup, 6)
 
+    @pytest.mark.group_one
     def test_two_closure_vars(self):
         @Entrypoint
         def callIt(x):
@@ -796,6 +831,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         self.assertEqual(callIt(1), 20)
 
+    @pytest.mark.group_one
     def test_mutually_recursive_assigned_variables(self):
         def callIt(x):
             if x % 2:
@@ -827,6 +863,7 @@ class TestCompilingClosures(unittest.TestCase):
         for i in range(10):
             self.assertEqual(callItE(i), callIt(i))
 
+    @pytest.mark.group_one
     def test_closure_bound_in_class(self):
         def makeClass(i):
             def fExternal():
@@ -850,6 +887,7 @@ class TestCompilingClosures(unittest.TestCase):
         self.assertEqual(callF(C1()), 1)
         self.assertEqual(callF(C2()), 2)
 
+    @pytest.mark.group_one
     def test_calling_doesnt_leak(self):
         @Entrypoint
         def g(x):
@@ -869,6 +907,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_building_closures_doesnt_leak(self):
         m0 = currentMemUsageMb()
         t0 = time.time()
@@ -882,6 +921,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_building_closures_of_closures_doesnt_leak(self):
         m0 = currentMemUsageMb()
         t0 = time.time()
@@ -897,6 +937,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_building_notcompiled_with_closures_doesnt_leak(self):
         m0 = currentMemUsageMb()
         t0 = time.time()
@@ -915,6 +956,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_calling_notcompiled_doesnt_leak(self):
         @Entrypoint
         def callIt(x):
@@ -930,6 +972,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_calling_entrypoint_with_closures_doesnt_leak(self):
         @Entrypoint
         def callIt(f, x):
@@ -945,6 +988,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 2.0
 
+    @pytest.mark.group_one
     def test_type_inference_doesnt_leak(self):
         def g(x):
             return x + 2.0
@@ -963,6 +1007,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert currentMemUsageMb() - m0 < 1.0
 
+    @pytest.mark.group_one
     def test_copy_closure_with_cells(self):
         # we need the closure to hold something with a refcount
         # or else we don't generate a closure
@@ -991,6 +1036,7 @@ class TestCompilingClosures(unittest.TestCase):
         # check that we are actually using a TypedCell
         assert issubclass(r.MemberTypes[0].ClosureType, TypedCell)
 
+    @pytest.mark.group_one
     def test_can_use_assigned_lambdas_in_compiled_code(self):
         @Entrypoint
         def callIt(x):
@@ -1000,6 +1046,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert callIt(10) == 2
 
+    @pytest.mark.group_one
     def test_can_use_reassigned_assigned_lambdas_in_compiled_code(self):
         @Entrypoint
         def callIt(x):
@@ -1013,6 +1060,7 @@ class TestCompilingClosures(unittest.TestCase):
         assert callIt(10) == 22
         assert callIt(11) == 36
 
+    @pytest.mark.group_one
     def test_captured_closure_values_have_good_types(self):
         aList = ListOf(int)([1, 2, 3])
 
@@ -1022,6 +1070,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert callIt() == ListOf(int)
 
+    @pytest.mark.group_one
     def test_captured_closure_values_in_class_methods_have_good_types(self):
         aList = ListOf(int)([1, 2, 3])
 
@@ -1033,6 +1082,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert Cls.callIt() == ListOf(int)
 
+    @pytest.mark.group_one
     def test_closure_lambdas_obey_not_compiled(self):
         @NotCompiled
         def g():
@@ -1044,6 +1094,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         f()
 
+    @pytest.mark.group_one
     def test_passed_lambdas_obey_not_compiled(self):
         @NotCompiled
         def g():
@@ -1055,6 +1106,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         f(g)
 
+    @pytest.mark.group_one
     def test_interior_lambdas_obey_not_compiled(self):
         @Entrypoint
         def f():
@@ -1066,6 +1118,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         f()
 
+    @pytest.mark.group_one
     def test_compiled_defs_obey_not_compiled(self):
         @Entrypoint
         def makeNocompile():
@@ -1077,6 +1130,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert makeNocompile().isNocompile
 
+    @pytest.mark.group_one
     def test_compiled_defs_obey_entrypoint(self):
         @Entrypoint
         def makeEntrypoint():
@@ -1088,6 +1142,7 @@ class TestCompilingClosures(unittest.TestCase):
 
         assert makeEntrypoint().isEntrypoint
 
+    @pytest.mark.group_one
     def test_compile_closures_with_type_refs(self):
         class C(Class):
             pass

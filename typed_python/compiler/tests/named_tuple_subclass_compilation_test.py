@@ -9,6 +9,7 @@ class T(NamedTuple(x=int, y=float)):
         return T(x=self.x + other, y=self.y)
 
 
+@pytest.mark.group_one
 def test_can_construct():
     @Entrypoint
     def getOne(x):
@@ -17,6 +18,7 @@ def test_can_construct():
     assert getOne(10).x == 10
 
 
+@pytest.mark.group_one
 def test_can_hit_operators():
     @Entrypoint
     def getOne(x):
@@ -25,6 +27,7 @@ def test_can_hit_operators():
     assert getOne(10).x == 10
 
 
+@pytest.mark.group_one
 def test_subclass_of_named_tuple_compilation():
     NT = NamedTuple(a=int, b=str)
 
@@ -85,6 +88,7 @@ def test_subclass_of_named_tuple_compilation():
 
 
 @flaky(max_runs=3, min_passes=1)
+@pytest.mark.group_one
 def test_subclass_of_named_tuple_compilation_perf():
     NT = NamedTuple(a=float, b=str)
 
@@ -111,6 +115,7 @@ def test_subclass_of_named_tuple_compilation_perf():
     assert time.time() - t0 < .01
 
 
+@pytest.mark.group_one
 def test_bound_method_on_named_tuple():
     class NT(NamedTuple(x=str)):
         @Function

@@ -45,6 +45,7 @@ def result_or_exception(f, *p):
 
 
 class TestBytesCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_bytes_passing_and_refcounting(self):
         @Compiled
         def takeFirst(x: bytes, y: bytes):
@@ -59,6 +60,7 @@ class TestBytesCompilation(unittest.TestCase):
                 self.assertEqual(s, takeFirst(s, s2))
                 self.assertEqual(s2, takeSecond(s, s2))
 
+    @pytest.mark.group_one
     def test_bytes_len(self):
         @Compiled
         def compiledLen(x: bytes):
@@ -67,6 +69,7 @@ class TestBytesCompilation(unittest.TestCase):
         for s in someBytes:
             self.assertEqual(len(s), compiledLen(s))
 
+    @pytest.mark.group_one
     def test_bytes_concatenation(self):
         @Compiled
         def concat(x: bytes, y: bytes):
@@ -81,6 +84,7 @@ class TestBytesCompilation(unittest.TestCase):
                 self.assertEqual(s+s2, concat(s, s2))
                 self.assertEqual(len(s+s2), concatLen(s, s2))
 
+    @pytest.mark.group_one
     def test_bytes_constants(self):
         def makeConstantConcatenator(s):
             def returner():
@@ -93,6 +97,7 @@ class TestBytesCompilation(unittest.TestCase):
 
             self.assertEqual(s, s_from_code, (repr(s), repr(s_from_code)))
 
+    @pytest.mark.group_one
     def test_bytes_getitem(self):
         @Compiled
         def getitem(x: bytes, y: int):
@@ -111,6 +116,7 @@ class TestBytesCompilation(unittest.TestCase):
                 )
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_bytes_perf(self):
         def bytesAdd(x: bytes):
             i = 0
@@ -137,6 +143,7 @@ class TestBytesCompilation(unittest.TestCase):
         # I get about 200
         self.assertGreater(speedup, 50)
 
+    @pytest.mark.group_one
     def test_bytes_literals(self):
 
         def f(i: int):
@@ -154,6 +161,7 @@ class TestBytesCompilation(unittest.TestCase):
             self.assertEqual(f(i), cf(i))
             self.assertEqual(g(i), cg(i))
 
+    @pytest.mark.group_one
     def test_bytes_conversions(self):
 
         def f(x: bytes):
@@ -173,6 +181,7 @@ class TestBytesCompilation(unittest.TestCase):
         # for v in ['123', 'abcdefgh', 'a\u00CAb', 'XyZ\U0001D471']:
         #     self.assertEqual(g(v), cg(v))
 
+    @pytest.mark.group_one
     def test_bytes_slice(self):
         def f(x: bytes, l: int, r: int):
             return x[l:r]
@@ -184,6 +193,7 @@ class TestBytesCompilation(unittest.TestCase):
                 for b in [b"", b"a", b"as", b"asdf"]:
                     self.assertEqual(fComp(b, l, r), f(b, l, r))
 
+    @pytest.mark.group_one
     def test_compare_bytes_to_constant(self):
         @Entrypoint
         def countEqualTo(z):
@@ -206,6 +216,7 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertLess(elapsed, .15)
         print("elapsed = ", elapsed)
 
+    @pytest.mark.group_one
     def test_add_constants(self):
         @Entrypoint
         def addConstants(count):
@@ -222,6 +233,7 @@ class TestBytesCompilation(unittest.TestCase):
         # llvm should recognize that this is just 'N' and so it should take no time.
         self.assertLess(time.time() - t0, 1e-4)
 
+    @pytest.mark.group_one
     def test_bytes_split(self):
         def split(someBytes, *args, **kwargs):
             return someBytes.split(*args, **kwargs)
@@ -285,6 +297,7 @@ class TestBytesCompilation(unittest.TestCase):
             compiledRsplit(b'abc', b'')
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_bytes_split_perf(self):
         def splitAndCount(s: bytes, sep: bytes, times: int):
             res = 0
@@ -308,6 +321,7 @@ class TestBytesCompilation(unittest.TestCase):
             f"Compiler was {compiled / uncompiled} times slower."
         )
 
+    @pytest.mark.group_one
     def test_bytes_iteration(self):
         def iter(x: bytes):
             r = ListOf(int)()
@@ -346,6 +360,7 @@ class TestBytesCompilation(unittest.TestCase):
             r2 = Compiled(contains_space)(v)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_bytes_bool_fns(self):
         def f_isalnum(x):
             return x.isalnum()
@@ -382,6 +397,7 @@ class TestBytesCompilation(unittest.TestCase):
                 r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2, (f, v))
 
+    @pytest.mark.group_one
     def test_bytes_startswith_endswith(self):
         def f_startswith(x, *args):
             return x.startswith(*args)
@@ -404,6 +420,7 @@ class TestBytesCompilation(unittest.TestCase):
                             r2 = c_f(x, y, start, end)
                             self.assertEqual(r1, r2, (f, x, y, start, end))
 
+    @pytest.mark.group_one
     def test_bytes_case(self):
         def f_lower(x):
             return x.lower()
@@ -428,6 +445,7 @@ class TestBytesCompilation(unittest.TestCase):
                 r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2, (f, v))
 
+    @pytest.mark.group_one
     def test_bytes_strip(self):
         def f_strip(x):
             return x.strip()
@@ -463,6 +481,7 @@ class TestBytesCompilation(unittest.TestCase):
                     r2 = Entrypoint(f)(v, y)
                     self.assertEqual(r1, r2, (f, v, y))
 
+    @pytest.mark.group_one
     def test_bytes_strip_bad_arg(self):
         @Entrypoint
         def strip(x, y):
@@ -471,6 +490,7 @@ class TestBytesCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             strip(b"asdf", 10)
 
+    @pytest.mark.group_one
     def test_bytes_count(self):
         def f_count(x, sub):
             return x.count(sub)
@@ -501,6 +521,7 @@ class TestBytesCompilation(unittest.TestCase):
                         r2 = Entrypoint(f)(v, sub, start, end)
                         self.assertEqual(r1, r2, (v, sub, start, end))
 
+    @pytest.mark.group_one
     def test_bytes_find(self):
         def f_find(x, sub):
             return x.find(sub)
@@ -580,6 +601,7 @@ class TestBytesCompilation(unittest.TestCase):
                                 with self.assertRaises(ValueError):
                                     Entrypoint(g)(v, sub, start, end)
 
+    @pytest.mark.group_one
     def test_bytes_mult(self):
         def f_mult(x, n):
             return x * n
@@ -590,6 +612,7 @@ class TestBytesCompilation(unittest.TestCase):
             r2 = Entrypoint(f_mult)(v, n)
             self.assertEqual(r1, r2, n)
 
+    @pytest.mark.group_one
     def test_bytes_contains_bytes(self):
         @Entrypoint
         def f_contains(x, y):
@@ -609,6 +632,7 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertTrue(f_not_contains(b'b', ListOf(bytes)([b'asfd'])))
         self.assertFalse(f_not_contains(b'asdf', ListOf(bytes)([b'asdf'])))
 
+    @pytest.mark.group_one
     def test_bytes_replace(self):
         def replace(x: bytes, y: bytes, z: bytes):
             return x.replace(y, z)
@@ -668,6 +692,7 @@ class TestBytesCompilation(unittest.TestCase):
             res = function(separator, make_obj(items))
             self.assertEqual(expected, res, description)
 
+    @pytest.mark.group_one
     def test_bytes_join_for_tuple_of_bytes(self):
         # test passing tuple of bytes
         @Compiled
@@ -676,6 +701,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         self.validate_joining_bytes(f, lambda items: TupleOf(bytes)(items))
 
+    @pytest.mark.group_one
     def test_bytes_join_for_list_of_bytes(self):
         # test passing list of bytes
         @Compiled
@@ -684,6 +710,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         self.validate_joining_bytes(f, lambda items: ListOf(bytes)(items))
 
+    @pytest.mark.group_one
     def test_bytes_join_for_dict_of_bytes(self):
         # test passing list of bytes
         @Compiled
@@ -692,6 +719,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         self.validate_joining_bytes(f, lambda items: Dict(bytes, bytes)({i: b"a" for i in items}))
 
+    @pytest.mark.group_one
     def test_bytes_join_for_const_dict_of_bytes(self):
         # test passing list of bytes
         @Compiled
@@ -700,6 +728,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         self.validate_joining_bytes(f, lambda items: ConstDict(bytes, bytes)({i: b"a" for i in items}))
 
+    @pytest.mark.group_one
     def test_bytes_join_for_bad_types(self):
         """bytes.join supports only joining iterables of bytes."""
 
@@ -719,6 +748,7 @@ class TestBytesCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, ""):
             f_int(b",", ListOf(int)(["1", "2", "3"]))
 
+    @pytest.mark.group_one
     def test_bytes_decode(self):
         def f_decode1(x, _i1, _i2):
             return x.decode()
@@ -737,6 +767,7 @@ class TestBytesCompilation(unittest.TestCase):
                         r2 = result_or_exception(Entrypoint(f), v, enc, err)
                         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_bytes_translate(self):
         def f_translate1(x, table):
             return x.translate(table)
@@ -804,6 +835,7 @@ class TestBytesCompilation(unittest.TestCase):
             r2 = result_or_exception(Entrypoint(f_maketrans3), bytes, x, y)
             self.assertEqual(r1, r2, (f_maketrans3, x, y))
 
+    @pytest.mark.group_one
     def test_bytes_partition(self):
         def f_partition(x, sep):
             return x.partition(sep)
@@ -824,6 +856,7 @@ class TestBytesCompilation(unittest.TestCase):
                 with self.assertRaises(TypeError):
                     Entrypoint(f)(v, 'abc')
 
+    @pytest.mark.group_one
     def test_bytes_just(self):
         def f_center(x, w, fill):
             if fill == ' ':
@@ -858,6 +891,7 @@ class TestBytesCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Entrypoint(f)(v, w, 'X')
 
+    @pytest.mark.group_one
     def test_bytes_to_int(self):
         @Entrypoint
         def bytesToInt(x: bytes):
@@ -868,6 +902,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         assert bytesToInt(b'') == 0
 
+    @pytest.mark.group_one
     def test_bytes_tabs(self):
         def f_expandtabs(x, t):
             return x.expandtabs(t)
@@ -894,6 +929,7 @@ class TestBytesCompilation(unittest.TestCase):
                 r2 = Entrypoint(f_splitlines)(v, k)
                 self.assertEqual(r1, r2, (v, k))
 
+    @pytest.mark.group_one
     def test_bytes_zfill(self):
         def f_zfill(x, w):
             return x.zfill(w)
@@ -904,6 +940,7 @@ class TestBytesCompilation(unittest.TestCase):
                 r2 = Entrypoint(f_zfill)(v, w)
                 self.assertEqual(r1, r2, (v, w))
 
+    @pytest.mark.group_one
     def test_bytes_internal_fns(self):
         """
         These are functions that are normally not called directly.

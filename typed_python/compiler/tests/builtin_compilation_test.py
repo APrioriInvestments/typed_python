@@ -31,6 +31,7 @@ def result_or_exception(f, *p):
 
 
 class TestBuiltinCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_builtins_on_various_types(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=str, t=TupleOf(int))
@@ -167,6 +168,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                         c_f(T(v))
                     self.assertEqual(r1, r2, (T, v, f))
 
+    @pytest.mark.group_one
     def test_min_max(self):
         def f_min(*v):
             return min(*v)
@@ -210,6 +212,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2)
                 self.assertEqual(type(r1), type(r2))
 
+    @pytest.mark.group_one
     def test_min_max_with_key(self):
         T = OneOf(str, ListOf(int), TupleOf(int), Set(int))
 
@@ -283,6 +286,7 @@ class TestBuiltinCompilation(unittest.TestCase):
             with self.assertRaises(TypeError):
                 Entrypoint(f)(v)
 
+    @pytest.mark.group_one
     def test_min_max_iterable(self):
         def f_min(v):
             return min(v)
@@ -342,6 +346,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2, (f, v))
                 self.assertEqual(type(r1), type(r2))
 
+    @pytest.mark.group_one
     def test_min_max_iterable_with_key(self):
         T = OneOf(str, ListOf(int), TupleOf(int), Set(int))
 
@@ -398,6 +403,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                 self.assertEqual(r1, r2)
                 self.assertEqual(type(r1), type(r2))
 
+    @pytest.mark.group_one
     def test_min_max_defaults(self):
         def f_min(v):
             return min(v)
@@ -440,6 +446,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                     self.assertEqual(f(v, d), d)
                     self.assertEqual(Entrypoint(f)(v, d), d)
 
+    @pytest.mark.group_one
     def test_min_max_extra_kwargs(self):
         def f_min_kw(v, **kw):
             return min(v, **kw)
@@ -454,6 +461,7 @@ class TestBuiltinCompilation(unittest.TestCase):
             with self.assertRaises(TypeError):
                 Entrypoint(f)(v, x=99)
 
+    @pytest.mark.group_one
     def test_min_max_cover(self):
         # these functions are compiled indirectly and tested elsewhere
         # to avoid codecov failures, they appear here
@@ -469,6 +477,7 @@ class TestBuiltinCompilation(unittest.TestCase):
         i_max_key(v, k)
         i_max_key_default(v, k, d)
 
+    @pytest.mark.group_one
     def test_min_max_with_object(self):
         @Entrypoint
         def minOI(x: object, y: int):
@@ -503,6 +512,7 @@ class TestBuiltinCompilation(unittest.TestCase):
                 assert maxIO(x, y) == max(x, y)
                 assert maxOO(x, y) == max(x, y)
 
+    @pytest.mark.group_one
     def test_abs_of_object(self):
         @Entrypoint
         def callAbs(o: object):

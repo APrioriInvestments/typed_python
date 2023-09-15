@@ -21,6 +21,7 @@ from typed_python import map
 
 
 class TestMap(unittest.TestCase):
+    @pytest.mark.group_one
     def test_map(self):
         def f(x):
             return x + 1
@@ -45,6 +46,7 @@ class TestMap(unittest.TestCase):
         self.assertEqual(type(compiledMap(f, aNamedTup)), NamedTuple(x=int, y=float))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_map_perf(self):
         @Function
         def addOne(x):
@@ -76,6 +78,7 @@ class TestMap(unittest.TestCase):
         # which has to recreate the type object each time, is very slow.
         self.assertGreater(speedup, 100)
 
+    @pytest.mark.group_one
     def test_transpose_lists(self):
         @Entrypoint
         def transposeLists(tupOfLists):
@@ -97,6 +100,7 @@ class TestMap(unittest.TestCase):
 
         self.assertEqual(res[0], makeNamedTuple(x=0, y=0.0))
 
+    @pytest.mark.group_one
     def test_map_with_multiple_outputs(self):
         @Entrypoint
         def f(x) -> OneOf(int, float):

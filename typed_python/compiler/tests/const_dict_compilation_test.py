@@ -47,6 +47,7 @@ def makeSomeValues(dtype, count=10):
 
 
 class TestConstDictCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_const_dict_copying(self):
         for dtype in dictTypes:
             @Compiled
@@ -58,6 +59,7 @@ class TestConstDictCompilation(unittest.TestCase):
             self.assertEqual(copyInOut(aDict), aDict)
             self.assertEqual(_types.refcount(aDict), 1)
 
+    @pytest.mark.group_one
     def test_const_dict_len(self):
         for dtype in dictTypes:
             @Compiled
@@ -68,6 +70,7 @@ class TestConstDictCompilation(unittest.TestCase):
                 d = makeSomeValues(dtype, ct)
                 self.assertEqual(len(d), compiledLen(d))
 
+    @pytest.mark.group_one
     def test_const_dict_getitem(self):
         for dtype in dictTypes:
             @Compiled
@@ -86,6 +89,7 @@ class TestConstDictCompilation(unittest.TestCase):
             for key in bigger_d:
                 self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key)))
 
+    @pytest.mark.group_one
     def test_const_dict_getitem_coercion(self):
         d = ConstDict(int, int)({1: 2})
 
@@ -134,6 +138,7 @@ class TestConstDictCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             getitem(d, 1.5)
 
+    @pytest.mark.group_one
     def test_const_dict_contains(self):
         for dtype in dictTypes:
             @Compiled
@@ -161,6 +166,7 @@ class TestConstDictCompilation(unittest.TestCase):
         self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 5))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_const_dict_loops_perf(self):
         def loop(x: ConstDict(int, int)):
             res = 0
@@ -194,6 +200,7 @@ class TestConstDictCompilation(unittest.TestCase):
         print("ConstDict lookup speedup is ", speedup)
         self.assertGreater(speedup, 1.75)
 
+    @pytest.mark.group_one
     def test_const_dict_key_error(self):
         @Compiled
         def lookup(x: ConstDict(int, int), y: int):
@@ -203,6 +210,7 @@ class TestConstDictCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             lookup({1: 2}, 2)
 
+    @pytest.mark.group_one
     def test_const_dict_unsafe_operations(self):
         T = ConstDict(int, int)
 
@@ -241,6 +249,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(toi), 1)
 
+    @pytest.mark.group_one
     def test_const_dict_comparison(self):
         @Entrypoint
         def eq(x, y):
@@ -264,6 +273,7 @@ class TestConstDictCompilation(unittest.TestCase):
         self.assertFalse(eq(t1, t2))
         self.assertTrue(neq(t1, t2))
 
+    @pytest.mark.group_one
     def test_const_dict_iteration(self):
         def iterateConstDict(cd):
             res = ListOf(type(cd).KeyType)()
@@ -328,6 +338,7 @@ class TestConstDictCompilation(unittest.TestCase):
             self.assertEqual(_types.refcount(atup), 2)
             self.assertEqual(_types.refcount(atup2), 2)
 
+    @pytest.mark.group_one
     def test_const_dict_iteration_perf(self):
         def loop(x: ConstDict(int, int)):
             res = 0
@@ -355,6 +366,7 @@ class TestConstDictCompilation(unittest.TestCase):
         print("ConstDict iteration speedup is ", speedup)
         self.assertGreater(speedup, 2)
 
+    @pytest.mark.group_one
     def test_yield_from_const_dict(self):
         def iterateTwice(d):
             for k in d:
@@ -372,6 +384,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         assert toList(ConstDict(int, float)({1: 2.2})) == [1, 1]
 
+    @pytest.mark.group_one
     def test_yield_from_const_dict_values(self):
         def iterateTwice(d):
             for k in d.values():
@@ -389,6 +402,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         assert toList(ConstDict(int, float)({1: 2.2})) == [2.2, 2.2]
 
+    @pytest.mark.group_one
     def test_yield_from_const_dict_items(self):
         def iterateTwice(d):
             for k in d.items():
@@ -406,6 +420,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         assert toList(ConstDict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]
 
+    @pytest.mark.group_one
     def test_convert_dict_to_const_dict(self):
         def f():
             res = Dict(object, object)({1: '2', 3: '4', -3: '6'})
@@ -414,6 +429,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         assert f() == Entrypoint(f)()
 
+    @pytest.mark.group_one
     def test_const_dict_add(self):
         @Entrypoint
         def addDicts(d1, d2):
@@ -438,6 +454,7 @@ class TestConstDictCompilation(unittest.TestCase):
             for d2 in someDicts:
                 assert d1 + d2 == addDicts(d1, d2)
 
+    @pytest.mark.group_one
     def test_const_dict_sub(self):
         @Entrypoint
         def subKey(dct, key):

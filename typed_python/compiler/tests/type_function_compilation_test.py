@@ -17,6 +17,7 @@ import unittest
 
 
 class CompileTypeFunctionTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic(self):
         @TypeFunction
         def List(T):
@@ -31,6 +32,7 @@ class CompileTypeFunctionTest(unittest.TestCase):
             ListOf(int)
         )
 
+    @pytest.mark.group_one
     def test_pass_type_function_as_value(self):
         @TypeFunction
         def List(T):
@@ -47,6 +49,7 @@ class CompileTypeFunctionTest(unittest.TestCase):
 
         self.assertEqual(inferType(List, int), ListOf(int))
 
+    @pytest.mark.group_one
     def test_instantiating_type_function_value(self):
         @TypeFunction
         def List(T):

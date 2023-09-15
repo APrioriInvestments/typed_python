@@ -48,6 +48,7 @@ def get_years_in_range(start, end):
 
 
 class TestDateFormatter(unittest.TestCase):
+    @pytest.mark.group_one
     def test_isoformat(self):
         seconds = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -61,6 +62,7 @@ class TestDateFormatter(unittest.TestCase):
                 "%Y-%m-%dT%H:%M:%S"
             )
 
+    @pytest.mark.group_one
     def test_format_directives(self):
         seconds = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -74,6 +76,7 @@ class TestDateFormatter(unittest.TestCase):
                 "%Y-%m-%dT%H:%M:%S"
             )
 
+    @pytest.mark.group_one
     def test_format_directive_a(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -86,6 +89,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%a"
             ) == day.strftime("%a"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_A(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -98,6 +102,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%A"
             ) == day.strftime("%A"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_w(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -110,6 +115,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%w"
             ) == day.strftime("%w"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_d(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -122,6 +128,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%d"
             ) == day.strftime("%d"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_b(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -134,6 +141,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%b"
             ) == day.strftime("%b"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_B(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -146,6 +154,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%B"
             ) == day.strftime("%B"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_m(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -158,6 +167,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%m"
             ) == day.strftime("%m"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_y(self):
         years = get_years_in_range(1999, 2022)
         for year in years:
@@ -165,6 +175,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(year), UTC, "%y"
             ) == year.strftime("%y"), year.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_H(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 0, 17, 0, 0, pytz.UTC),
@@ -176,6 +187,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(minute), UTC, "%H"
             ) == minute.strftime("%H"), minute.strftime("%Y-%m-%dT%H:%M:%S")
 
+    @pytest.mark.group_one
     def test_format_directive_I(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 0, 17, 0, 0, pytz.UTC),
@@ -193,6 +205,7 @@ class TestDateFormatter(unittest.TestCase):
         timezone = FixedOffsetTimezone(offset_hours=offset_hours)
         assert dt.strftime("%I") == DateFormatter.format(unixtime, timezone, "%I")
 
+    @pytest.mark.group_one
     def test_format_directive_p(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 0, 17, 0, 0, pytz.UTC),
@@ -204,6 +217,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(minute), UTC, "%p"
             ) == minute.strftime("%p"), minute.strftime("%Y-%m-%dT%H:%M:%S")
 
+    @pytest.mark.group_one
     def test_format_directive_M(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 10, 17, 0, 0, pytz.UTC),
@@ -215,6 +229,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(minute), UTC, "%M"
             ) == minute.strftime("%M"), minute.strftime("%Y-%m-%dT%H:%M:%S")
 
+    @pytest.mark.group_one
     def test_format_directive_S(self):
         seconds = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 13, 17, 0, 0, pytz.UTC),
@@ -226,6 +241,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(second), UTC, "%S"
             ) == second.strftime("%S"), second.strftime("%Y-%m-%dT%H:%M:%S")
 
+    @pytest.mark.group_one
     def test_format_directive_Z(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -238,6 +254,7 @@ class TestDateFormatter(unittest.TestCase):
                 DateFormatter.format(datetime.timestamp(day), UTC, "%Z") == "UTC"
             ), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_z(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -250,6 +267,7 @@ class TestDateFormatter(unittest.TestCase):
                 DateFormatter.format(datetime.timestamp(day), UTC, "%z") == "+0000"
             ), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_C(self):
         years = get_years_in_range(1999, 2022)
 
@@ -258,6 +276,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(year), UTC, "%C"
             ) == year.strftime("%C"), year.strftime("%Y")
 
+    @pytest.mark.group_one
     def test_format_directive_Y(self):
         years = get_years_in_range(1999, 2022)
         for year in years:
@@ -265,6 +284,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(year), UTC, "%Y"
             ) == year.strftime("%Y"), year.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_u(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -277,6 +297,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%u"
             ) == day.strftime("%u"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_percent(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -289,6 +310,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%%"
             ) == day.strftime("%%"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_directive_doy(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -301,6 +323,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%j"
             ) == day.strftime("%j"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_string_Ymd(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -313,6 +336,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%Y-%m-%d"
             ) == day.strftime("%Y-%m-%d"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_string_ymd(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -325,6 +349,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%y-%m-%d"
             ) == day.strftime("%y-%m-%d"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_string_abdY(self):
         days = get_datetimes_in_range(
             start=datetime(2019, 1, 1, 0, 0, 0, 0, pytz.UTC),
@@ -337,6 +362,7 @@ class TestDateFormatter(unittest.TestCase):
                 datetime.timestamp(day), UTC, "%a %b %d, %Y"
             ) == day.strftime("%a %b %d, %Y"), day.strftime("%Y-%m-%d")
 
+    @pytest.mark.group_one
     def test_format_string_YmdHMS(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 10, 17, 0, 0, pytz.UTC),
@@ -350,6 +376,7 @@ class TestDateFormatter(unittest.TestCase):
                 "%Y-%m-%dT%H:%M:%S"
             )
 
+    @pytest.mark.group_one
     def test_format_string_YmdTHMS(self):
         minutes = get_datetimes_in_range(
             start=datetime(2020, 2, 29, 10, 17, 0, 0, pytz.UTC),

@@ -5,6 +5,7 @@ from typed_python import Entrypoint, ListOf, Dict
 from typed_python.lib.sorted_dict import SortedDict
 
 
+@pytest.mark.group_one
 def test_sorted_dict_basic():
     d = SortedDict(int, int)()
 
@@ -42,6 +43,7 @@ def test_sorted_dict_basic():
     assert d.setdefault(11, 20) == 20
 
 
+@pytest.mark.group_one
 def test_sorted_dict_insert():
     d = SortedDict(int, int)()
 
@@ -64,6 +66,7 @@ def test_sorted_dict_insert():
     d._checkInvariants()
 
 
+@pytest.mark.group_one
 def test_sorted_dict_size_on_repeat_set():
     d = SortedDict(int, int)()
     for i in range(10):
@@ -72,6 +75,7 @@ def test_sorted_dict_size_on_repeat_set():
     assert len(d) == 10
 
 
+@pytest.mark.group_one
 def test_sorted_dict_invariants():
     numpy.random.seed(42)
 
@@ -117,6 +121,7 @@ def test_sorted_dict_invariants():
         d._checkInvariants()
 
 
+@pytest.mark.group_one
 def test_sorted_dict_comparator():
     d = SortedDict(int, int, lambda x, y: y < x)()
 
@@ -128,6 +133,7 @@ def test_sorted_dict_comparator():
     assert list(d) == list(reversed(range(10)))
 
 
+@pytest.mark.group_one
 def test_sorted_dict_compiled_iter():
     d = SortedDict(int, int)()
 

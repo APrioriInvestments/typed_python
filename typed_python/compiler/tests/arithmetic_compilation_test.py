@@ -107,6 +107,7 @@ ALL_OPERATIONS = [
 
 
 class TestArithmeticCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_compile_simple(self):
         @Compiled
         def f(x: int) -> int:
@@ -115,6 +116,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(f(20), 60)
         self.assertEqual(f(10), 30)
 
+    @pytest.mark.group_one
     def test_in_to_out(self):
         @Compiled
         def identity(x: In) -> Out:
@@ -170,6 +172,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))
 
+    @pytest.mark.group_one
     def test_assignment_of_pod(self):
         def f(x: int) -> int:
             y = x
@@ -177,6 +180,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_simple_loop(self):
         def f(x: int) -> int:
             y = 0
@@ -187,6 +191,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
             return x+1
@@ -196,6 +201,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_basic_type_conversion(self):
         def f(x: int) -> int:
             y = 1.5
@@ -203,6 +209,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_integers_in_closures(self):
         y = 2
 
@@ -211,6 +218,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    @pytest.mark.group_one
     def test_negation(self):
         @Compiled
         def negate_int(x: int):
@@ -223,6 +231,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(negate_int(10), -10)
         self.assertEqual(negate_float(20.5), -20.5)
 
+    @pytest.mark.group_one
     def test_can_stringify_unsigned(self):
         @Entrypoint
         def toString(x):
@@ -233,6 +242,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(toString(UInt16(10)), "10u16")
         self.assertEqual(toString(UInt8(10)), "10u8")
 
+    @pytest.mark.group_one
     def test_can_compile_register_builtins(self):
         registerTypes = [bool, Int8, Int16, Int32, int, UInt8, UInt16, UInt32, UInt64, Float32, float]
 
@@ -295,6 +305,7 @@ class TestArithmeticCompilation(unittest.TestCase):
                     # e.g. round(float(1), 0) returns int when interpreted,
                     # but float when compiled
 
+    @pytest.mark.group_one
     def test_can_call_types_with_no_args(self):
         @Entrypoint
         def makeEmpty(T):
@@ -305,6 +316,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(makeEmpty(bool), False)
         self.assertEqual(makeEmpty(str), "")
 
+    @pytest.mark.group_one
     def test_not_on_float(self):
         @Entrypoint
         def doit(f):
@@ -315,6 +327,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(doit(1.0), "its true")
         self.assertEqual(doit(0.0), "its false")
 
+    @pytest.mark.group_one
     def test_can_compile_register_operations(self):
         failed = False
 
@@ -594,6 +607,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.assertFalse(failed)
 
+    @pytest.mark.group_one
     def test_int_of_nan(self):
         @Entrypoint
         def f(x):
@@ -605,6 +619,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "infinity"):
             f(inf)
 
+    @pytest.mark.group_one
     def test_mod_constant_in_tuple(self):
         @Entrypoint
         def rf(row):
@@ -612,6 +627,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.assertEqual(rf(makeNamedTuple(x=1.0)), 0.0)
 
+    @pytest.mark.group_one
     def test_pow_with_bad_inputs(self):
         @Entrypoint
         def callPow(x, y):
@@ -623,6 +639,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         with self.assertRaises(ZeroDivisionError):
             callPow(0, -1)
 
+    @pytest.mark.group_one
     def test_floordiv_with_bad_inputs(self):
         @Entrypoint
         def callFloordiv(x, y):
@@ -634,6 +651,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         with self.assertRaises(ZeroDivisionError):
             callFloordiv(1, 0)
 
+    @pytest.mark.group_one
     def test_shift_with_bad_inputs(self):
         @Entrypoint
         def callShift(x, y):
@@ -645,6 +663,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         with self.assertRaises(OverflowError):
             callShift(1, 2048)
 
+    @pytest.mark.group_one
     def test_formatting_with_format_strings_works(self):
         @Entrypoint
         def format(x):
@@ -652,6 +671,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         assert format(1.0) == f"{1.0:.6g}"
 
+    @pytest.mark.group_one
     def test_formatting_strings_in_loop(self):
         @Entrypoint
         def format(a, b, c, d):
@@ -662,6 +682,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         format(1, 2, 3, 4)
 
+    @pytest.mark.group_one
     def test_string_joining_in_loop(self):
         @Entrypoint
         def format(a, b, c, d):
@@ -676,6 +697,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         format(1, 2, 3, 4)
 
+    @pytest.mark.group_one
     def test_unary_ops_on_constants(self):
         @Entrypoint
         def sliceAtPositiveZero(x):

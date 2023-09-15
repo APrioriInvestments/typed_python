@@ -18,6 +18,7 @@ import unittest
 
 
 class TestOperatorIsCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_none_is_none(self):
         @Entrypoint
         def f(x):
@@ -26,6 +27,7 @@ class TestOperatorIsCompilation(unittest.TestCase):
         self.assertTrue(f(None))
         self.assertFalse(f(1))
 
+    @pytest.mark.group_one
     def test_one_is_not_one(self):
         @Entrypoint
         def f(x):
@@ -34,6 +36,7 @@ class TestOperatorIsCompilation(unittest.TestCase):
         self.assertFalse(f(None))
         self.assertFalse(f(1))
 
+    @pytest.mark.group_one
     def test_true_is_not_false(self):
         @Entrypoint
         def testIs(x, y):
@@ -67,6 +70,7 @@ class TestOperatorIsCompilation(unittest.TestCase):
         self.assertFalse(testIs(False, True))
         self.assertTrue(testIsNot(False, True))
 
+    @pytest.mark.group_one
     def test_types_are_themselves(self):
         trueLambdas = [
             lambda: type is type,
@@ -88,6 +92,7 @@ class TestOperatorIsCompilation(unittest.TestCase):
         for fl in falseLambda:
             self.assertFalse(Entrypoint(fl)())
 
+    @pytest.mark.group_one
     def test_oneof_and_is(self):
         @Entrypoint
         def testIs(x: OneOf(None, bool), y: OneOf(None, bool)):
@@ -98,6 +103,7 @@ class TestOperatorIsCompilation(unittest.TestCase):
             for v2 in vals:
                 self.assertEqual(testIs(v1, v2), v1 is v2)
 
+    @pytest.mark.group_one
     def test_type_is(self):
         @Entrypoint
         def testSameType(x, y):

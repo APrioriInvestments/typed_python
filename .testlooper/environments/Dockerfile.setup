@@ -1,0 +1,9 @@
+# used for generating the test plan - requires only access to the repo and Python 3.10 stdlib
+# TODO - we don't need the whole directory.
+FROM python:3.10
+
+WORKDIR /app
+
+COPY . /app
+
+ENTRYPOINT ["/bin/bash", "-c"]

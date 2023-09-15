@@ -24,6 +24,7 @@ from typed_python._types import refcount
 
 
 class TypedQueueTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic(self):
         queue = TypedQueue(float)()
 
@@ -57,6 +58,7 @@ class TypedQueueTests(unittest.TestCase):
         self.assertEqual(queue.peek(), None)
         self.assertEqual(queue.getNonblocking(), None)
 
+    @pytest.mark.group_one
     def test_threading(self):
         queue1 = TypedQueue(float)()
         queue2 = TypedQueue(float)()
@@ -73,6 +75,7 @@ class TypedQueueTests(unittest.TestCase):
         thread1.join()
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_queue_perf(self):
         untypedQueue1 = queue.Queue()
         untypedQueue2 = queue.Queue()
@@ -155,6 +158,7 @@ class TypedQueueTests(unittest.TestCase):
         queue1.put(1.0)
         thread1.join()
 
+    @pytest.mark.group_one
     def test_create_in_compiler(self):
         def f():
             q = TypedQueue(float)()
@@ -166,6 +170,7 @@ class TypedQueueTests(unittest.TestCase):
         self.assertEqual(f(), 10)
         self.assertEqual(Entrypoint(f)(), 10)
 
+    @pytest.mark.group_one
     def test_create_in_compiler_and_use_in_other_thread(self):
         @Entrypoint
         def f():
@@ -186,6 +191,7 @@ class TypedQueueTests(unittest.TestCase):
 
         t.join()
 
+    @pytest.mark.group_one
     def test_many_append(self):
         @Entrypoint
         def f():
@@ -200,6 +206,7 @@ class TypedQueueTests(unittest.TestCase):
 
         otherThread(q)
 
+    @pytest.mark.group_one
     def test_typed_queue_refcounts(self):
         x = TypedQueue(ListOf(int))()
         a = ListOf(int)()

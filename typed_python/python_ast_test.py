@@ -24,6 +24,7 @@ someVarname = 10
 
 
 class TestPythonAst(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic_parsing(self):
         pyast = python_ast.convertFunctionToAlgebraicPyAst(lambda: X)  # noqa: F821
 
@@ -43,6 +44,7 @@ class TestPythonAst(unittest.TestCase):
 
         return f2
 
+    @pytest.mark.group_one
     def test_reverse_parse(self):
         self.reverseParseCheck(lambda: X)  # noqa: F821
         self.reverseParseCheck(lambda x: X)  # noqa: F821
@@ -65,6 +67,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_ast_for_function_with_decorator(self):
         # check that the ast for a function with a decorator doesn't actually
         # include the decorator, as the decorator isn't part of the function
@@ -81,6 +84,7 @@ class TestPythonAst(unittest.TestCase):
         assert pyast.matches.FunctionDef
         assert not pyast.decorator_list
 
+    @pytest.mark.group_one
     def test_reverse_parse_classdef(self):
         def f():
             class A:
@@ -98,6 +102,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_reverse_parse_functions_with_keywords(self):
         def f():
             def g(x=10, y=20, *args, q=30):
@@ -106,6 +111,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_reverse_parse_comprehensions(self):
         def f():
             [x for x in y]  # noqa: F821
@@ -126,12 +132,14 @@ class TestPythonAst(unittest.TestCase):
 
         self.assertEqual(f(*args), f_2(*args))
 
+    @pytest.mark.group_one
     def test_reverse_parse_eval(self):
         def f(x):
             return x+x
         self.reverseParseAndEvalCheck(f, 10)
         self.reverseParseAndEvalCheck(lambda x: x+x, 10)
 
+    @pytest.mark.group_one
     def test_reverse_parse_eval_withblock(self):
         def f(x, filename):
             with open(filename, 'r'):
@@ -140,12 +148,14 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseAndEvalCheck(f, (10, ownName))
 
+    @pytest.mark.group_one
     def test_reverse_parse_eval_import(self):
         def f(x):
             from numpy import float64
             return float(float64(x))
         self.reverseParseAndEvalCheck(f, 10)
 
+    @pytest.mark.group_one
     def test_parsing_fstring(self):
         """
         This code generates:
@@ -154,18 +164,21 @@ class TestPythonAst(unittest.TestCase):
         """
         self.reverseParseCheck(lambda x: f" - {x} - ")
 
+    @pytest.mark.group_one
     def test_parsing_assert(self):
         """This code generates ast.Assert node."""
         def f(x):
             assert x == 1
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_yield_from(self):
         """This code generates ast.YieldFrom."""
         def f(x):
             yield from x
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_async(self):
         """This code generates:
             - ast.AsyncFunctionDef
@@ -185,6 +198,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_nonlocal(self):
         """This code generates: ast.Nonlocal."""
         def f():
@@ -200,6 +214,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_matmul(self):
         """This code generates: ast.MatMult."""
         def f(a, b):
@@ -208,6 +223,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_annotated_assignment(self):
         """This code generates: ast.AddAssign."""
         def f():
@@ -216,12 +232,14 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_parsing_bytes(self):
         def f():
             return b"aaa"
 
         self.reverseParseCheck(f)
 
+    @pytest.mark.group_one
     def test_converting_lambdas_in_expressions(self):
         def identity(x):
             return x
@@ -238,12 +256,14 @@ class TestPythonAst(unittest.TestCase):
         for lam in someLambdas:
             self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
+    @pytest.mark.group_one
     def test_converting_two_lambdas_on_same_line(self):
         someLambdas = (lambda x: x + 1, lambda x: x + 2)
 
         for lam in someLambdas:
             self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
+    @pytest.mark.group_one
     def test_converting_two_lambdas_with_similar_bodies_but_different_args_on_same_line(self):
         # shouldn't matter which one we pick
         someLambdas = (lambda x, y: x + 1, lambda x, z: x + 1)
@@ -251,6 +271,7 @@ class TestPythonAst(unittest.TestCase):
         for lam in someLambdas:
             self.assertEqual(self.reverseParseCheck(lam)(10, 11), lam(10, 11))
 
+    @pytest.mark.group_one
     def test_converting_two_identical_lambdas_on_same_line(self):
         # shouldn't matter which one we pick
         someLambdas = (lambda x: x + 1, lambda x: x + 1)
@@ -258,6 +279,7 @@ class TestPythonAst(unittest.TestCase):
         for lam in someLambdas:
             self.assertEqual(self.reverseParseCheck(lam)(10), lam(10))
 
+    @pytest.mark.group_one
     def test_converting_lambdas_pulled_out_of_binding(self):
         # shouldn't matter which one we pick
         aLambda = (lambda x: (lambda y: x + y))(10)
@@ -267,6 +289,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.assertEqual(aLambda(11), aLambda2(11))
 
+    @pytest.mark.group_one
     def test_converting_lambda_with_double_star_dicts(self):
         def f():
             x = {1: 2}
@@ -275,6 +298,7 @@ class TestPythonAst(unittest.TestCase):
 
         self.assertEqual(self.reverseParseCheck(f)(), f())
 
+    @pytest.mark.group_one
     def test_conflicting_code_objects_for_list_comps(self):
         with tempfile.TemporaryDirectory() as tf:
             fname1 = os.path.join(tf, "a.py")

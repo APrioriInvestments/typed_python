@@ -29,6 +29,7 @@ def compiledHash(T, obj):
 
 
 class TestDictCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_can_copy_dict(self):
         @Entrypoint
         def f(x):
@@ -62,6 +63,7 @@ class TestDictCompilation(unittest.TestCase):
 
             self.assertEqual(refcounts, refcounts2)
 
+    @pytest.mark.group_one
     def test_dict_contains(self):
         @Entrypoint
         def isIn(x, d):
@@ -84,6 +86,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertFalse(isIn("boo", d))
         self.assertTrue(isNotIn("boo", d))
 
+    @pytest.mark.group_one
     def test_dict_length(self):
         @Entrypoint
         def dict_len(x):
@@ -100,6 +103,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(dict_len(x), 1)
 
+    @pytest.mark.group_one
     def test_dict_getitem(self):
         @Entrypoint
         def dict_getitem(x, y):
@@ -114,6 +118,7 @@ class TestDictCompilation(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "2"):
             dict_getitem(x, 2)
 
+    @pytest.mark.group_one
     def test_dict_get_default(self):
         @Entrypoint
         def dict_get(x, y):
@@ -132,6 +137,7 @@ class TestDictCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.assertEqual(x[1.5], 2)
 
+    @pytest.mark.group_one
     def test_dict_get_nodefault(self):
         @Entrypoint
         def dict_get(x, y):
@@ -153,6 +159,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(dict_get(x, 2), None)
         self.assertEqual(x.get(2), None)
 
+    @pytest.mark.group_one
     def test_dict_setitem(self):
         @Entrypoint
         def dict_setitem(d, k, v):
@@ -185,6 +192,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(x, {i: str(i*i) for i in range(1000)})
 
+    @pytest.mark.group_one
     def test_dict_with_oneof_keys(self):
         d = Dict(OneOf(None, int), int)()
 
@@ -203,6 +211,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(d.get(30), None)
         self.assertEqual(d.get(20), 20)
 
+    @pytest.mark.group_one
     def test_dict_position_same(self):
         def check(someInts):
             dInterp = Dict(int, int)()
@@ -236,6 +245,7 @@ class TestDictCompilation(unittest.TestCase):
             check(range(i))
             check(numpy.random.choice(1000000, size=i).tolist())
 
+    @pytest.mark.group_one
     def test_adding_to_dicts(self):
         @Entrypoint
         def f(count):
@@ -256,6 +266,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertTrue(f(20000))
 
+    @pytest.mark.group_one
     def test_dicts_in_dicts(self):
         @Entrypoint
         def f():
@@ -271,6 +282,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(d['hi']['good'], 100.0)
 
+    @pytest.mark.group_one
     def test_dict_destructors(self):
         @Entrypoint
         def f():
@@ -280,6 +292,7 @@ class TestDictCompilation(unittest.TestCase):
 
         f()
 
+    @pytest.mark.group_one
     def test_dict_setdefault(self):
         @Entrypoint
         def dict_setdefault(d, k, v):
@@ -298,6 +311,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(v2, "b")
         self.assertEqual(x, {1: "a", 2: "b"})
 
+    @pytest.mark.group_one
     def test_dict_setdefault_noarg(self):
         @Entrypoint
         def dict_setdefault(d, k):
@@ -316,6 +330,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(v2, "")
         self.assertEqual(x, {1: "a", 2: ""})
 
+    @pytest.mark.group_one
     def test_dict_pop(self):
         @Entrypoint
         def dict_pop(d, k):
@@ -336,6 +351,7 @@ class TestDictCompilation(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "10"):
             dict_pop(d, 10)
 
+    @pytest.mark.group_one
     def test_dict_with_different_types(self):
         """Check if the dictionary with different types
         supports proper key and type conversion.
@@ -352,6 +368,7 @@ class TestDictCompilation(unittest.TestCase):
         x["a"] = 1
         self.assertEqual(x, {"a": 1})
 
+    @pytest.mark.group_one
     def test_dict_del(self):
         @Entrypoint
         def dict_delitem(d, k):
@@ -366,6 +383,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(x, {2: 3})
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_dict_read_write_perf(self):
         def dict_setmany(d, count, passes):
             for _ in range(passes):
@@ -400,6 +418,7 @@ class TestDictCompilation(unittest.TestCase):
         print("Speedup was ", ratio, ". compiled time was ", t3 - t2)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_dict_read_write_perf_releases_gil(self):
         def dict_setmany(d, count, passes):
             for _ in range(passes):
@@ -437,6 +456,7 @@ class TestDictCompilation(unittest.TestCase):
 
         print("Multicore slowdown factor was ", slowdownRatio)
 
+    @pytest.mark.group_one
     def test_iteration(self):
         def iterateDirect(d):
             res = ListOf(type(d).KeyType)()
@@ -485,6 +505,7 @@ class TestDictCompilation(unittest.TestCase):
 
             self.assertEqual(iterateCompiled(d), iterate(d))
 
+    @pytest.mark.group_one
     def test_refcounting(self):
         TOI = TupleOf(int)
         x = Dict(TOI, TOI)()
@@ -512,6 +533,7 @@ class TestDictCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(aTup3), 2)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_dict_hash_perf_compiled(self):
         @Entrypoint
         def f(dictToLookupIn, items, passes):
@@ -540,6 +562,7 @@ class TestDictCompilation(unittest.TestCase):
         f(aDict, someStrings, 1000000)
         print(time.time() - t0, "to lookup 100mm strings")
 
+    @pytest.mark.group_one
     def test_dict_clear_compiles(self):
         T = Dict(str, str)
 
@@ -569,6 +592,7 @@ class TestDictCompilation(unittest.TestCase):
             d["1"] = "1"
             self.assertTrue("1" in d)
 
+    @pytest.mark.group_one
     def test_dict_update_compiles(self):
         T = Dict(str, str)
 
@@ -591,6 +615,7 @@ class TestDictCompilation(unittest.TestCase):
 
                 self.assertEqual(aDict, aDict2)
 
+    @pytest.mark.group_one
     def test_dict_pop_many(self):
         @Entrypoint
         def f(x: Dict(int, int)):
@@ -612,6 +637,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(len(x), 0)
 
+    @pytest.mark.group_one
     def test_dict_up_and_down(self):
         @Entrypoint
         def f(targets):
@@ -639,6 +665,7 @@ class TestDictCompilation(unittest.TestCase):
                         for i5 in range(C):
                             f(ListOf(int)([i1, i2, i3, i4, i5]))
 
+    @pytest.mark.group_one
     def test_dict_fuzz(self):
         # try adding and removing items repeatedly, in an effort to fill the table up
         @Entrypoint
@@ -670,6 +697,7 @@ class TestDictCompilation(unittest.TestCase):
                     print(actions)
                     raise
 
+    @pytest.mark.group_one
     def test_dict_of_int_with_neg_one(self):
         # negative one is special because it hashes to -1. Python
         # treats a -1 as an error code (indicating there was
@@ -691,6 +719,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(get(d, -1), 2)
 
+    @pytest.mark.group_one
     def test_dict_of_float_with_neg_one(self):
         # negative one is special because it hashes to -1. Python
         # treats a -1 as an error code (indicating there was
@@ -712,6 +741,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(get(d, -1.0), 2)
 
+    @pytest.mark.group_one
     def test_dict_assign_and_copy(self):
 
         @Entrypoint
@@ -733,6 +763,7 @@ class TestDictCompilation(unittest.TestCase):
         d = Dict(str, int)({'a': 1, 'b': 3, 'c': 5})
         self.assertEqual(dict_copy_and_modify_original(d, 'q', 'b'), {'a': 1, 'b': 3, 'c': 5})
 
+    @pytest.mark.group_one
     def test_dict_del_refcounts(self):
         T = Dict(int, ListOf(int))
 
@@ -760,6 +791,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert _types.refcount(aListOf) == 1
 
+    @pytest.mark.group_one
     def test_dict_aliasing(self):
         T = Dict(int, int)
 
@@ -770,6 +802,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert len(t2) == 0
 
+    @pytest.mark.group_one
     def test_dict_aliasing_compiled(self):
         T = Dict(int, int)
 
@@ -786,6 +819,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert len(t2) == 0
 
+    @pytest.mark.group_one
     def test_dict_assign_untyped_containers(self):
         T = Dict(int, ListOf(int))
 
@@ -801,6 +835,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert len(aDict[10]) == 1
 
+    @pytest.mark.group_one
     def test_dict_assign_untyped_sets(self):
         T = Dict(int, Set(int))
 
@@ -816,6 +851,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert len(aDict[10]) == 1
 
+    @pytest.mark.group_one
     def test_dict_compiled_equality_with_python_and_object(self):
         def f_compare(x, y):
             return x == y
@@ -834,6 +870,7 @@ class TestDictCompilation(unittest.TestCase):
             self.assertEqual(r2, True)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_dict_size_change_during_iteration_raises(self):
         @Entrypoint
         def checkIt():
@@ -846,6 +883,7 @@ class TestDictCompilation(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "dictionary size changed"):
             checkIt()
 
+    @pytest.mark.group_one
     def test_dict_collisions(self):
         aDict = Dict(int, int)()
 
@@ -862,6 +900,7 @@ class TestDictCompilation(unittest.TestCase):
             if time.time() - t0 > 1e-5:
                 print(i, time.time() - t0)
 
+    @pytest.mark.group_one
     def test_dict_of_object_compiles(self):
         aDict = Dict(object, object)()
 
@@ -892,6 +931,7 @@ class TestDictCompilation(unittest.TestCase):
         print("object hash of UInt32(70) is ", compiledHash(object, UInt32(70)))
         assert aDict[UInt32(70)] == 60
 
+    @pytest.mark.group_one
     def test_dict_of_oneof(self):
         A = Alternative("A", A=dict())
         B = Alternative("B", B=dict())
@@ -905,6 +945,7 @@ class TestDictCompilation(unittest.TestCase):
         put(aDict, B.B(), 10)
         assert B.B() in aDict
 
+    @pytest.mark.group_one
     def test_dict_of_alternatives(self):
         A = Alternative("A", A=dict(x=int), B=dict(x=float))
 
@@ -926,6 +967,7 @@ class TestDictCompilation(unittest.TestCase):
             assert get(aDict, A.A(x=i)) == i
             assert get(aDict, A.B(x=i)) == i * 1000
 
+    @pytest.mark.group_one
     def test_dict_of_concrete_alternatives(self):
         A = Alternative("A", A=dict(), B=dict(), C=dict(), D=dict())
 
@@ -949,6 +991,7 @@ class TestDictCompilation(unittest.TestCase):
         assert get(aDict, A.C()) == 3
         assert get(aDict, A.D()) == 4
 
+    @pytest.mark.group_one
     def test_yield_from_dict(self):
         def iterateTwice(d):
             for k in d:
@@ -966,6 +1009,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert toList(Dict(int, float)({1: 2.2})) == [1, 1]
 
+    @pytest.mark.group_one
     def test_yield_from_dict_values(self):
         def iterateTwice(d):
             for k in d.values():
@@ -983,6 +1027,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert toList(Dict(int, float)({1: 2.2})) == [2.2, 2.2]
 
+    @pytest.mark.group_one
     def test_yield_from_dict_items(self):
         def iterateTwice(d):
             for k in d.items():
@@ -1000,6 +1045,7 @@ class TestDictCompilation(unittest.TestCase):
 
         assert toList(Dict(int, float)({1: 2.2})) == [(1, 2.2), (1, 2.2)]
 
+    @pytest.mark.group_one
     def test_dict_with_const_dict_keys(self):
         d = Dict(ConstDict(int, int), int)()
 

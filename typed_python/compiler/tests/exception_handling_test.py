@@ -18,6 +18,7 @@ import traceback
 from typed_python import Entrypoint, ListOf, NotCompiled, _types
 
 
+@pytest.mark.group_one
 def test_string_to_int_error_catchable():
     @Entrypoint
     def f(x):
@@ -31,6 +32,7 @@ def test_string_to_int_error_catchable():
     assert f("3.0") == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_string_to_float_error_catchable():
     @Entrypoint
     def f(x):
@@ -44,6 +46,7 @@ def test_string_to_float_error_catchable():
     assert f("asdf") == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_mod_zero_catchable():
     @Entrypoint
     def f(x):
@@ -56,6 +59,7 @@ def test_mod_zero_catchable():
     assert f(0.0) == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_throwing_exceptions_from_C_code_triggers_destructors():
     @NotCompiled
     def throws():
@@ -80,6 +84,7 @@ def test_throwing_exceptions_from_C_code_triggers_destructors():
     assert _types.refcount(aList) == 2
 
 
+@pytest.mark.group_one
 def test_throwing_exceptions_from_uncompiled_code_triggers_destructors():
     @NotCompiled
     def throws():
@@ -104,6 +109,7 @@ def test_throwing_exceptions_from_uncompiled_code_triggers_destructors():
     assert _types.refcount(aList) == 2
 
 
+@pytest.mark.group_one
 def test_exceptions_from_not_compiled():
     @NotCompiled
     def g0(x):
@@ -120,6 +126,7 @@ def test_exceptions_from_not_compiled():
     assert f0(0.0) == "caught"
 
 
+@pytest.mark.group_one
 def test_can_rethrow_in_compiled_code():
     def throws():
         raise Exception("something to throw")
@@ -140,6 +147,7 @@ def test_can_rethrow_in_compiled_code():
     assert aList == ["something to throw"]
 
 
+@pytest.mark.group_one
 def test_raise_non_exception_in_compiled_code():
     @Entrypoint
     def throw(x):
@@ -152,6 +160,7 @@ def test_raise_non_exception_in_compiled_code():
         throw(None)
 
 
+@pytest.mark.group_one
 def test_can_capture_exception_and_rethrow():
     def throws():
         raise Exception("From 'throws'")
@@ -189,6 +198,7 @@ def test_can_capture_exception_and_rethrow():
     assert getStringTraceback(f) == getStringTraceback(Entrypoint(f))
 
 
+@pytest.mark.group_one
 def test_catch_and_return_none():
     def blah(x):
         if x:
@@ -207,6 +217,7 @@ def test_catch_and_return_none():
     assert trySplit("a_b_c") is None
 
 
+@pytest.mark.group_one
 def test_catch_multiple_types():
     @Entrypoint
     def catcher(toRaise):
@@ -222,6 +233,7 @@ def test_catch_multiple_types():
         catcher(RuntimeError)
 
 
+@pytest.mark.group_one
 def test_convert_assert():
     @Entrypoint
     def assertIt(x):
@@ -233,6 +245,7 @@ def test_convert_assert():
         assertIt(False)
 
 
+@pytest.mark.group_one
 def test_convert_assert_str():
     @Entrypoint
     def assertIt(x):

@@ -1,0 +1,12 @@
+version: 1.0
+name: typedpython
+primary-branch: will-testlooper
+image:
+     docker:
+       dockerfile: .testlooper/environments/Dockerfile.setup
+
+variables:
+    PYTHONPATH: ${REPO_ROOT}
+
+command:
+    python .testlooper/generate_test_plan.py  --output ${TEST_PLAN_OUTPUT}

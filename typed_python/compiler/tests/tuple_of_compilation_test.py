@@ -38,6 +38,7 @@ class TestTupleOfCompilation(unittest.TestCase):
             self.assertEqual(fastval, slowval)
         return t_py, t_fast
 
+    @pytest.mark.group_one
     def test_tuple_of_float(self):
         def f(x: TupleOf(float), y: TupleOf(float)) -> float:
             j = 0
@@ -67,6 +68,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         print(t_py / t_fast, " speedup")
 
+    @pytest.mark.group_one
     def test_tuple_passing(self):
         @Compiled
         def f(x: TupleOf(int)) -> int:
@@ -74,6 +76,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(f((1, 2, 3)), 0)
 
+    @pytest.mark.group_one
     def test_tuple_len(self):
         @Compiled
         def f(x: TupleOf(int)) -> int:
@@ -81,6 +84,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(f((1, 2, 3)), 3)
 
+    @pytest.mark.group_one
     def test_tuple_assign(self):
         @Compiled
         def f(x: TupleOf(int)) -> TupleOf(int):
@@ -93,6 +97,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(t), 1)
 
+    @pytest.mark.group_one
     def test_tuple_indexing(self):
         @Compiled
         def f(x: TupleOf(int), y: int) -> int:
@@ -103,6 +108,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             f((1, 2, 3), 1000000000)
 
+    @pytest.mark.group_one
     def test_tuple_refcounting(self):
         @Function
         def f(x: TupleOf(int), y: TupleOf(int)) -> TupleOf(int):
@@ -124,6 +130,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
             self.assertEqual(_types.refcount(intTup), 1)
 
+    @pytest.mark.group_one
     def test_bad_mod_generates_exception(self):
         @Compiled
         def f(x: int, y: int) -> int:
@@ -132,6 +139,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             f(0, 0)
 
+    @pytest.mark.group_one
     def test_tuple_of_adding(self):
         T = TupleOf(int)
 
@@ -150,6 +158,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(res, t1+t2)
 
+    @pytest.mark.group_one
     def test_tuple_of_tuple_refcounting(self):
         T = TupleOf(int)
         TT = TupleOf(T)
@@ -173,6 +182,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         aTT = None
         self.assertEqual(_types.refcount(t1), 1)
 
+    @pytest.mark.group_one
     def test_tuple_creation_doesnt_leak(self):
         T = TupleOf(int)
 
@@ -191,6 +201,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertTrue(finalMem < initMem + 5)
 
+    @pytest.mark.group_one
     def test_create_tuple_of_directly_from_list(self):
         def makeT():
             return TupleOf(int)([1, 2, 3, 4])
@@ -198,6 +209,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         self.assertEqual(makeT(), Compiled(makeT)())
         self.assertEqual(type(makeT()), type(Compiled(makeT)()))
 
+    @pytest.mark.group_one
     def test_create_tuple_of_directly_from_tuple(self):
         def makeT():
             return TupleOf(int)((1, 2, 3, 4))
@@ -205,6 +217,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         self.assertEqual(makeT(), Compiled(makeT)())
         self.assertEqual(type(makeT()), type(Compiled(makeT)()))
 
+    @pytest.mark.group_one
     def test_create_tuple_of_from_untyped(self):
         def makeT(aList: object):
             return TupleOf(int)(aList)
@@ -212,6 +225,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         self.assertEqual(makeT([1, 2, 3, 4]), Compiled(makeT)([1, 2, 3, 4]))
         self.assertEqual(makeT({1: 2}), Compiled(makeT)({1: 2}))
 
+    @pytest.mark.group_one
     def test_tuple_of_from_list_of_empty(self):
         @Entrypoint
         def makeT(aList: ListOf(int)):
@@ -219,6 +233,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         assert len(makeT([])) == 0
 
+    @pytest.mark.group_one
     def test_slice_list_of_compiled(self):
         @Entrypoint
         def sliceIt(aLst: ListOf(int), x: int):
@@ -226,6 +241,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         assert sliceIt((1, 2, 3), 1) == [1]
 
+    @pytest.mark.group_one
     def test_slice_tuple_of_compiled(self):
         @Entrypoint
         def sliceIt(aTup: TupleOf(int), x: int):
@@ -233,6 +249,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         assert sliceIt((1, 2, 3), 1) == (1,)
 
+    @pytest.mark.group_one
     def test_add_untyped_tuple(self):
         @Entrypoint
         def addIt(aTup: TupleOf(int), x: int):
@@ -245,6 +262,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         assert addIt((1, 2), 3) == (1, 2, 3)
         assert addItLst((1, 2), 3) == (1, 2, 3)
 
+    @pytest.mark.group_one
     def test_add_untyped_tuple_reversed(self):
         @Entrypoint
         def addIt(aTup: TupleOf(int), x: int):

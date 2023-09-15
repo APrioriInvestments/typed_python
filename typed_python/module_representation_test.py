@@ -32,11 +32,13 @@ def evaluateInto(module, code, codeDir=None):
 
 
 class TestModuleRepresentation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_construction(self):
         mr = ModuleRepresentation("module")
 
         assert mr.getDict()['__name__'] == 'module'
 
+    @pytest.mark.group_one
     def test_addExternal(self):
         mr = ModuleRepresentation("module")
 
@@ -49,6 +51,7 @@ class TestModuleRepresentation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, ""):
             mr.addExternal("hi2", "bye2")
 
+    @pytest.mark.group_one
     def test_otherModulesAreExternal(self):
         mr = ModuleRepresentation("module")
 
@@ -58,6 +61,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr.oidFor(os) is None
         assert mr.oidFor(os.path) is None
 
+    @pytest.mark.group_one
     def test_copy_into_basic(self):
         mr = ModuleRepresentation("module")
         evaluateInto(mr, "y = 10")
@@ -67,6 +71,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
         assert mr2.getDict()['y'] == 10
 
+    @pytest.mark.group_one
     def test_copy_into_other_module(self):
         mr = ModuleRepresentation("module")
 
@@ -88,6 +93,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr.getDict()['f']() == 20
         assert mr2.getDict()['f']() == 10
 
+    @pytest.mark.group_one
     def test_duplication_of_functions(self):
         mr = ModuleRepresentation("module")
 
@@ -107,6 +113,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr2.getDict()['f'].__globals__ is mr2.getDict()
         assert mr3.getDict()['f'].__globals__ is mr3.getDict()
 
+    @pytest.mark.group_one
     def test_duplication_of_mutually_recursive_functions(self):
         mr = ModuleRepresentation("module")
 
@@ -123,6 +130,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr2.getDict()['f'].__globals__ is mr2.getDict()
         assert mr2.getDict()['g'].__globals__ is mr2.getDict()
 
+    @pytest.mark.group_one
     def test_duplication_of_classes(self):
         mr = ModuleRepresentation("module")
 
@@ -190,6 +198,7 @@ class TestModuleRepresentation(unittest.TestCase):
         assert mr2.getDict()['C'].classMeth() == 10
         assert mr2.getDict()['C'].staticMeth() == 10
 
+    @pytest.mark.group_one
     def test_tp_functions(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -225,6 +234,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert identityHash(mr.getDict()['f']) != identityHash(mr2.getDict()['f'])
 
+    @pytest.mark.group_one
     def test_tp_classes(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -279,6 +289,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr2.getDict()['C'](10).staticF(10) == 12
             assert mr2.getDict()['C'](10).propF == 13
 
+    @pytest.mark.group_one
     def test_tp_class_hierarchy(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -306,6 +317,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr2.getDict()['Child'].BaseClasses[0] is not mr.getDict()['Base']
             assert mr2.getDict()['Child'].BaseClasses[0] is mr2.getDict()['Base']
 
+    @pytest.mark.group_one
     def test_tp_class_mutually_recursive_child_and_base(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -339,6 +351,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert type(Base() + Base()) is Child
 
+    @pytest.mark.group_one
     def test_copy_into_doesnt_duplicate_unnecessarily(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -359,6 +372,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr.getDict()['list1'] is mr2.getDict()['list1']
             assert mr.getDict()['list2'] is not mr2.getDict()['list2']
 
+    @pytest.mark.group_one
     def test_duplicated_class_object_module_and_name(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -383,6 +397,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert C1.__doc__ == C2.__doc__
             assert C1.__module__ == C2.__module__
 
+    @pytest.mark.group_one
     def test_class_method_closures_get_copied(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -416,6 +431,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert C2().c() is C2
             assert C2().c() is not C1
 
+    @pytest.mark.group_one
     def test_copy_in_native_base_class(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -440,6 +456,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(Child, Base)
 
+    @pytest.mark.group_one
     def test_copy_in_tp_base_class(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -465,6 +482,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(Child, Base)
 
+    @pytest.mark.group_one
     def test_defining_subclass_referenced_in_base_class(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -483,6 +501,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(mr3.getDict()['Child'], mr3.getDict()['Base'])
 
+    @pytest.mark.group_one
     def test_defining_subclass_referenced_in_base_class_2(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -505,6 +524,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert issubclass(mr3.getDict()['Child1'], mr3.getDict()['Base'])
             assert issubclass(mr3.getDict()['Child2'], mr3.getDict()['Base'])
 
+    @pytest.mark.group_one
     def test_copying_classes_with_methods_is_transitive(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -528,6 +548,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
             assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
 
+    @pytest.mark.group_one
     def test_duplicate_class_with_functions(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -560,6 +581,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr3.getDict()['C'].f.__globals__ is not mr2.getDict()
             assert mr3.getDict()['C'].f.__globals__ is mr3.getDict()
 
+    @pytest.mark.group_one
     def test_add_base_class_as_inactive_preserves_identity(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -603,6 +625,7 @@ class TestModuleRepresentation(unittest.TestCase):
 
             assert issubclass(mr4.getDict()['C'], mr3.getDict()['O'])
 
+    @pytest.mark.group_one
     def test_assign_to_global_scope_updates_class_and_subclass(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -645,6 +668,7 @@ class TestModuleRepresentation(unittest.TestCase):
             assert mr3.getDict()['Base'].__init__.__globals__ is not mr2.getDict()
             assert mr3.getDict()['Base'].__init__.__globals__ is mr3.getDict()
 
+    @pytest.mark.group_one
     def test_duplicated_child_class_interchangeable(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")
@@ -682,6 +706,7 @@ class TestModuleRepresentation(unittest.TestCase):
             # its the 'type identical'
             ListOf(Base2)([Child1()])
 
+    @pytest.mark.group_one
     def test_serialization_robust_to_module_ordering(self):
         with tempfile.TemporaryDirectory() as td:
             mr = ModuleRepresentation("module")

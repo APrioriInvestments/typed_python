@@ -24,6 +24,7 @@ import pytest
 import ctypes
 
 
+@pytest.mark.group_one
 def test_global_variable_pointers():
     readGlobalVarFunc = Function(
         args=[],
@@ -94,6 +95,7 @@ def test_global_variable_pointers():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_create_binary_shared_object():
     f = Function(
         args=[],

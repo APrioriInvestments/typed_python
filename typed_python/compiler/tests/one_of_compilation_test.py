@@ -73,6 +73,7 @@ class ClassB(Class, Final):
 
 
 class TestOneOfCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_oneof_wrapper_fast_is_check(self):
         assert typeWrapper(OneOf(int, float))._simpleNoneCheckIndex() == -1
         assert typeWrapper(OneOf(int, None))._simpleNoneCheckIndex() == 1
@@ -80,6 +81,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert typeWrapper(OneOf(None, int))._simpleNoneCheckIndex() == 0
         assert typeWrapper(OneOf(None, object))._simpleNoneCheckIndex() is None
 
+    @pytest.mark.group_one
     def test_one_of_basic(self):
         @Compiled
         def f(x: OneOf(int, float)) -> OneOf(int, float):
@@ -88,6 +90,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertEqual(f(10.2), 10.2)
 
+    @pytest.mark.group_one
     def test_one_of_with_refcounts(self):
         @Compiled
         def f(x: OneOf(None, TupleOf(int))) -> OneOf(None, TupleOf(int)):
@@ -101,6 +104,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTup), 1)
 
+    @pytest.mark.group_one
     def test_one_of_binop_stays_dual(self):
         @Compiled
         def f(x: OneOf(int, float), y: int) -> OneOf(int, float):
@@ -115,6 +119,7 @@ class TestOneOfCompilation(unittest.TestCase):
             for b in [0, 1, 2]:
                 check(a, b)
 
+    @pytest.mark.group_one
     def test_one_of_binop_converges(self):
         @Compiled
         def f(x: OneOf(int, float), y: float) -> float:
@@ -129,6 +134,7 @@ class TestOneOfCompilation(unittest.TestCase):
             for b in [0.0, 1.0, 2.0]:
                 check(a, b)
 
+    @pytest.mark.group_one
     def test_one_of_binop_rhs(self):
         @Compiled
         def f(x: int, y: OneOf(int, float)) -> OneOf(int, float):
@@ -144,6 +150,7 @@ class TestOneOfCompilation(unittest.TestCase):
             for b in things:
                 check(a, b)
 
+    @pytest.mark.group_one
     def test_one_of_dual_binop(self):
         @Compiled
         def f(x: OneOf(int, float), y: OneOf(int, float)) -> OneOf(int, float):
@@ -172,6 +179,7 @@ class TestOneOfCompilation(unittest.TestCase):
             for b in things:
                 check(a, b)
 
+    @pytest.mark.group_one
     def test_one_of_downcast_to_primitive(self):
         @Compiled
         def f(x: OneOf(int, float)) -> int:
@@ -180,6 +188,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertEqual(f(10.5), 10)
 
+    @pytest.mark.group_one
     def test_one_of_downcast_to_oneof(self):
         @Compiled
         def f(x: OneOf(int, float, None)) -> OneOf(int, None):
@@ -189,6 +198,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertIs(f(None), None)
         self.assertEqual(f(10.5), 10)
 
+    @pytest.mark.group_one
     def test_one_of_upcast(self):
         @Compiled
         def f(x: OneOf(int, None)) -> OneOf(int, float, None):
@@ -197,6 +207,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertIs(f(None), None)
 
+    @pytest.mark.group_one
     def test_one_of_returning(self):
         @Compiled
         def f(x: OneOf(None, int, float)) -> OneOf(None, int, float):
@@ -207,6 +218,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(10.5), 10.5)
         self.assertIs(f(None), None)
 
+    @pytest.mark.group_one
     def test_value_equal(self):
         @Compiled
         def f(x: Value, y: Value) -> bool:
@@ -216,6 +228,7 @@ class TestOneOfCompilation(unittest.TestCase):
             for val2 in someValues:
                 self.assertEqual(val1 == val2, f(val1, val2), (val1, val2))
 
+    @pytest.mark.group_one
     def test_value_types(self):
         @Compiled
         def f(x: ValueType(1), y: ValueType(2)):
@@ -223,6 +236,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(1, 2), 3)
 
+    @pytest.mark.group_one
     def test_convert_bool_to_value(self):
         @Compiled
         def f(x: bool) -> Value:
@@ -231,6 +245,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(False), False)
         self.assertEqual(f(True), True)
 
+    @pytest.mark.group_one
     def test_value_get_method(self):
         @Compiled
         def getHi(x: Value) -> Value:
@@ -239,6 +254,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(getHi({}), None)
         self.assertEqual(getHi({'hi': 20}), 20)
 
+    @pytest.mark.group_one
     def test_convert_ordering(self):
         # we should always pick the int if we can
         @Compiled
@@ -272,6 +288,7 @@ class TestOneOfCompilation(unittest.TestCase):
         # require an explicit cast.
         self.assertEqual(f4(1.5), 1)
 
+    @pytest.mark.group_one
     def test_oneof_method_dispatch(self):
         @Compiled
         def f(c: OneOf(ClassA, ClassB), y: OneOf(int, float)):
@@ -285,6 +302,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(aB, 0.5), aB.f(0.5))
         self.assertEqual(f(aB, 1), aB.f(1))
 
+    @pytest.mark.group_one
     def test_oneof_attribute_dispatch(self):
         @Compiled
         def f(c: OneOf(ClassA, ClassB)):
@@ -296,6 +314,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(anA), anA.x)
         self.assertEqual(f(aB), aB.x)
 
+    @pytest.mark.group_one
     def test_oneof_getitem(self):
         @Compiled
         def f(c: OneOf(TupleOf(int), ListOf(float))):
@@ -304,6 +323,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(TupleOf(int)((1,))), 1)
         self.assertEqual(f(ListOf(float)((1.5,))), 1.5)
 
+    @pytest.mark.group_one
     def test_oneof_to_bool(self):
         @Compiled
         def f(c: OneOf(int, float)):
@@ -316,6 +336,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(0), "no")
         self.assertEqual(f(0.0), "no")
 
+    @pytest.mark.group_one
     def test_oneof_round(self):
         def f(c: OneOf(int, float)):
             return round(c)
@@ -325,6 +346,7 @@ class TestOneOfCompilation(unittest.TestCase):
         for thing in [0, 0.0, 1, 1.5]:
             self.assertEqual(f(thing), fComp(thing))
 
+    @pytest.mark.group_one
     def test_len_of_none_or_listof(self):
         @Entrypoint
         def iterate(x: OneOf(None, ListOf(int))):
@@ -335,6 +357,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         self.assertEqual(iterate(ListOf(int)([1, 2, 3])), [1, 2, 3])
 
+    @pytest.mark.group_one
     def test_oneof_call(self):
         @Compiled
         def f(i: int):
@@ -348,6 +371,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(f(1), "1")
         self.assertEqual(f(2), 2.0)
 
+    @pytest.mark.group_one
     def test_named_tuple_with_oneof(self):
         @Entrypoint
         def makeNT(x: NamedTuple(x=OneOf("A", "B"))):  # noqa
@@ -355,6 +379,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         self.assertEqual(makeNT(NamedTuple(x=OneOf("A", "B"))(x="A")).x, "A")
 
+    @pytest.mark.group_one
     def test_oneof_in_return_types(self):
         class A(Class, Final):
             @staticmethod
@@ -369,6 +394,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         do()
 
+    @pytest.mark.group_one
     def test_make_oneof(self):
         @Entrypoint
         def f(x):
@@ -382,6 +408,7 @@ class TestOneOfCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             f(10)
 
+    @pytest.mark.group_one
     def test_oneof_promotion(self):
         @Entrypoint
         def f(x: OneOf("A", "B")) -> str: # noqa
@@ -390,6 +417,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert f("A") == "A"
         assert f("B") == "B"
 
+    @pytest.mark.group_one
     def test_oneof_promotion_heterogeneous(self):
         @Entrypoint
         def f(x: OneOf("A", 10)) -> OneOf(str, int): # noqa
@@ -398,6 +426,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert f("A") == "A"
         assert f(10) == 10
 
+    @pytest.mark.group_one
     def test_operations_on_oneof_values(self):
         @Entrypoint
         def oneof_concat(x: OneOf('A', 'B')): # noqa
@@ -438,6 +467,7 @@ class TestOneOfCompilation(unittest.TestCase):
         self.assertEqual(oneof_not(0), True)
         self.assertEqual(oneof_not(1), False)
 
+    @pytest.mark.group_one
     def test_oneof_setitem(self):
         @Entrypoint
         def setItem(x: OneOf(None, ListOf(int)), i, y):
@@ -460,6 +490,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert getSlice(aList, 0, 0) == ListOf(int)()
         assert getSlice(aList, 0, 1) == aList
 
+    @pytest.mark.group_one
     def test_oneof_resize_works_with_fcall(self):
         from typed_python import UInt16
 
@@ -484,6 +515,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert len(resizeOneof(10)) == 10
 
+    @pytest.mark.group_one
     def test_oneof_resize_works_with_inline_call(self):
         @Entrypoint
         def resizeOneof(sz):
@@ -503,6 +535,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert len(resizeOneof(10)) == 10
 
+    @pytest.mark.group_one
     def test_assign_to_oneof_preserves_ref(self):
         @Entrypoint
         def preservesReference():
@@ -517,6 +550,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
             assert len(x[5]) == 10
 
+    @pytest.mark.group_one
     def test_returning_oneof_preserves_reference(self):
         @Entrypoint
         def returnAsNotNone(x: OneOf(None, ListOf(UInt16))) -> ListOf(UInt16):
@@ -538,6 +572,7 @@ class TestOneOfCompilation(unittest.TestCase):
             assert len(x[5]) == 10
             assert len(y) == 10
 
+    @pytest.mark.group_one
     def test_explicitly_converting_to_oneof_works(self):
         @Entrypoint
         def check():
@@ -559,6 +594,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         check()
 
+    @pytest.mark.group_one
     def test_oneof_binary_ops_dont_duplicate(self):
         class AddMakesTuple:
             def __init__(self, x):
@@ -586,6 +622,7 @@ class TestOneOfCompilation(unittest.TestCase):
         lst.append(10)
         assert aL[1] == lst
 
+    @pytest.mark.group_one
     def test_compile_str_on_oneof(self):
         @Entrypoint
         def callStr(x: OneOf(ZeroDivisionError, str)):
@@ -593,6 +630,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert callStr(ZeroDivisionError()) == str(ZeroDivisionError())
 
+    @pytest.mark.group_one
     def test_convert_oneof_or_none_to_index(self):
         @Entrypoint
         def index(l: ListOf(int), y: OneOf(None, int)):
@@ -603,6 +641,7 @@ class TestOneOfCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Can't take instance of type 'NoneType'"):
             assert index([1, 2, 3], None) == 3
 
+    @pytest.mark.group_one
     def test_check_if_oneof_is_none(self):
         @Entrypoint
         def strTranslate(x: str, table):
@@ -622,6 +661,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         strTranslate("hi", {})
 
+    @pytest.mark.group_one
     def test_oneof_method_call(self):
         @Entrypoint
         def append(x: OneOf(ListOf(int), ListOf(float))):
@@ -631,6 +671,7 @@ class TestOneOfCompilation(unittest.TestCase):
         append(l)
         assert len(l) == 4
 
+    @pytest.mark.group_one
     def test_split_on_oneof_type(self):
         @Entrypoint
         def split(x: Value):
@@ -638,6 +679,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert issubclass(split("HI"), OneOf)
 
+    @pytest.mark.group_one
     def test_string_split_on_oneof_with_constant(self):
         @Entrypoint
         def split(x: Value):
@@ -648,6 +690,7 @@ class TestOneOfCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Can.t call bytes.split"):
             split(b"AHIB")
 
+    @pytest.mark.group_one
     def test_string_split_on_oneof_retains_type(self):
         @Entrypoint
         def split(x: Value):
@@ -657,6 +700,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert split("AHIB") == ListOf(str)
 
+    @pytest.mark.group_one
     def test_len_of_oneof(self):
         @Entrypoint
         def lenOf(x: Value):
@@ -664,6 +708,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert lenOf("AHIB") == 4
 
+    @pytest.mark.group_one
     def test_string_split_on_oneof_retains_type_2(self):
         @Entrypoint
         def split(x: Value, y: Value):
@@ -674,6 +719,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert split("AHIB", "HI") == list
         assert split(b"AHIB", b"HI") == list
 
+    @pytest.mark.group_one
     def test_isinstance_convert_overlapping(self):
         @Entrypoint
         def checkIt(x: OneOf(1, 2, 3, int)):
@@ -686,6 +732,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         assert checkIt(2) == 2
 
+    @pytest.mark.group_one
     def test_call_function_with_none_and_ifcheck(self):
         @Entrypoint
         def checkIt(x, y: object):
@@ -694,6 +741,7 @@ class TestOneOfCompilation(unittest.TestCase):
 
         checkIt(None, float)
 
+    @pytest.mark.group_one
     def test_call_type_on_oneof(self):
         @Entrypoint
         def checkIt(x: OneOf(int, float)):
@@ -705,6 +753,7 @@ class TestOneOfCompilation(unittest.TestCase):
         assert checkIt(1.0) == "float"
 
     @pytest.mark.skipif("sys.version_info.minor < 8")
+    @pytest.mark.group_one
     def test_direct_assign_works_with_oneof(self):
         @Entrypoint
         def checkIt(x: OneOf(None, Tuple(str, str))):

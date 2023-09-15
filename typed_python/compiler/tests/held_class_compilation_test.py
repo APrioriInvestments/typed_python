@@ -73,6 +73,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         self.assertEqual(compiledOutput, interpretedOutput)
 
+    @pytest.mark.group_one
     def test_held_class_pointer_to_self(self):
         @Entrypoint
         def callPointerTo(h):
@@ -83,6 +84,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         assert callPointerTo(h) == pointerTo(h)
         assert h.pointerToSelf() == pointerTo(h)
 
+    @pytest.mark.group_one
     def test_comparison_calls_magic_method(self):
         @Held
         class H(Class, Final):
@@ -111,6 +113,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         checkIt()
         Entrypoint(checkIt)()
 
+    @pytest.mark.group_one
     def test_comparison_magic_reverse_magic_method(self):
         @Held
         class H(Class, Final):
@@ -145,6 +148,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         checkIt()
         Entrypoint(checkIt)()
 
+    @pytest.mark.group_one
     def test_comparison_default(self):
         @Held
         class H(Class, Final):
@@ -182,6 +186,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         checkIt()
         Entrypoint(checkIt)()
 
+    @pytest.mark.group_one
     def test_comparison_against_object(self):
         @Held
         class H(Class, Final):
@@ -195,14 +200,17 @@ class TestHeldClassCompilation(unittest.TestCase):
         assert checkEqual(H(x=2), H(x=2))
         assert not checkEqual(H(x=2), H(x=3))
 
+    @pytest.mark.group_one
     def test_held_class_repr(self):
         assert repr(H()) == "ReprForH"
         self.checkCompiler(lambda x: repr(x), H())
 
+    @pytest.mark.group_one
     def test_held_class_str(self):
         assert str(H()) == "StrForH"
         self.checkCompiler(lambda x: str(x), H())
 
+    @pytest.mark.group_one
     def test_held_class_entrypointed_methods(self):
         h1 = H(x=2, y=3)
         h2 = H(x=2, y=3)
@@ -213,6 +221,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         assert h1.x == h2.x
         assert h1.getX() == h1.x
 
+    @pytest.mark.group_one
     def test_stringify_held_class(self):
         h = H(x=2, y=3)
 
@@ -222,6 +231,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert str(h) == callStr(h)
 
+    @pytest.mark.group_one
     def test_pointer_to_held_class_compiles(self):
         h = H(x=2, y=3)
 
@@ -231,6 +241,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert pointerTo(h) == getPtr(h)
 
+    @pytest.mark.group_one
     def test_pass_held_to_function_with_signature(self):
         @Entrypoint
         def f(h: H):
@@ -244,6 +255,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         assert g().x == 100
 
+    @pytest.mark.group_one
     def test_pass_held_by_ref_across_entrypoint(self):
         @Entrypoint
         def g(h):
@@ -253,6 +265,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         g(h)
         assert h.x == 100
 
+    @pytest.mark.group_one
     def test_compile_held_class(self):
         @Held
         class H(Class, Final):
@@ -290,6 +303,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         self.checkCompiler(lambda c: c.h1.f(), c)
         self.checkCompiler(lambda c: c.h1.typeOfSelf(), c)
 
+    @pytest.mark.group_one
     def test_compile_list_of_held_class(self):
         assert not _types._temporaryReferenceTracerActive()
 
@@ -361,6 +375,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         self.assertEqual(getitem(aList, 0).x, 2)
         self.assertEqual(getitem(aList, 5).x, 2)
 
+    @pytest.mark.group_one
     def test_compile_construct_with_init(self):
         @Held
         class H(Class, Final):
@@ -377,6 +392,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         self.checkCompiler(lambda: H(x=10).x)
 
+    @pytest.mark.group_one
     def test_compile_access_child_held_class(self):
         @Held
         class H2(Class, Final):
@@ -389,10 +405,12 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         self.checkCompiler(f)
 
+    @pytest.mark.group_one
     def test_compile_add_operator(self):
         self.checkCompiler(lambda: (Complex(real=10) + 20).real)
         self.checkCompiler(lambda: (Complex(real=10) + Complex(imag=20)).imag)
 
+    @pytest.mark.group_one
     def test_compile_add_operator_perf(self):
         @Entrypoint
         def f(ct):
@@ -408,6 +426,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         f(100000000)
         print(time.time() - t0)
 
+    @pytest.mark.group_one
     def test_del_works(self):
         delType = ListOf(type)()
 
@@ -433,6 +452,7 @@ class TestHeldClassCompilation(unittest.TestCase):
         assert len(delType) >= 1
         assert delType[0] == C
 
+    @pytest.mark.group_one
     def test_class_hasattr(self):
         @Held
         class C(Class):
@@ -465,6 +485,7 @@ class TestHeldClassCompilation(unittest.TestCase):
 
         compiledDel()
 
+    @pytest.mark.group_one
     def test_class_hasattr_perf(self):
         @Held
         class C(Class):

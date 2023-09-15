@@ -25,6 +25,7 @@ def f(x):
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_populates():
     with tempfile.TemporaryDirectory() as compilerCacheDir:
         assert evaluateExprInFreshProcess({'x.py': MAIN_MODULE}, 'x.f(10)', compilerCacheDir) == 11
@@ -38,6 +39,7 @@ def test_compiler_cache_populates():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_can_handle_conflicting_versions_of_the_same_code():
     with tempfile.TemporaryDirectory() as compilerCacheDir:
         assert evaluateExprInFreshProcess({'x.py': MAIN_MODULE}, 'x.f(10)', compilerCacheDir) == 11
@@ -51,6 +53,7 @@ def test_compiler_cache_can_handle_conflicting_versions_of_the_same_code():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_can_detect_invalidation_through_modules():
     xmodule = "\n".join([
         "def f(x):",
@@ -78,6 +81,7 @@ def test_compiler_cache_can_detect_invalidation_through_modules():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_robust_to_irrelevant_module_changes():
     xmodule = "\n".join([
         "# this is a comment",
@@ -103,6 +107,7 @@ def test_compiler_cache_robust_to_irrelevant_module_changes():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_understands_type_changes():
     xmodule = "\n".join([
         "G = Dict(int, int)({1: 2})",
@@ -136,6 +141,7 @@ def test_compiler_cache_understands_type_changes():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_handles_exceptions_properly():
     xmodule = "\n".join([
         "@Entrypoint",
@@ -157,6 +163,7 @@ def test_compiler_cache_handles_exceptions_properly():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_understands_granular_module_accesses():
     xmodule = "\n".join([
         "@Entrypoint",
@@ -186,6 +193,7 @@ def test_compiler_cache_understands_granular_module_accesses():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_load_dependent_modules():
     xmodule = "\n".join([
         "@Entrypoint",
@@ -217,6 +225,7 @@ def test_load_dependent_modules():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_reference_existing_function_twice():
     xmodule = "\n".join([
         "@Entrypoint",
@@ -257,6 +266,7 @@ def test_reference_existing_function_twice():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_handles_class_destructors_correctly():
     xmodule = "\n".join([
         "class C(Class):",
@@ -283,6 +293,7 @@ def test_compiler_cache_handles_class_destructors_correctly():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_handles_classes():
     xmodule = "\n".join([
         "class C(Class):",
@@ -309,6 +320,7 @@ def test_compiler_cache_handles_classes():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_handles_references_to_globals():
     xmodule = "\n".join([
         "aList = []",
@@ -330,6 +342,7 @@ def test_compiler_cache_handles_references_to_globals():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_compiler_cache_handles_changed_types():
     xmodule1 = "\n".join([
         "@Entrypoint",
@@ -371,6 +384,7 @@ def test_compiler_cache_handles_changed_types():
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_ordering_is_stable_under_code_change():
     # check that the order of functions in a MutuallyRecursiveTypeGroup is
     # stable even if we change the code underneath it.

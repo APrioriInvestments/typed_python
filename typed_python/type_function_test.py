@@ -75,6 +75,7 @@ def IntLevelClass(i):
 
 
 class TypeFunctionTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic(self):
         @TypeFunction
         def List(T):
@@ -96,11 +97,13 @@ class TypeFunctionTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             List(int).Node(head=10, tail=l_f)
 
+    @pytest.mark.group_one
     def test_name_and_qualname(self):
         assert TfLevelMethod.__name__ == 'TfLevelMethod'
         assert TfLevelMethod.__module__ == 'typed_python.type_function_test'
         assert TfLevelMethod.__qualname__ == 'TfLevelMethod'
 
+    @pytest.mark.group_one
     def test_mutually_recursive(self):
         @TypeFunction
         def X(T):
@@ -127,6 +130,7 @@ class TypeFunctionTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             anX.y = Y(float)()
 
+    @pytest.mark.group_one
     def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
@@ -159,6 +163,7 @@ class TypeFunctionTest(unittest.TestCase):
             l_l
         )
 
+    @pytest.mark.group_one
     def test_type_function_on_typed_lists(self):
         @TypeFunction
         def SumThem(x):
@@ -176,6 +181,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         self.assertEqual(SumThem(ListOf(int)([1, 2, 3])).X, 6)
 
+    @pytest.mark.group_one
     def test_type_functions_with_recursive_annotations(self):
         @TypeFunction
         def Boo(T):
@@ -188,6 +194,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         self.assertEqual(boo, boo.f())
 
+    @pytest.mark.group_one
     def test_compile_typefunc_staticmethod(self):
         @TypeFunction
         def A(T):
@@ -220,6 +227,7 @@ class TypeFunctionTest(unittest.TestCase):
         # trip the assertion on isCompiled
         self.assertEqual(A(float).aFunc(ListOf(float)([1, 2])), [1, 2])
 
+    @pytest.mark.group_one
     def test_typefunc_in_staticmethod_annotation(self):
         @TypeFunction
         def makeClass(T):
@@ -231,6 +239,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         makeClass(int)()
 
+    @pytest.mark.group_one
     def test_typefunc_in_staticmethod_annotation_notcompiled(self):
         @TypeFunction
         def makeClass(T):
@@ -243,6 +252,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         makeClass(int)()
 
+    @pytest.mark.group_one
     def test_compiled_method_in_tf_closure(self):
         timesCompiled = Runtime.singleton().timesCompiled
 
@@ -251,6 +261,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert Runtime.singleton().timesCompiled - timesCompiled < 10
 
+    @pytest.mark.group_one
     def test_pass_function_with_reference_doesnt_recompile(self):
         timesCompiled = Runtime.singleton().timesCompiled
 
@@ -270,9 +281,11 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert Runtime.singleton().timesCompiled - timesCompiled < 10
 
+    @pytest.mark.group_one
     def test_module_level_type_function_name(self):
         assert SerializationContext().nameForObject(TfLevelMethod) is not None
 
+    @pytest.mark.group_one
     def test_deserialize_type_functions_usable(self):
         @TypeFunction
         def TF(T):
@@ -289,6 +302,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert TFInt(x=20).x == 20
 
+    @pytest.mark.group_one
     def test_classes_binding_methods_with_closures(self):
         def makeF(boundvalue):
             def f():
@@ -313,6 +327,7 @@ class TypeFunctionTest(unittest.TestCase):
         self.assertEqual(callIt(makeFClass((1, 2))), (1, 2))
         self.assertEqual(callIt(makeFClass((1, 3))), (1, 3))
 
+    @pytest.mark.group_one
     def test_can_compile_function_taking_type_function_output_bound_to_function(self):
         def makeMultiplier(val):
             def f(x):
@@ -336,6 +351,7 @@ class TypeFunctionTest(unittest.TestCase):
         assert instantiateAndCall(C2) == 30.0
         assert instantiateAndCall(C3) == 20.0
 
+    @pytest.mark.group_one
     def test_call_type_function_with_constant(self):
         # if the cache is on, this won't work
         if os.getenv("TP_COMPILER_CACHE"):
@@ -380,12 +396,14 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert vis.variableTypes['T'] is not object
 
+    @pytest.mark.group_one
     def test_serialize_type_function_results(self):
         # confirm that when we serialize a TF Class we don't serialize the contents of the
         # class!
         sc = SerializationContext().withoutCompression()
         assert b'thisIsAMethod' not in sc.serialize(IntLevelClass(10))
 
+    @pytest.mark.group_one
     def test_compiled_type_function_sees_through_constants(self):
         @Entrypoint
         def callNext(c):
@@ -396,6 +414,7 @@ class TypeFunctionTest(unittest.TestCase):
 
         assert compilerInferredNextType is intendedType
 
+    @pytest.mark.group_one
     def test_type_functions_are_classes(self):
         @TypeFunction
         def Temp(C):
@@ -410,6 +429,7 @@ class TypeFunctionTest(unittest.TestCase):
         assert issubclass(Temp(int), Temp)
         assert issubclass(Temp, TypeFunction)
 
+    @pytest.mark.group_one
     def test_serialize_regular_class_output(self):
         C = RegularPythonClass(int)
 

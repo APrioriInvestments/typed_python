@@ -1,6 +1,7 @@
 from typed_python import Entrypoint, Alternative, Class
 
 
+@pytest.mark.group_one
 def test_type_of_class_is_specific():
     class C(Class):
         pass
@@ -15,6 +16,7 @@ def test_type_of_class_is_specific():
     assert typeOfArg(B()) is B
 
 
+@pytest.mark.group_one
 def test_type_of_alternative_is_specific():
     for members in [{}, {'a': int}]:
         A = Alternative("A", A=members)
@@ -26,6 +28,7 @@ def test_type_of_alternative_is_specific():
         assert typeOfArg(A.A()) is A.A
 
 
+@pytest.mark.group_one
 def test_type_of_concrete_alternative_is_specific():
     for members in [{}, {'a': int}]:
         A = Alternative("A", A=members)
@@ -37,6 +40,7 @@ def test_type_of_concrete_alternative_is_specific():
         assert typeOfArg(A.A()) is A.A
 
 
+@pytest.mark.group_one
 def test_type_name():
     A = Alternative("A", X=dict(x=int), Y=dict(y=int))
 

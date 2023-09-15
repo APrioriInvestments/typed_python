@@ -2,4 +2,8 @@ llvmlite==0.38
 numpy
 psutil
 pytz
+pytest 
+pyyaml
+pytest-json-report
 sortedcontainers
+toml

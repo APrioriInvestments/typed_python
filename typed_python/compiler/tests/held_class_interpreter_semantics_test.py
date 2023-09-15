@@ -25,6 +25,7 @@ class H(Class, Final):
 
 
 class TestHeldClassInterpreterSemantics(unittest.TestCase):
+    @pytest.mark.group_one
     def test_held_class_str(self):
         @Held
         class H(Class):
@@ -33,6 +34,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert str(H()) == "HI"
 
+    @pytest.mark.group_one
     def test_can_return_held_class_from_typed_function(self):
         @Function
         def f(x, y) -> H:
@@ -47,6 +49,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert res2.x == 12
         assert res2.y == 22
 
+    @pytest.mark.group_one
     def test_construct_and_call_method(self):
         # note that we can't just call this at the root of the function
         # because pytest keeps all the temporary variables alive, which obviates
@@ -56,6 +59,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert runTest() == 30
 
+    @pytest.mark.group_one
     def test_construct_and_call_method_multiline(self):
         def runTest():
             res = H(x=10, y=20).addToX(
@@ -73,6 +77,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert runTest() == 20
         assert runTest2() == 20
 
+    @pytest.mark.group_one
     def test_can_assign_to_held_class_in_list(self):
         def runTest():
             aList = ListOf(H)()
@@ -84,6 +89,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         runTest()
 
+    @pytest.mark.group_one
     def test_list_of_held_class_item_type(self):
         assert sys.gettrace() is None
 
@@ -106,12 +112,14 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert sys.gettrace() is None
 
+    @pytest.mark.group_one
     def test_construct_held_class_on_heap_doesnt_leak(self):
         mb = currentMemUsageMb()
         for _ in range(100000):
             H()
         assert currentMemUsageMb() - mb < .1
 
+    @pytest.mark.group_one
     def test_can_call_held_class_in_interpreter(self):
         @Held
         class H(Class, Final):
@@ -120,6 +128,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert H()(10) == (H, 10)
 
+    @pytest.mark.group_one
     def test_can_construct_held_class_on_heap(self):
         h = H(x=10, y=20)
         assert type(h) is H
@@ -129,6 +138,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert h.x == 20
 
+    @pytest.mark.group_one
     def test_can_construct_held_class_on_heap_with_init(self):
         @Held
         class H(Class, Final):
@@ -140,6 +150,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         h = H()
         assert h.x == 100
 
+    @pytest.mark.group_one
     def test_held_class_methods_get_passed_refs(self):
         @Held
         class H(Class, Final):
@@ -148,6 +159,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert H().f() is H
 
+    @pytest.mark.group_one
     def test_multiple_refs_simultaneously(self):
         aList = ListOf(H)()
         aList.resize(2)
@@ -192,6 +204,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
             runTest()
 
+    @pytest.mark.group_one
     def test_refs_passed_to_functions(self):
         aList = ListOf(H)()
         aList.resize(1)
@@ -228,6 +241,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert aList[0].x == 30
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_nested_ref_call_cost(self):
         # verify that the python interpreter is not
         # slowed down too much while HeldClass references are in play.
@@ -254,6 +268,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         f(aList, aList[0], 0)
 
+    @pytest.mark.group_one
     def test_access_held_class_functions(self):
         aList = ListOf(H)()
         aList.resize(1)
@@ -265,6 +280,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert aList[0].x == 11
 
+    @pytest.mark.group_one
     def test_held_class_held_classes(self):
         @Held
         class H2(Class, Final):
@@ -283,6 +299,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         aList[0].h = h
         assert aList[0].h.x == 5
 
+    @pytest.mark.group_one
     def test_held_class_ref_conversion_with_existing_trace_function(self):
         # HeldClass uses 'sys.settrace' internally to know when the temporary ref
         # needs to get converted to a proper instance. We need to check that this doesn't
@@ -321,6 +338,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert traced1 == traced2
         assert type(objects1[0]) is H
 
+    @pytest.mark.group_one
     def test_held_class_instance_conversion_doesnt_leak(self):
         aList = ListOf(H)()
         aList.resize(1)
@@ -337,6 +355,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert leakSize < .1
 
+    @pytest.mark.group_one
     def test_pointer_to_held_class(self):
         h = H()
 
@@ -345,6 +364,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         h.x = 10
         assert p.x.get() == 10
 
+    @pytest.mark.group_one
     def test_contains_operator(self):
         @Held
         class H(Class, Final):
@@ -356,6 +376,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert 10 in H(x=10)
         assert 11 not in H(x=10)
 
+    @pytest.mark.group_one
     def test_len_operator(self):
         @Held
         class H(Class, Final):
@@ -366,6 +387,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert len(H(x=10)) == 10
 
+    @pytest.mark.group_one
     def test_getitem(self):
         @Held
         class H(Class, Final):
@@ -376,6 +398,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert H(x=10)[20] == 30
 
+    @pytest.mark.group_one
     def test_setitem(self):
         @Held
         class H(Class, Final):
@@ -391,6 +414,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         h[1] = 30
         assert h.x == 20
 
+    @pytest.mark.group_one
     def test_inquiry(self):
         @Held
         class H(Class, Final):
@@ -408,6 +432,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
         assert H2(x=1)
         assert not H2(x=0)
 
+    @pytest.mark.group_one
     def test_ceil(self):
         @Held
         class H(Class, Final):
@@ -416,6 +441,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert math.ceil(H()) == 123
 
+    @pytest.mark.group_one
     def test_add_operator(self):
         @Held
         class H(Class, Final):
@@ -426,6 +452,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         assert H(x=12) + 1 == 13
 
+    @pytest.mark.group_one
     def test_nested_held_classes(self):
         @Held
         class H1(Class, Final):
@@ -443,6 +470,7 @@ class TestHeldClassInterpreterSemantics(unittest.TestCase):
 
         checkX(H2(10).h)
 
+    @pytest.mark.group_one
     def test_temporary_held_classes_in_lists(self):
         @Held
         class H1(Class, Final):

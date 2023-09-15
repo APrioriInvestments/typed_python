@@ -350,6 +350,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assert_is_copy(obj, ping_pong(obj, ser_ctx))
 
+    @pytest.mark.group_one
     def test_serialize_lists_with_compression(self):
         def check_idempotence(x):
             s1 = SerializationContext().withoutCompression()
@@ -373,6 +374,7 @@ class TypesSerializationTest(unittest.TestCase):
         aList.resize(0)
         check_idempotence((aList, aList))
 
+    @pytest.mark.group_one
     def test_serialize_lists_compression_and_threads(self):
         someFloats = ListOf(float)(range(1000000))
         for _ in range(6):
@@ -404,6 +406,7 @@ class TypesSerializationTest(unittest.TestCase):
         print("nocompress is ", nocompressTime, int(size3 / 1024 / 1024))
         print("speedup is ", normalTime / threadTime)
 
+    @pytest.mark.group_one
     def test_can_deserialize_pod_lists_with_any_context(self):
         someFloats = ListOf(float)(range(1000))
         someInts = ListOf(int)(range(1000))
@@ -414,6 +417,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert s2.deserialize(s1.serialize(someFloats)) == someFloats
         assert s2.deserialize(s1.serialize(someInts)) == someInts
 
+    @pytest.mark.group_one
     def test_serialize_core_python_objects(self):
         self.check_idempotence(0)
         self.check_idempotence(10)
@@ -450,10 +454,12 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_idempotence(TupleOf(int))
         self.check_idempotence(TupleOf(int)([0x08]))
 
+    @pytest.mark.group_one
     def test_serialize_python_dict(self):
         d = {1: 2, 3: '4', '5': 6, 7.0: b'8'}
         self.check_idempotence(d)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_list(self):
         def check_reclist(size):
             init = list(range(size))
@@ -469,6 +475,7 @@ class TypesSerializationTest(unittest.TestCase):
         for i in range(4):
             check_reclist(i)
 
+    @pytest.mark.group_one
     def test_serialize_memoizes_tuples(self):
         ts = SerializationContext()
 
@@ -477,6 +484,7 @@ class TypesSerializationTest(unittest.TestCase):
             lst = (lst, lst)
             self.assertTrue(len(ts.serialize(lst)) < (i+1) * 100)
 
+    @pytest.mark.group_one
     def test_serialize_objects(self):
         class AnObject:
             def __init__(self, o):
@@ -491,6 +499,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIsInstance(o2, AnObject)
         self.assertEqual(o2.o, 123)
 
+    @pytest.mark.group_one
     def test_serialize_stream_integers(self):
         for someInts in [(1, 2), TupleOf(int)((1, 2)), [1, 2]]:
             self.assertEqual(
@@ -503,6 +512,7 @@ class TypesSerializationTest(unittest.TestCase):
                 TupleOf(int)(someInts)
             )
 
+    @pytest.mark.group_one
     def test_serialize_stream_complex(self):
         T = OneOf(None, float, str, int, ListOf(int))
 
@@ -520,6 +530,7 @@ class TypesSerializationTest(unittest.TestCase):
                 TupleOf(T)([T(x) for x in items])
             )
 
+    @pytest.mark.group_one
     def test_serialize_recursive_object(self):
         class AnObject:
             def __init__(self, o):
@@ -533,10 +544,12 @@ class TypesSerializationTest(unittest.TestCase):
         o2 = ping_pong(o, ts)
         self.assertIs(o2.o, o2)
 
+    @pytest.mark.group_one
     def test_serialize_primitive_native_types(self):
         for t in [int, float, bool, type(None), str, bytes]:
             self.assertIs(ping_pong(t), t)
 
+    @pytest.mark.group_one
     def test_serialize_primitive_compound_types(self):
         class A:
             pass
@@ -558,6 +571,7 @@ class TypesSerializationTest(unittest.TestCase):
                     ]:
             self.assertIs(ping_pong(t, ts), t)
 
+    @pytest.mark.group_one
     def test_serialize_functions_basic(self):
         def f():
             return 10
@@ -565,6 +579,7 @@ class TypesSerializationTest(unittest.TestCase):
         ts = SerializationContext({'f': f})
         self.assertIs(ping_pong(f, ts), f)
 
+    @pytest.mark.group_one
     def test_serialize_alternatives_as_types(self):
         A = Forward("A")
         A = A.define(Alternative("A", X={'a': int}, Y={'a': A}))
@@ -573,6 +588,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(ping_pong(A, ts), A)
         self.assertIs(ping_pong(A.X, ts), A.X)
 
+    @pytest.mark.group_one
     def test_serialize_lambdas(self):
         def check(f, args):
             self.assertEqual(f(*args), ping_pong(f)(*args))
@@ -593,6 +609,7 @@ class TypesSerializationTest(unittest.TestCase):
         check(lambda x: (x, None), (10,))
         check(lambda x: x+y, (10,))
 
+    @pytest.mark.group_one
     def test_serialize_class_instance(self):
         class A:
             def __init__(self, x):
@@ -613,6 +630,7 @@ class TypesSerializationTest(unittest.TestCase):
         anA2 = deserialize(A, serialize(A, A(10), ts), ts)
         self.assertEqual(anA2.x, 10)
 
+    @pytest.mark.group_one
     def test_serialize_and_numpy(self):
         x = numpy.ones(10000)
         ts = SerializationContext()
@@ -629,11 +647,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertTrue(sizeNotCompressed > sizeCompressed * 2, (sizeNotCompressed, sizeCompressed))
 
+    @pytest.mark.group_one
     def test_serialize_and_numpy_with_dicts(self):
         x = numpy.ones(10000)
 
         self.assertTrue(numpy.all(ping_pong({'a': x, 'b': x})['a'] == x))
 
+    @pytest.mark.group_one
     def test_serialize_and_threads(self):
         class A:
             def __init__(self, x):
@@ -657,10 +677,12 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(len(OK), len(threads))
 
+    @pytest.mark.group_one
     def test_serialize_named_tuple(self):
         X = NamedTuple(x=int)
         self.check_idempotence(X(x=20))
 
+    @pytest.mark.group_one
     def test_serialize_named_tuple_subclass(self):
         class X(NamedTuple(x=int)):
             def f(self):
@@ -674,6 +696,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.check_idempotence(X(x=20), ts)
 
+    @pytest.mark.group_one
     def test_serialization_context_queries(self):
         sc = SerializationContext({
             'X': False,
@@ -684,22 +707,26 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(sc.objectFromName('Y'), True)
         self.assertIs(sc.nameForObject(True), 'Y')
 
+    @pytest.mark.group_one
     def test_serializing_dicts_in_loop(self):
         self.serializeInLoop(lambda: 1)
         self.serializeInLoop(lambda: {})
         self.serializeInLoop(lambda: {1: 2})
         self.serializeInLoop(lambda: {1: {2: 3}})
 
+    @pytest.mark.group_one
     def test_serializing_tuples_in_loop(self):
         self.serializeInLoop(lambda: ())
         self.serializeInLoop(lambda: (1, 2, 3))
         self.serializeInLoop(lambda: (1, 2, (3, 4,), ((5, 6), (((6,),),))))
 
+    @pytest.mark.group_one
     def test_serializing_lists_in_loop(self):
         self.serializeInLoop(lambda: [])
         self.serializeInLoop(lambda: [1, 2, 3, 4])
         self.serializeInLoop(lambda: [1, 2, [3, 4, 5], [6, [[[[]]]]]])
 
+    @pytest.mark.group_one
     def test_serializing_objects_in_loop(self):
         class X:
             def __init__(self, a=None, b=None, c=None):
@@ -710,12 +737,14 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.serializeInLoop(lambda: X(a=X(), b=[1, 2, 3], c=X(a=X())), context=c)
 
+    @pytest.mark.group_one
     def test_serializing_numpy_arrays_in_loop(self):
         self.serializeInLoop(lambda: numpy.array([]))
         self.serializeInLoop(lambda: numpy.array([1, 2, 3]))
         self.serializeInLoop(lambda: numpy.array([[1, 2, 3], [2, 3, 4]]))
         self.serializeInLoop(lambda: numpy.ones(2000))
 
+    @pytest.mark.group_one
     def test_serializing_anonymous_recursive_types(self):
         NT = Forward("NT")
         NT = NT.define(TupleOf(OneOf(int, NT)))
@@ -725,6 +754,7 @@ class TypesSerializationTest(unittest.TestCase):
         nt2 = NT2((1, 2, 3))
         NT2((nt2, 2))
 
+    @pytest.mark.group_one
     def test_serializing_named_tuples_in_loop(self):
         NT = Forward("NT")
         NT = NT.define(NamedTuple(x=OneOf(int, float), y=OneOf(int, TupleOf(NT))))
@@ -733,6 +763,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.serializeInLoop(lambda: NT(x=10, y=(NT(x=20, y=2),)), context=context)
 
+    @pytest.mark.group_one
     def test_serializing_tuple_of_in_loop(self):
         TO = TupleOf(int)
 
@@ -740,6 +771,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.serializeInLoop(lambda: TO((1, 2, 3, 4, 5)), context=context)
 
+    @pytest.mark.group_one
     def test_serializing_alternatives_in_loop(self):
         AT = Forward("AT")
         AT = AT.define(Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
@@ -750,6 +782,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: AT.Y, context=context)
         self.serializeInLoop(lambda: AT.X(x=10, y=20), context=context)
 
+    @pytest.mark.group_one
     def test_inject_exception_into_context(self):
         NT = NamedTuple()
 
@@ -790,11 +823,13 @@ class TypesSerializationTest(unittest.TestCase):
     ##########################################################################
     # The Tests below are  Adapted from pickletester.py in cpython/Lib/test
 
+    @pytest.mark.group_one
     def test_serialize_roundtrip_equality(self):
         expected = create_data()
         got = ping_pong(expected, sc)
         self.assert_is_copy(expected, got)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_tuple_and_list(self):
         t = ([],)
         t[0].append(t)
@@ -806,6 +841,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(len(x[0]), 1)
         self.assertIs(x[0][0], x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_dict(self):
         d = {}
         d[1] = d
@@ -815,6 +851,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(list(x.keys()), [1])
         self.assertIs(x[1], x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_dict_key(self):
         d = {}
         k = K(d)
@@ -826,6 +863,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIsInstance(list(x.keys())[0], K)
         self.assertIs(list(x.keys())[0].value, x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_set(self):
         y = set()
         k = K(y)
@@ -837,6 +875,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIsInstance(list(x)[0], K)
         self.assertIs(list(x)[0].value, x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_inst(self):
         i = C()
         i.attr = i
@@ -846,6 +885,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(dir(x), dir(i))
         self.assertIs(x.attr, x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_multi(self):
         lst = []
         d = {1: lst}
@@ -871,21 +911,27 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIsInstance(list(x)[0], H)
         self.assertIs(list(x)[0].attr, x)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_list_and_inst(self):
         self.check_recursive_collection_and_inst(list)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_tuple_and_inst(self):
         self.check_recursive_collection_and_inst(tuple)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_dict_and_inst(self):
         self.check_recursive_collection_and_inst(dict.fromkeys)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_set_and_inst(self):
         self.check_recursive_collection_and_inst(set)
 
+    @pytest.mark.group_one
     def test_serialize_recursive_frozenset_and_inst(self):
         self.check_recursive_collection_and_inst(frozenset)
 
+    @pytest.mark.group_one
     def test_serialize_base_type_subclass(self):
         assert sc.deserialize(sc.serialize(MyInt())) == MyInt()
         assert sc.deserialize(sc.serialize(MyFloat())) == MyFloat()
@@ -899,6 +945,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert sc.deserialize(sc.serialize(MySet())) == MySet()
         assert sc.deserialize(sc.serialize(MyFrozenSet())) == MyFrozenSet()
 
+    @pytest.mark.group_one
     def test_serialize_unicode_1(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
                     '<\\>', '<\\\U00012345>']
@@ -908,12 +955,14 @@ class TypesSerializationTest(unittest.TestCase):
             u2 = ping_pong(u)
             self.assert_is_copy(u, u2)
 
+    @pytest.mark.group_one
     def test_serialize_unicode_high_plane(self):
         t = '\U00012345'
 
         t2 = ping_pong(t)
         self.assert_is_copy(t, t2)
 
+    @pytest.mark.group_one
     def test_serialize_bytes(self):
         for s in b'', b'xyz', b'xyz'*100:
             s2 = ping_pong(s)
@@ -927,6 +976,7 @@ class TypesSerializationTest(unittest.TestCase):
             s2 = ping_pong(s)
             self.assert_is_copy(s, s2)
 
+    @pytest.mark.group_one
     def test_serialize_ints(self):
         n = sys.maxsize
         while n:
@@ -935,6 +985,7 @@ class TypesSerializationTest(unittest.TestCase):
                 self.assert_is_copy(expected, n2)
             n = n >> 1
 
+    @pytest.mark.group_one
     def test_serialize_float(self):
         test_values = [0.0, 4.94e-324, 1e-310, 7e-308, 6.626e-34, 0.1, 0.5,
                        3.14, 263.44582062374053, 6.022e23, 1e30]
@@ -944,28 +995,33 @@ class TypesSerializationTest(unittest.TestCase):
             got = ping_pong(value)
             self.assert_is_copy(value, got)
 
+    @pytest.mark.group_one
     def test_serialize_numpy_float(self):
         deserializedVal = ping_pong(numpy.float64(1.0))
 
         self.assertEqual(deserializedVal, 1.0)
         self.assertIsInstance(deserializedVal, numpy.float64)
 
+    @pytest.mark.group_one
     def test_serialize_reduce(self):
         inst = AAA()
         loaded = ping_pong(inst, sc)
         self.assertEqual(loaded, REDUCE_A)
 
+    @pytest.mark.group_one
     def test_serialize_getinitargs(self):
         inst = initarg(1, 2)
         loaded = ping_pong(inst)
         self.assert_is_copy(inst, loaded)
 
+    @pytest.mark.group_one
     def test_serialize_metaclass(self):
         a = use_metaclass()
         b = ping_pong(a, sc)
         self.assertEqual(a.__class__, b.__class__)
 
     @pytest.mark.skip(reason="Didn't even bother")
+    @pytest.mark.group_one
     def test_serialize_dynamic_class(self):
         import copyreg
         a = create_dynamic_class("my_dynamic_class", (object,))
@@ -975,6 +1031,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
+    @pytest.mark.group_one
     def test_class_serialization_stable(self):
         class C:
             pass
@@ -990,6 +1047,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert CSer == CSer2
 
     @pytest.mark.skip(reason="Fails on 3.8 for some reason")
+    @pytest.mark.group_one
     def test_serialize_structseq(self):
         import time
         import os
@@ -1006,14 +1064,17 @@ class TypesSerializationTest(unittest.TestCase):
             u = ping_pong(t)
             self.assert_is_copy(t, u)
 
+    @pytest.mark.group_one
     def test_serialize_ellipsis(self):
         u = ping_pong(...)
         self.assertIs(..., u)
 
+    @pytest.mark.group_one
     def test_serialize_notimplemented(self):
         u = ping_pong(NotImplemented)
         self.assertIs(NotImplemented, u)
 
+    @pytest.mark.group_one
     def test_serialize_singleton_types(self):
         # Issue #6477: Test that types of built-in singletons can be pickled.
         singletons = [None, ..., NotImplemented]
@@ -1021,6 +1082,7 @@ class TypesSerializationTest(unittest.TestCase):
             u = ping_pong(type(singleton))
             self.assertIs(type(singleton), u)
 
+    @pytest.mark.group_one
     def test_serialize_many_puts_and_gets(self):
         # Test that internal data structures correctly deal with lots of
         # puts/gets.
@@ -1032,6 +1094,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assert_is_copy(obj, loaded)
 
     @pytest.mark.skip(reason="Not sure that TP should insist on this")
+    @pytest.mark.group_one
     def test_serialize_attribute_name_interning(self):
         # Test that attribute names of pickled objects are interned when
         # unpickling.
@@ -1045,6 +1108,7 @@ class TypesSerializationTest(unittest.TestCase):
         for x_key, y_key in zip(x_keys, y_keys):
             self.assertIs(x_key, y_key)
 
+    @pytest.mark.group_one
     def test_serialize_large_pickles(self):
         # Test the correctness of internal buffering routines when handling
         # large data.
@@ -1053,6 +1117,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(len(loaded), len(data))
         self.assertEqual(loaded, data)
 
+    @pytest.mark.group_one
     def test_serialize_nested_names(self):
         global Nested
 
@@ -1074,6 +1139,7 @@ class TypesSerializationTest(unittest.TestCase):
                 unpickled = ping_pong(obj, sc)
                 self.assertIs(obj, unpickled)
 
+    @pytest.mark.group_one
     def test_serialize_lambdas_more(self):
         sc = SerializationContext()
 
@@ -1100,6 +1166,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(deserialized_f_2(10), 11)
 
+    @pytest.mark.group_one
     def test_serialize_result_of_decorator(self):
         sc = SerializationContext()
 
@@ -1117,10 +1184,12 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(g2(10), g(10))
 
+    @pytest.mark.group_one
     def test_serialize_modules(self):
         sc = SerializationContext()
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
 
+    @pytest.mark.group_one
     def test_serialize_submodules(self):
         sc = SerializationContext()
 
@@ -1129,6 +1198,7 @@ class TypesSerializationTest(unittest.TestCase):
             numpy.linalg
         )
 
+    @pytest.mark.group_one
     def test_serialize_functions_with_references_in_list_comprehensions(self):
         sc = SerializationContext()
 
@@ -1141,6 +1211,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(sc.deserialize(sc.serialize(f))(), "testfunction")
 
+    @pytest.mark.group_one
     def test_serialize_functions_with_nested_list_comprehensions(self):
         sc = SerializationContext()
 
@@ -1149,6 +1220,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(sc.deserialize(sc.serialize(f))(), f())
 
+    @pytest.mark.group_one
     def test_serialize_lambdas_with_nested_list_comprehensions(self):
         sc = SerializationContext()
 
@@ -1156,6 +1228,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(sc.deserialize(sc.serialize(f))(), f())
 
+    @pytest.mark.group_one
     def test_serialize_large_lists(self):
         x = SerializationContext()
 
@@ -1171,6 +1244,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(lst, l2)
 
+    @pytest.mark.group_one
     def test_serialize_large_numpy_arrays(self):
         x = SerializationContext()
 
@@ -1179,6 +1253,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertTrue(numpy.all(a == a2))
 
+    @pytest.mark.group_one
     def test_serialize_datetime_objects(self):
         x = SerializationContext()
 
@@ -1206,6 +1281,7 @@ class TypesSerializationTest(unittest.TestCase):
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
 
+    @pytest.mark.group_one
     def test_serialize_dict(self):
         x = SerializationContext()
 
@@ -1217,6 +1293,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(d, d2)
 
+    @pytest.mark.group_one
     def test_serialize_set(self):
         x = SerializationContext()
 
@@ -1232,6 +1309,7 @@ class TypesSerializationTest(unittest.TestCase):
         s.clear()
         self.assertEqual(s, x.deserialize(x.serialize(s)))
 
+    @pytest.mark.group_one
     def test_serialize_recursive_dict_more(self):
         D = Forward("D")
         D = D.define(Dict(str, OneOf(str, D)))
@@ -1247,6 +1325,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d2['recurses']['recurses']['hi'], 'bye')
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_serialize_dict_doesnt_leak(self):
         T = Dict(int, int)
         d = T({i: i+1 for i in range(100)})
@@ -1261,6 +1340,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertLess(currentMemUsageMb(), usage+1)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_serialize_array_doesnt_leak(self):
         d = numpy.ones(1000000)
         x = SerializationContext()
@@ -1275,6 +1355,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertLess(currentMemUsageMb(), usage+2)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_deserialize_set_doesnt_leak(self):
         s = set(range(1000000))
         x = SerializationContext()
@@ -1290,6 +1371,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertLess(currentMemUsageMb(), usage+1)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_deserialize_tuple_doesnt_leak(self):
         s = tuple(range(1000000))
         x = SerializationContext()
@@ -1305,6 +1387,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertLess(currentMemUsageMb(), usage+1)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_deserialize_list_doesnt_leak(self):
         s = list(range(1000000))
         x = SerializationContext()
@@ -1320,6 +1403,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertLess(currentMemUsageMb(), usage+1)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_deserialize_class_doesnt_leak(self):
         class C(Class, Final):
             x = Member(int)
@@ -1339,6 +1423,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertLess(currentMemUsageMb(), usage+.5)
 
+    @pytest.mark.group_one
     def test_serialize_named_tuples_with_extra_fields(self):
         T1 = NamedTuple(x=int)
         T2 = NamedTuple(x=int, y=float, z=str)
@@ -1348,6 +1433,7 @@ class TypesSerializationTest(unittest.TestCase):
             T2(x=10, y=0.0, z="")
         )
 
+    @pytest.mark.group_one
     def test_serialize_listof(self):
         T = ListOf(int)
 
@@ -1360,6 +1446,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(aPopulatedList, deserialize(T, serialize(T, aPopulatedList)))
         self.assertEqual(refcount(deserialize(T, serialize(T, aPopulatedList))), 1)
 
+    @pytest.mark.group_one
     def test_serialize_classes(self):
         class AClass(Class, Final):
             x = Member(int)
@@ -1379,6 +1466,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(refcount(a2), 1)
 
+    @pytest.mark.group_one
     def test_embedded_messages(self):
         T = NamedTuple(x=TupleOf(int))
         T_with_message = NamedTuple(x=EmbeddedMessage)
@@ -1393,6 +1481,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(t2.x, t.x)
         self.assertEqual(t2.y, t.x)
 
+    @pytest.mark.group_one
     def test_serialize_untyped_classes(self):
         sc = SerializationContext()
 
@@ -1412,6 +1501,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(C2(20).f(), 30)
         self.assertEqual(C2(20).g(), 20)
 
+    @pytest.mark.group_one
     def test_serialize_functions_with_return_types(self):
         sc = SerializationContext()
 
@@ -1422,6 +1512,7 @@ class TypesSerializationTest(unittest.TestCase):
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(10.5), 10)
 
+    @pytest.mark.group_one
     def test_serialize_functions_with_annotations(self):
         sc = SerializationContext()
 
@@ -1440,6 +1531,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(f(), f2())
 
+    @pytest.mark.group_one
     def test_serialize_typed_classes(self):
         sc = SerializationContext()
 
@@ -1474,6 +1566,7 @@ class TypesSerializationTest(unittest.TestCase):
             C(x=10, y=30).g()
         )
 
+    @pytest.mark.group_one
     def test_serialize_recursive_typed_classes(self):
         sc = SerializationContext()
 
@@ -1506,6 +1599,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertTrue(isinstance(instance2.getSelf(), B2))
         self.assertTrue(isinstance(instance2.getSelf(), B3))
 
+    @pytest.mark.group_one
     def test_serialize_functions_with_cells(self):
         def fMaker():
             @Entrypoint
@@ -1526,6 +1620,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(f2(10), 11)
 
+    @pytest.mark.group_one
     def test_reserialize_functions(self):
         sc = SerializationContext({'Entrypoint': Entrypoint})
 
@@ -1586,6 +1681,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(f3(10), 11)
         self.assertEqual(h2(10), (13, 14))
 
+    @pytest.mark.group_one
     def test_serialize_unnamed_classes_retains_identity(self):
         sc = SerializationContext()
 
@@ -1599,6 +1695,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert B2().f() is B2
         assert B().f() is B2
 
+    @pytest.mark.group_one
     def test_serialize_unnamed_typed_classes_retains_identity(self):
         sc = SerializationContext()
 
@@ -1612,6 +1709,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert B2().f() is B2
         assert B().f() is B2
 
+    @pytest.mark.group_one
     def test_serialize_lambda_preserves_identity_hash(self):
         sc = SerializationContext()
 
@@ -1623,6 +1721,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert identityHash(aFunction) == identityHash(aFunction2)
 
+    @pytest.mark.group_one
     def test_serialize_subclasses(self):
         sc = SerializationContext()
 
@@ -1659,6 +1758,7 @@ class TypesSerializationTest(unittest.TestCase):
         aList2[2].b.x = 100
         self.assertEqual(aList2[0].x, 100)
 
+    @pytest.mark.group_one
     def test_serialize_subclasses_multiple_views(self):
         sc = SerializationContext()
 
@@ -1683,6 +1783,7 @@ class TypesSerializationTest(unittest.TestCase):
         for e in t:
             self.assertEqual(e.x4, 2)
 
+    @pytest.mark.group_one
     def test_serialize_classes_with_staticmethods_and_properties(self):
         sc = SerializationContext()
 
@@ -1700,6 +1801,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(B2.f(10), 11)
         self.assertEqual(B().p, 11)
 
+    @pytest.mark.group_one
     def test_roundtrip_serialization_of_functions_with_annotations(self):
         T = int
 
@@ -1713,6 +1815,7 @@ class TypesSerializationTest(unittest.TestCase):
         f2Typed = Function(f2)
         self.assertEqual(f2Typed.overloads[0].returnType, int)
 
+    @pytest.mark.group_one
     def test_roundtrip_serialization_of_functions_with_defaults(self):
         def f(x=10, *, y=20):
             return x + y
@@ -1721,6 +1824,7 @@ class TypesSerializationTest(unittest.TestCase):
         f2 = sc.deserialize(sc.serialize(f))
         self.assertEqual(f2(), 30)
 
+    @pytest.mark.group_one
     def test_roundtrip_serialization_of_functions_with_closures(self):
         F = int
 
@@ -1739,6 +1843,7 @@ class TypesSerializationTest(unittest.TestCase):
         fWrapper2 = sc.deserialize(sc.serialize(fWrapper))
         self.assertEqual(fWrapper2(), 1)
 
+    @pytest.mark.group_one
     def test_serialize_many_large_equivalent_strings(self):
         sc = SerializationContext()
 
@@ -1754,6 +1859,7 @@ class TypesSerializationTest(unittest.TestCase):
             20
         )
 
+    @pytest.mark.group_one
     def test_serialize_class_with_classmethod(self):
         class ClassWithClassmethod(Class, Final):
             @classmethod
@@ -1769,6 +1875,7 @@ class TypesSerializationTest(unittest.TestCase):
             ClassWithClassmethod.ownName(),
         )
 
+    @pytest.mark.group_one
     def test_serialize_class_with_nontrivial_signatures(self):
         N = NamedTuple(x=int, y=float)
 
@@ -1789,12 +1896,14 @@ class TypesSerializationTest(unittest.TestCase):
             ClassWithStaticmethod.hi(lst),
         )
 
+    @pytest.mark.group_one
     def test_serialize_class_simple(self):
         sc = SerializationContext()
         self.assertTrue(
             sc.deserialize(sc.serialize(C)) is C
         )
 
+    @pytest.mark.group_one
     def test_serialize_unnamed_alternative(self):
         X = Alternative("X", A={}, B={'x': int})
 
@@ -1804,6 +1913,7 @@ class TypesSerializationTest(unittest.TestCase):
             sc.deserialize(sc.serialize(X)).B(x=2).x == 2
         )
 
+    @pytest.mark.group_one
     def test_serialize_mutually_recursive_unnamed_forwards_alternatives(self):
         X1 = Forward("X1")
         X2 = Forward("X2")
@@ -1814,6 +1924,7 @@ class TypesSerializationTest(unittest.TestCase):
         sc = SerializationContext()
         sc.deserialize(sc.serialize(X1))
 
+    @pytest.mark.group_one
     def test_compression_has_checksum(self):
         sc = SerializationContext().withCompression()
         data = ListOf(float)(range(100))
@@ -1824,6 +1935,7 @@ class TypesSerializationTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "blockChecksum"):
             sc.deserialize(bytes(serDat))
 
+    @pytest.mark.group_one
     def test_serialize_mutually_recursive_unnamed_forwards_tuples(self):
         X1 = Forward("X1")
         X2 = Forward("X2")
@@ -1840,6 +1952,7 @@ class TypesSerializationTest(unittest.TestCase):
         sc = SerializationContext().withoutCompression()
         sc.deserialize(sc.serialize(X1))
 
+    @pytest.mark.group_one
     def test_serialize_named_alternative(self):
         self.assertEqual(
             ModuleLevelAlternative.__module__,
@@ -1853,6 +1966,7 @@ class TypesSerializationTest(unittest.TestCase):
             ModuleLevelAlternative
         )
 
+    @pytest.mark.group_one
     def test_serialize_unnamed_recursive_alternative(self):
         X = Forward("X")
         X = X.define(
@@ -1865,6 +1979,7 @@ class TypesSerializationTest(unittest.TestCase):
             sc.deserialize(sc.serialize(X)).B(x=2).x == 2
         )
 
+    @pytest.mark.group_one
     def test_serialize_module_level_class(self):
         assert ModuleLevelClass.__module__ == 'typed_python.types_serialization_test'
 
@@ -1877,6 +1992,7 @@ class TypesSerializationTest(unittest.TestCase):
             sc.serialize(ModuleLevelClass),
         )
 
+    @pytest.mark.group_one
     def test_serialize_unnamed_subclass_of_named_tuple(self):
         class SomeNamedTuple(NamedTuple(x=int)):
             def f(self):
@@ -1894,6 +2010,7 @@ class TypesSerializationTest(unittest.TestCase):
             10
         )
 
+    @pytest.mark.group_one
     def test_serialize_named_subclass_of_named_tuple(self):
         sc = SerializationContext()
 
@@ -1927,6 +2044,7 @@ class TypesSerializationTest(unittest.TestCase):
             10
         )
 
+    @pytest.mark.group_one
     def test_serialize_builtin_tp_functions(self):
         sc = SerializationContext()
 
@@ -1941,6 +2059,7 @@ class TypesSerializationTest(unittest.TestCase):
                 sc.deserialize(sc.serialize(thing)), thing
             )
 
+    @pytest.mark.group_one
     def test_serialize_methods_on_named_classes(self):
         sc = SerializationContext()
 
@@ -1953,11 +2072,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertIs(m1, m2)
 
+    @pytest.mark.group_one
     def test_serialize_frozenset(self):
         sc = SerializationContext()
 
         assert sc.nameForObject(frozenset) is not None
 
+    @pytest.mark.group_one
     def test_serialize_entrypointed_modulelevel_functions(self):
         sc = SerializationContext()
 
@@ -1971,6 +2092,7 @@ class TypesSerializationTest(unittest.TestCase):
             type(sc.deserialize(sc.serialize(moduleLevelEntrypointedFunction)))
         )
 
+    @pytest.mark.group_one
     def test_serialize_entrypointed_modulelevel_class_functions(self):
         sc = SerializationContext()
 
@@ -1984,6 +2106,7 @@ class TypesSerializationTest(unittest.TestCase):
             type(sc.deserialize(sc.serialize(ModuleLevelClass.f)))
         )
 
+    @pytest.mark.group_one
     def test_serialize_type_function(self):
         sc = SerializationContext()
 
@@ -1992,6 +2115,7 @@ class TypesSerializationTest(unittest.TestCase):
             sc.deserialize(sc.serialize(FancyClass(int)))
         )
 
+    @pytest.mark.group_one
     def test_serialize_module_level_recursive_forward(self):
         sc = SerializationContext()
 
@@ -2000,6 +2124,7 @@ class TypesSerializationTest(unittest.TestCase):
             sc.deserialize(sc.serialize(ModuleLevelRecursiveForward))
         )
 
+    @pytest.mark.group_one
     def test_serialize_reference_to_module_level_constant(self):
         sc = SerializationContext()
 
@@ -2007,6 +2132,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert getter()[0] is moduleLevelDict
 
+    @pytest.mark.group_one
     def test_serialize_type_with_reference_to_self_through_closure(self):
         @Entrypoint
         def f(x):
@@ -2022,6 +2148,7 @@ class TypesSerializationTest(unittest.TestCase):
         # C and 'f' are mutually recursive
         sc.deserialize(sc.serialize(C))
 
+    @pytest.mark.group_one
     def test_serialize_cell_type(self):
         sc = SerializationContext()
 
@@ -2033,6 +2160,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(getCellType, ()) is getCellType()
 
+    @pytest.mark.group_one
     def test_self_visible_base_class_forward_resolved(self):
         Base = Forward("Base")
 
@@ -2043,6 +2171,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert 'Forward' not in recursiveTypeGroupRepr(Base)
 
+    @pytest.mark.group_one
     def test_serialize_classes_with_visible_base_class(self):
         def getOptimizer():
             Base = Forward("Base")
@@ -2065,6 +2194,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert isinstance(Base() + Base() + Base(), Base)
         assert isinstance(Base() + Base() + Base(), Child)
 
+    @pytest.mark.group_one
     def test_serialize_self_referencing_class_basic(self):
         def g(x):
             return 10
@@ -2087,6 +2217,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert c.g() == 10
         assert c.s() is type(c)
 
+    @pytest.mark.group_one
     def test_serialize_self_referencing_class_through_tuple(self):
         def g(x):
             return 10
@@ -2110,6 +2241,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert c.g() == 10
         assert c.s() is type(c)
 
+    @pytest.mark.group_one
     def test_names_of_builtin_alternatives(self):
         sc = SerializationContext().withoutCompression()
 
@@ -2129,11 +2261,13 @@ class TypesSerializationTest(unittest.TestCase):
         assert len(sc.serialize(native_ast.Type)) < 100
         assert len(sc.serialize(TupleOf(native_ast.Type))) < 100
 
+    @pytest.mark.group_one
     def test_badly_named_module_works(self):
         sc = SerializationContext()
 
         assert sc.objectFromName(".modules.NOT.A.REAL.MODULE") is None
 
+    @pytest.mark.group_one
     def test_can_serialize_nullptrs(self):
         x = PointerTo(int)()
 
@@ -2142,6 +2276,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert sc.deserialize(sc.serialize(type(x))) == type(x)
         assert sc.deserialize(sc.serialize(x)) == x
 
+    @pytest.mark.group_one
     def test_can_serialize_subclassOf(self):
         class C(Class):
             pass
@@ -2157,6 +2292,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert sc.deserialize(sc.serialize(T)) is T
         assert sc.deserialize(sc.serialize(lst)) == lst
 
+    @pytest.mark.group_one
     def test_can_serialize_nested_function_references(self):
         def lenProxy(x):
             return len(x)
@@ -2180,6 +2316,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert lenProxyDeserialized("asdf") == 4
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_set_closure_doesnt_leak(self):
         def makeFunWithClosure(x):
             def f():
@@ -2194,6 +2331,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert currentMemUsageMb() < mem + 1
 
+    @pytest.mark.group_one
     def test_serialize_without_line_info_doesnt_have_path(self):
         def aFun():
             return 10
@@ -2203,6 +2341,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert b'types_serialization_test' not in sc.serialize(aFun.__code__)
         assert b'types_serialization_test' not in sc.serialize(aFun.__code__)
 
+    @pytest.mark.group_one
     def test_serialize_builtin_type_objects(self):
         s = SerializationContext()
 
@@ -2213,6 +2352,7 @@ class TypesSerializationTest(unittest.TestCase):
         check(types.FunctionType)
         check(types.ModuleType)
 
+    @pytest.mark.group_one
     def test_serialize_self_referential_class(self):
         def makeSeesItself():
             class SeesItself:
@@ -2229,6 +2369,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert SeesItself.seeItself(1, 2, 3, 4, 5) is SeesItself
 
+    @pytest.mark.group_one
     def test_serialize_anonymous_module(self):
         with tempfile.TemporaryDirectory() as tf:
             c = SerializationContext().withFunctionGlobalsAsIs()
@@ -2255,6 +2396,7 @@ class TypesSerializationTest(unittest.TestCase):
             aModule2.y = 30
             assert aModule2.f(10) == 40
 
+    @pytest.mark.group_one
     def test_serialize_locks(self):
         l = threading.Lock()
         x = (l, l)
@@ -2265,11 +2407,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert x2[0] is x2[1] and isinstance(x2[0], type(x[0]))
 
+    @pytest.mark.group_one
     def test_serialize_methods(self):
         sc = SerializationContext()
 
         assert sc.deserialize(sc.serialize(ModuleLevelClass().f))() == "HI!"
 
+    @pytest.mark.group_one
     def test_can_deserialize_anonymous_class_methods(self):
         class Cls:
             def f(self):
@@ -2277,6 +2421,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(Cls().f, ()) is Cls
 
+    @pytest.mark.group_one
     def test_serialization_preserves_forward_structure_in_classes(self):
         def getCls():
             Cls = Forward("Cls")
@@ -2295,6 +2440,7 @@ class TypesSerializationTest(unittest.TestCase):
         Cls2 = getCls()
         assert Cls2.f.__annotations__['return'].__typed_python_category__ == 'Forward'
 
+    @pytest.mark.group_one
     def test_can_deserialize_untyped_forward_class_methods_1(self):
         Cls = Forward("Cls")
 
@@ -2306,6 +2452,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
 
+    @pytest.mark.group_one
     def test_can_deserialize_untyped_forward_class_methods_2(self):
         def getCls():
             Cls = Forward("Cls")
@@ -2320,6 +2467,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         callFunctionInFreshProcess(getCls, ())
 
+    @pytest.mark.group_one
     def test_can_deserialize_forward_class_methods_tp_class(self):
         Cls = Forward("Cls")
 
@@ -2332,6 +2480,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(Cls, ()).f().m == "HI"
 
+    @pytest.mark.group_one
     def test_can_deserialize_forward_class_methods_tp_class_no_self_reference(self):
         Cls = Forward("Cls")
 
@@ -2344,6 +2493,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(Cls, ()).f() == "HI"
 
+    @pytest.mark.group_one
     def test_deserialize_regular_class_retains_identity(self):
         class Cls:
             # recall that regular classes ignore their annotations
@@ -2359,6 +2509,7 @@ class TypesSerializationTest(unittest.TestCase):
         "sys.version_info.minor >= 8",
         reason="serialization differences on 3.8 we need to investigate"
     )
+    @pytest.mark.group_one
     def test_identity_of_function_with_annotation_stable(self):
         def makeFunction():
             @Entrypoint
@@ -2375,6 +2526,7 @@ class TypesSerializationTest(unittest.TestCase):
         "sys.version_info.minor >= 8",
         reason="serialization differences on 3.8 we need to investigate"
     )
+    @pytest.mark.group_one
     def test_identity_of_function_with_default_value_stable(self):
         def makeFunction():
             @Entrypoint
@@ -2388,6 +2540,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert identityHash(f) == identityHashOfF
 
     @pytest.mark.skip(reason='broken')
+    @pytest.mark.group_one
     def test_deserialize_untyped_class_in_forward_retains_identity(self):
         # this still breaks because we have some inconsistency between how
         # the MRTG gets created after deserialization when we have a regular
@@ -2420,6 +2573,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert identityHash(Cls) == identityHash(Cls2)
 
+    @pytest.mark.group_one
     def test_deserialize_tp_class_retains_identity(self):
         Cls = Forward("Cls")
 
@@ -2433,6 +2587,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert identityHash(Cls) == identityHash(Cls2)
 
+    @pytest.mark.group_one
     def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion_defined_in_host(self):
         Base = Forward("Base")
 
@@ -2470,6 +2625,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callFunctionInFreshProcess(deserializeAndCall, (aChildBytes,)) == "OK"
 
+    @pytest.mark.group_one
     def test_call_method_dispatch_on_two_versions_of_self_referential_class_produced_differently(self):
         def deserializeAndCall():
             Base = Forward("Base")
@@ -2502,6 +2658,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callF1(child1) == callF2(child2)
 
+    @pytest.mark.group_one
     def test_deserialize_anonymous_recursive_base_and_subclass(self):
         def deserializeAndCall():
             Base = Forward("Base")
@@ -2539,6 +2696,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert callF1(child1) == callF2(child2)
 
+    @pytest.mark.group_one
     def test_identity_hash_of_lambda_doesnt_change_serialization(self):
         s = SerializationContext()
 
@@ -2552,6 +2710,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert ser1 == ser2
 
+    @pytest.mark.group_one
     def test_call_method_dispatch_on_two_versions_of_same_class_with_recursion(self):
         Base = Forward("Base")
 
@@ -2596,6 +2755,7 @@ class TypesSerializationTest(unittest.TestCase):
     @pytest.mark.skip(
         reason="serialization differences on 3.8 we need to investigate"
     )
+    @pytest.mark.group_one
     def test_serialization_of_entrypointed_function_stable(self):
         def returnSerializedForm():
             s = SerializationContext().withoutCompression()
@@ -2643,6 +2803,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert childBytes == childBytes2
 
+    @pytest.mark.group_one
     def test_serialize_abc_subclass(self):
         # ensure we can serialize and hash anonymous classes descended from ABC
         def makeClasses():
@@ -2682,6 +2843,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert AnotherChildClass().f() == "concrete2"
 
+    @pytest.mark.group_one
     def test_serialize_mutually_recursive_untyped_classes(self):
         # ensure we can serialize and hash anonymous classes descended from ABC
         def makeClasses():
@@ -2699,6 +2861,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert type(BaseClass.getChild()) is ChildClass
 
+    @pytest.mark.group_one
     def test_serialize_recursive_function(self):
         # ensure we can serialize and hash anonymous classes descended from ABC
         def makeF():
@@ -2718,6 +2881,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert f(10) == 10
 
+    @pytest.mark.group_one
     def test_can_serialize_classes_with_methods_and_custom_globals(self):
         def serializeIt():
             def f(self):
@@ -2742,6 +2906,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert Child2().func() == 10
 
+    @pytest.mark.group_one
     def test_can_reserialize_deserialized_function_with_no_backing_file(self):
         # when we serialize an anonymous function on one machine, where we have
         # a definition for that code, we need to ensure that on another machine,
@@ -2786,6 +2951,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert f(10) == f2(10)
 
+    @pytest.mark.group_one
     def test_globals_of_entrypointed_functions_serialized_externally(self):
         def makeC():
             with tempfile.TemporaryDirectory() as tempdir:
@@ -2820,6 +2986,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert C.anF() is C
         assert C.anF.overloads[0].methodOf.Class is C
 
+    @pytest.mark.group_one
     def test_held_class_serialized_externally(self):
         def makeC():
             with tempfile.TemporaryDirectory() as tempdir:
@@ -2853,6 +3020,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert type(C.make()) is C
 
+    @pytest.mark.group_one
     def test_serialization_independent_of_whether_function_is_hashed(self):
         s = SerializationContext().withoutLineInfoEncoded().withoutCompression()
 
@@ -2864,6 +3032,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert s1 == s2
 
+    @pytest.mark.group_one
     def test_serialization_has_no_filename_reference(self):
         def makeF(modulename):
             with tempfile.TemporaryDirectory() as tempdir:
@@ -2919,6 +3088,7 @@ class TypesSerializationTest(unittest.TestCase):
         checkSame(Entrypoint(f1), Entrypoint(f2))
         checkSame(NotCompiled(f1), NotCompiled(f2))
 
+    @pytest.mark.group_one
     def test_serialize_anonymous_class_with_defaults_and_nonempty(self):
         class C1(Class):
             x1 = Member(int, default_value=10, nonempty=True)
@@ -2945,6 +3115,7 @@ class TypesSerializationTest(unittest.TestCase):
         assert C2.ClassMembers['x3'].defaultValue == 2.5
         assert C2.ClassMembers['x4'].defaultValue is None
 
+    @pytest.mark.group_one
     def test_serialize_unresolved_forward(self):
         F = Forward("Hi")
         T = NamedTuple(x=F)
@@ -2955,6 +3126,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         assert T2.ElementTypes[0].__typed_python_category__ == "Forward"
 
+    @pytest.mark.group_one
     def test_serialization_doesnt_starve_gil(self):
         checkCount = [0]
         serializeCount = [0]
@@ -3001,11 +3173,13 @@ class TypesSerializationTest(unittest.TestCase):
         assert .05 <= avgTimeHeld[0] <= .95
         assert .05 <= avgTimeHeld[1] <= .95
 
+    @pytest.mark.group_one
     def test_serialization_context_names_for_pmap_functions(self):
         from typed_python.lib.pmap import ensureThreads
         sc = SerializationContext()
         assert sc.nameForObject(type(ensureThreads)) is not None
 
+    @pytest.mark.group_one
     def test_pmap_of_notcompiled_serialized_externally(self):
         def makeC():
             with tempfile.TemporaryDirectory() as tempdir:
@@ -3046,6 +3220,7 @@ class TypesSerializationTest(unittest.TestCase):
             print("DO!")
             pmap(args, f, str, minGranularity=10000)
 
+    @pytest.mark.group_one
     def test_serialize_pyobj_in_MRTG(self):
         def getX():
             class C:

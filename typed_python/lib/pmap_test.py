@@ -40,6 +40,7 @@ def isPrimeLC(x):
     return res
 
 
+@pytest.mark.group_one
 def test_pmap_correct():
     def addOne(x):
         return x + 1
@@ -48,6 +49,7 @@ def test_pmap_correct():
 
 
 @flaky(max_runs=3, min_passes=1)
+@pytest.mark.group_one
 def test_pmap_perf():
     # disable this test on travis, as extra cores aren't guaranteed.
     if os.environ.get('TRAVIS_CI', None) is not None:
@@ -78,6 +80,7 @@ def test_pmap_perf():
     assert speedup > 1.5
 
 
+@pytest.mark.group_one
 def test_pmap_with_exceptions():
     def sometimesThrows(x):
         if x % 100 == 93:
@@ -99,6 +102,7 @@ def test_pmap_with_exceptions():
     assert 'sometimesThrows' in stringTb
 
 
+@pytest.mark.group_one
 def test_pmap_returning_wrong_type():
     def makesFloat(x):
         return float(x)
@@ -109,6 +113,7 @@ def test_pmap_returning_wrong_type():
     )
 
 
+@pytest.mark.group_one
 def test_pmap_with_uninitializable():
     class C(Class, Final):
         x = Member(int)
@@ -129,6 +134,7 @@ def test_pmap_with_uninitializable():
         tryResize(someCs, 101)
 
 
+@pytest.mark.group_one
 def test_pmap_with_lots_of_work():
     def makesOne(x):
         return 1
@@ -139,6 +145,7 @@ def test_pmap_with_lots_of_work():
         assert r == 1
 
 
+@pytest.mark.group_one
 def test_pmap_with_no_output():
     aList = ListOf(int)()
     aList.resize(100)
@@ -152,6 +159,7 @@ def test_pmap_with_no_output():
         assert aList[i] == i
 
 
+@pytest.mark.group_one
 def test_recursive_pmap():
     tq = TypedQueue(Tuple(int, int))()
 
@@ -173,6 +181,7 @@ def test_recursive_pmap():
     assert len(tq) == 1111
 
 
+@pytest.mark.group_one
 def test_pmap_arg_refcounts():
     def f(x) -> int:
         return 0
@@ -187,6 +196,7 @@ def test_pmap_arg_refcounts():
     assert refcount(lst) == 1
 
 
+@pytest.mark.group_one
 def test_pmap_value_refcounts():
     def f(x) -> ListOf(int):
         return ListOf(int)()
@@ -200,6 +210,7 @@ def test_pmap_value_refcounts():
     assert refcount(lst) == 1
 
 
+@pytest.mark.group_one
 def test_pmap_func_refcounts():
     x = ListOf(int)()
 

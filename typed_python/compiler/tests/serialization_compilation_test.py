@@ -27,6 +27,7 @@ import threading
 import time
 
 
+@pytest.mark.group_one
 def test_can_serialize_under_entrypoint():
     s = SerializationContext().withoutCompression()
 
@@ -44,6 +45,7 @@ def test_can_serialize_under_entrypoint():
     check(ListOf(str)(['hi']), ListOf(str))
 
 
+@pytest.mark.group_one
 def test_can_deserialize_under_entrypoint():
     s = SerializationContext().withoutCompression()
 
@@ -68,6 +70,7 @@ def test_can_deserialize_under_entrypoint():
     check(ListOf(str)(['hi']), ListOf(str))
 
 
+@pytest.mark.group_one
 def test_can_serialize_object_under_entrypoint():
     s = SerializationContext()
 
@@ -97,6 +100,7 @@ def timeInNThreads(f, args, threadCount):
 
 
 @pytest.mark.skipif('sys.platform=="darwin"')
+@pytest.mark.group_one
 def test_serialization_perf():
     s = SerializationContext().withoutCompression()
 
@@ -142,6 +146,7 @@ def test_serialization_perf():
     assert compiledThreadScaling < 1.5
 
 
+@pytest.mark.group_one
 def test_can_serialize_with_or_without_out_context():
     @Entrypoint
     def roundtripCompiled(T, x, sc):

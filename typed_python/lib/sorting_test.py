@@ -23,6 +23,7 @@ from typed_python import ListOf, Tuple
 
 class TestSorting(unittest.TestCase):
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_perf_not_quadratic(self):
         length = 100000
 
@@ -58,22 +59,26 @@ class TestSorting(unittest.TestCase):
         self.assertLess(inReverseOrder, inRandomOrder * 10)
         self.assertLess(allEqualTiming, inRandomOrder * 10)
 
+    @pytest.mark.group_one
     def test_quicksort_float_correct(self):
         x = ListOf(float)(numpy.random.uniform(size=1000))
 
         self.assertEqual(ListOf(float)(sorted(x)), sorting.sorted(x))
 
+    @pytest.mark.group_one
     def test_quicksort_int_correct(self):
         x = ListOf(int)(numpy.random.choice(1000, 1000, replace=False))
 
         self.assertEqual(ListOf(int)(sorted(x)), sorting.sorted(x))
 
+    @pytest.mark.group_one
     def test_quicksort_int_correct_with_repeated_values(self):
         x = ListOf(int)(numpy.random.choice(100, size=1000, replace=True))
 
         self.assertEqual(ListOf(int)(sorted(x)), sorting.sorted(x))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_sort_perf_simple(self):
         x = ListOf(float)(numpy.random.uniform(size=1000000))
 
@@ -91,6 +96,7 @@ class TestSorting(unittest.TestCase):
         self.assertGreater(speedup, 1.5)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_sort_perf_tuples(self):
         x = ListOf(Tuple(float, float))()
 
@@ -110,6 +116,7 @@ class TestSorting(unittest.TestCase):
         # I get about 9
         self.assertGreater(speedup, 2)
 
+    @pytest.mark.group_one
     def test_sort_with_key(self):
         x = ListOf(int)(range(100))
 

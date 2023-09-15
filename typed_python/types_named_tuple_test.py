@@ -17,6 +17,7 @@ from typed_python import NamedTuple, ListOf, _types, OneOf, TupleOf
 
 
 class NamedTupleTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_named_tuple(self):
         t = NamedTuple(a=int, b=int)
 
@@ -33,6 +34,7 @@ class NamedTupleTests(unittest.TestCase):
         self.assertEqual(t(a=1, b=2).a, 1)
         self.assertEqual(t(a=1, b=2).b, 2)
 
+    @pytest.mark.group_one
     def test_error_message_when_assigning_bad_attributes(self):
         T = NamedTuple(a=int)
 
@@ -54,6 +56,7 @@ class NamedTupleTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "Cannot set attributes on instance of type 'A' because it is immutable"):
             A().a = 20
 
+    @pytest.mark.group_one
     def test_named_tuple_construction(self):
         t = NamedTuple(a=int, b=int)
 
@@ -72,6 +75,7 @@ class NamedTupleTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             t(c=10)
 
+    @pytest.mark.group_one
     def test_named_tuple_construction_bad_args(self):
         T = NamedTuple(a=int, b=str)
 
@@ -81,6 +85,7 @@ class NamedTupleTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "member 'a'"):
             T(a="hi")
 
+    @pytest.mark.group_one
     def test_named_tuple_str(self):
         t = NamedTuple(a=str, b=str)
 
@@ -92,6 +97,7 @@ class NamedTupleTests(unittest.TestCase):
         self.assertEqual(t().a, '')
         self.assertEqual(t().b, '')
 
+    @pytest.mark.group_one
     def test_named_tuple_subclass(self):
         class X(NamedTuple(x=int)):
             pass
@@ -101,6 +107,7 @@ class NamedTupleTests(unittest.TestCase):
             str(NamedTuple(x=int)(x=10))
         )
 
+    @pytest.mark.group_one
     def test_named_tuple_subclass_magic_methods(self):
         hashCalled = []
         hashWantsException = False
@@ -148,6 +155,7 @@ class NamedTupleTests(unittest.TestCase):
         hashWantsException = False
         hash(B())
 
+    @pytest.mark.group_one
     def test_named_tuple_from_dict(self):
         N = NamedTuple(x=int, y=str, z=OneOf(None, "hihi"))
         self.assertEqual(N().x, 0)
@@ -168,6 +176,7 @@ class NamedTupleTests(unittest.TestCase):
             N({'y': 'hi', 'z': "not hihi"})
             N({'a': 0, 'b': 0, 'c': 0, 'd': 0})
 
+    @pytest.mark.group_one
     def test_named_tuple_comparison(self):
         N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
 
@@ -182,6 +191,7 @@ class NamedTupleTests(unittest.TestCase):
         self.assertNotEqual(S(x=1, y=2), S(x=1, y=3))
         self.assertFalse(S(x=1, y=2) == S(x=1, y=3))
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_argument_errors(self):
         N = NamedTuple(a=int, b=str)
         n = N(a=10, b='20')
@@ -201,6 +211,7 @@ class NamedTupleTests(unittest.TestCase):
 
         self.assertTrue("Argument 'c' is not in the tuple definition." in str(context.exception), str(context.exception))
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_function(self):
         N = NamedTuple(a=int, b=str)
 
@@ -236,6 +247,7 @@ class NamedTupleTests(unittest.TestCase):
         self.assertEqual(n3.a, 3)
         self.assertEqual(n3.b, 'yy')
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_refcount(self):
         N = NamedTuple(x=ListOf(int))
         aList = ListOf(int)([1, 2, 3])
@@ -247,6 +259,7 @@ class NamedTupleTests(unittest.TestCase):
         nt = None
         self.assertEqual(_types.refcount(aList), 1)
 
+    @pytest.mark.group_one
     def test_named_tuple_replacing_subclass(self):
         class NTSubclass(NamedTuple(x=int, y=str)):
             def f(self, y):
@@ -258,11 +271,13 @@ class NamedTupleTests(unittest.TestCase):
         self.assertIsInstance(nt2.f("a string"), NTSubclass)
         self.assertEqual(nt2.f("a string").y, "a string")
 
+    @pytest.mark.group_one
     def test_construct_named_tuple_from_tuple(self):
         NT = NamedTuple(x=int, y=str)
 
         self.assertEqual(NT((1, "2")), NT(x=1, y="2"))
 
+    @pytest.mark.group_one
     def test_repr_of_string_in_named_tuple(self):
         NT = NamedTuple(x=str)
 
@@ -271,6 +286,7 @@ class NamedTupleTests(unittest.TestCase):
         self.assertEqual(repr(NT(x="asdf\tbsdf")), '(x="asdf\\tbsdf",)')
         self.assertEqual(repr(NT(x="asdf\x12bsdf")), '(x="asdf\\x12bsdf",)')
 
+    @pytest.mark.group_one
     def test_subclassing(self):
         BaseTuple = NamedTuple(x=int, y=float)
 

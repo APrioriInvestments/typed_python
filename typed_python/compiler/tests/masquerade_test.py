@@ -33,6 +33,7 @@ class TestMasqueradeTypes(unittest.TestCase):
     not directly modifying the kwargs you're passed in compiled code, and we don't
     allow list and dict masquerades to escape a given statement.
     """
+    @pytest.mark.group_one
     def test_compile_star_arg_of_masquerade(self):
         @Entrypoint
         def f(**x):
@@ -44,6 +45,7 @@ class TestMasqueradeTypes(unittest.TestCase):
 
         assert g(3) == (3, 3)
 
+    @pytest.mark.group_one
     def test_star_args_of_masquerade(self):
         def f(*args):
             return args[1]
@@ -54,6 +56,7 @@ class TestMasqueradeTypes(unittest.TestCase):
 
         self.assertEqual(callF.resultTypeFor().interpreterTypeRepresentation, list)
 
+    @pytest.mark.group_one
     def test_iterate_kwargs(self):
         def f(**kwargs):
             res = 0
@@ -69,6 +72,7 @@ class TestMasqueradeTypes(unittest.TestCase):
 
         assert sumSomeThings() == 6
 
+    @pytest.mark.group_one
     def test_promote_masquerade_tuple_to_typed_tuple(self):
         @Entrypoint
         def f(x: TupleOf(int)):
@@ -80,6 +84,7 @@ class TestMasqueradeTypes(unittest.TestCase):
 
         assert callF() == 3
 
+    @pytest.mark.group_one
     def test_promote_masquerade_list_to_typed_list(self):
         @Entrypoint
         def f(x: ListOf(int)):

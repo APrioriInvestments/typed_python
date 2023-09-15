@@ -89,11 +89,13 @@ class ClassWithComplexDispatch(Class):
 
 
 class NativeClassTypesTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_class_name(self):
         assert ClassWithInit.__name__ == 'ClassWithInit'
         assert ClassWithInit.__module__ == 'typed_python.class_types_test'
         assert ClassWithInit.__qualname__ == 'ClassWithInit'
 
+    @pytest.mark.group_one
     def test_member_default_value(self):
         c = DefaultVal()
 
@@ -112,6 +114,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.s0, "")
         self.assertEqual(c.s1, "abc")
 
+    @pytest.mark.group_one
     def test_class_dispatch_by_name(self):
         c = ClassWithComplexDispatch(x=200)
 
@@ -119,6 +122,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(x=10), 'x')
         self.assertEqual(c.f(y=10), 'y')
 
+    @pytest.mark.group_one
     def test_class_with_uninitializable(self):
         c = ClassWithInit()
 
@@ -132,6 +136,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(c.cwi.x, 10)
 
+    @pytest.mark.group_one
     def test_implied_init_fun(self):
         self.assertEqual(Interior().x, 0)
         self.assertEqual(Interior().y, 0)
@@ -156,6 +161,7 @@ class NativeClassTypesTests(unittest.TestCase):
         gc.collect()
         self.assertLess(currentMemUsageMb() - memUsage, 1.0)
 
+    @pytest.mark.group_one
     def test_typed_function_call_doesnt_leak(self):
         @Function
         def f(x, y):
@@ -163,6 +169,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.executeInLoop(lambda: f(1, 2))
 
+    @pytest.mark.group_one
     def test_typed_function_call_with_star_args_doesnt_leak(self):
         @Function
         def f(*args):
@@ -170,13 +177,16 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.executeInLoop(lambda: f(1, 2))
 
+    @pytest.mark.group_one
     def test_class_create_doesnt_leak(self):
         self.executeInLoop(lambda: ClassWithInit(cwi=ClassWithInit()))
 
+    @pytest.mark.group_one
     def test_class_member_access_doesnt_leak(self):
         x = ClassWithInit(cwi=ClassWithInit())
         self.executeInLoop(lambda: x.cwi.z)
 
+    @pytest.mark.group_one
     def test_class(self):
         with self.assertRaises(TypeError):
             class A0(Class):
@@ -204,6 +214,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(a.x, 10)
 
+    @pytest.mark.group_one
     def test_class_holding_class(self):
         e = Exterior()
 
@@ -216,10 +227,12 @@ class NativeClassTypesTests(unittest.TestCase):
         anI2.x = 10
         self.assertEqual(e.iTup.x.x, 10)
 
+    @pytest.mark.group_one
     def test_class_stringification(self):
         self.assertEqual(Interior.__qualname__, "Interior")
         self.assertEqual(str(Interior()), "Interior(x=0, y=0)")
 
+    @pytest.mark.group_one
     def test_class_functions_work(self):
         class C(Class, Final):
             x = Member(int)
@@ -233,6 +246,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(c.x, 20)
 
+    @pytest.mark.group_one
     def test_class_functions_return_types(self):
         class C(Class, Final):
             def returnsInt(self, x) -> int:
@@ -252,6 +266,7 @@ class NativeClassTypesTests(unittest.TestCase):
         # this should throw because we are happy to convert int to float
         c.returnsFloat(1)
 
+    @pytest.mark.group_one
     def test_class_function_dispatch_on_arity(self):
         class C(Class, Final):
             def f(self):
@@ -276,6 +291,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(1, 2), 2)
         self.assertEqual(c.f(1, 2, 3), 3)
 
+    @pytest.mark.group_one
     def test_class_function_exceptions(self):
         class C(Class, Final):
             def g(self, a, b):
@@ -289,6 +305,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             c.g(1, 2)
 
+    @pytest.mark.group_one
     def test_class_function_sends_args_to_right_place(self):
         def g(a, b, c=10, d=20, *args, **kwargs):
             return (a, b, d, args, kwargs)
@@ -315,6 +332,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6))
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, q=20))
 
+    @pytest.mark.group_one
     def test_class_function_type_dispatch(self):
         class C(Class, Final):
             def f(self, a: float):
@@ -341,6 +359,7 @@ class NativeClassTypesTests(unittest.TestCase):
             C().f(1, "hi")
         self.assertEqual(C().f(x=(1, 2)), "named tuple of ints")
 
+    @pytest.mark.group_one
     def test_class_members_accessible(self):
         class C(Class, Final):
             x = 10
@@ -360,6 +379,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(C.x, 10)
         self.assertEqual(C.y, Member(int))
 
+    @pytest.mark.group_one
     def test_static_methods(self):
         class C(Class, Final):
             @staticmethod
@@ -391,6 +411,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 thing.f(1, "hi")
             self.assertEqual(thing.f(x=(1, 2)), "named tuple of ints")
 
+    @pytest.mark.group_one
     def test_python_objects_in_classes(self):
         class NormalPyClass:
             pass
@@ -462,6 +483,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(x.f(NormalPyClass()), "NormalPyClass")
         self.assertEqual(x.f(10), "object")
 
+    @pytest.mark.group_one
     def test_class_with_getitem(self):
         class WithGetitem(Class, Final):
             def __getitem__(self, x: int):
@@ -476,6 +498,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             WithGetitem()[None]
 
+    @pytest.mark.group_one
     def test_class_with_len(self):
         class WithLen(Class, Final):
             x = Member(int)
@@ -495,6 +518,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             len(WithLen(-2))
 
+    @pytest.mark.group_one
     def test_class_unary_operators(self):
         class WithLotsOfOperators(Class, Final):
             def __neg__(self):
@@ -528,6 +552,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(float(c), 123.5)
         self.assertEqual([1, 2, 3][c], 3)
 
+    @pytest.mark.group_one
     def test_class_binary_operators(self):
         class WithLotsOfOperators(Class, Final):
             def __add__(self, other):
@@ -581,6 +606,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c^0, (c, "xor", 0))
         self.assertEqual(c@0, (c, "matmul", 0))
 
+    @pytest.mark.group_one
     def test_class_binary_operators_reverse(self):
         class WithLotsOfOperators(Class, Final):
             def __radd__(self, other):
@@ -634,6 +660,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(0^c, (c, "xor", 0))
         self.assertEqual(0@c, (c, "matmul", 0))
 
+    @pytest.mark.group_one
     def test_class_binary_inplace_operators(self):
         class WithLotsOfOperators(Class, Final):
             def __iadd__(self, other):
@@ -687,6 +714,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(operator.ixor(c, 0), (c, "ixor", 0))
         self.assertEqual(operator.imatmul(c, 0), (c, "imatmul", 0))
 
+    @pytest.mark.group_one
     def test_class_dispatch_on_tuple_vs_list(self):
         class WithTwoFunctions(Class, Final):
             def f(self, x: TupleOf(int)):
@@ -699,6 +727,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(TupleOf(int)((1, 2, 3))), "Tuple")
         self.assertEqual(c.f(ListOf(int)((1, 2, 3))), "List")
 
+    @pytest.mark.group_one
     def test_class_comparison_operators(self):
         class ClassWithComparisons(Class, Final):
             x = Member(int)
@@ -751,6 +780,7 @@ class NativeClassTypesTests(unittest.TestCase):
                     i != j
                 )
 
+    @pytest.mark.group_one
     def test_class_comparison_subclassing(self):
         class ClassWithComparisons(Class):
             x = Member(int)
@@ -771,6 +801,7 @@ class NativeClassTypesTests(unittest.TestCase):
             SubclassWithComparisons(x=10)
         )
 
+    @pytest.mark.group_one
     def test_class_repr_and_str_and_hash(self):
         class ClassWithReprAndStr(Class, Final):
             def __repr__(self):
@@ -786,6 +817,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(repr(ClassWithReprAndStr()), "repr")
         self.assertEqual(str(ClassWithReprAndStr()), "str")
 
+    @pytest.mark.group_one
     def test_class_missing_inplace_operators_fallback(self):
 
         class ClassWithoutInplaceOp(Class, Final):
@@ -868,6 +900,7 @@ class NativeClassTypesTests(unittest.TestCase):
         c ^= 10
         self.assertEqual(c, "worked")
 
+    @pytest.mark.group_one
     def test_class_with_property(self):
         class ClassWithProperty(Class, Final):
             _x = Member(int)
@@ -881,6 +914,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(ClassWithProperty(10).x, 11)
 
+    @pytest.mark.group_one
     def test_class_with_bound_methods(self):
         class SomeClass:
             pass
@@ -907,6 +941,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(c.x.x, 2000000)
 
+    @pytest.mark.group_one
     def test_class_inheritance_basic(self):
         class BaseClass(Class):
             x = Member(int)
@@ -930,6 +965,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.y, 20)
         self.assertEqual(c.f(100), 130)
 
+    @pytest.mark.group_one
     def test_class_inheritance_and_containers(self):
         class BaseClass(Class):
             pass
@@ -948,6 +984,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertIsInstance(clsList[0], Child1)
         self.assertIsInstance(clsList[1], Child2)
 
+    @pytest.mark.group_one
     def test_class_multiple_inheritence(self):
         class BaseA(Class):
             def f(self, x: int) -> str:
@@ -975,6 +1012,7 @@ class NativeClassTypesTests(unittest.TestCase):
         # get "BaseA" first.
         self.assertEqual(x.g(), "BaseA")
 
+    @pytest.mark.group_one
     def test_multiple_inheritance_with_members_in_both_children_fails(self):
         class BaseA(Class):
             x = Member(int)
@@ -1001,6 +1039,7 @@ class NativeClassTypesTests(unittest.TestCase):
             class BaseBoth(BaseA, BaseB):
                 pass
 
+    @pytest.mark.group_one
     def test_member_order(self):
         class BaseClass(Class):
             x = Member(int)
@@ -1011,6 +1050,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(ChildClass.MemberNames, ('x', 'y', 'z'))
 
+    @pytest.mark.group_one
     def test_final_classes(self):
         class BaseClass(Class):
             pass
@@ -1025,6 +1065,7 @@ class NativeClassTypesTests(unittest.TestCase):
             class BadClass(ChildClass):
                 pass
 
+    @pytest.mark.group_one
     def test_callable_class(self):
         class CallableClass(Class, Final):
             x = Member(int)
@@ -1055,6 +1096,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             obj()
 
+    @pytest.mark.group_one
     def test_recursive_classes_repr(self):
         A0 = Forward("A0")
 
@@ -1071,6 +1113,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         print(repr(a))
 
+    @pytest.mark.group_one
     def test_dispatch_tries_without_conversion_first(self):
         class ClassWithForcedConversion(Class, Final):
             def f(self, x: float):
@@ -1109,6 +1152,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(ClassWithBoth2().f(10.5), "float")
         self.assertEqual(ClassWithBoth2().f(True), "bool")
 
+    @pytest.mark.group_one
     def test_class_magic_methods(self):
 
         class AClass(Class, Final):
@@ -1205,6 +1249,7 @@ class NativeClassTypesTests(unittest.TestCase):
         d = dir(AClass())
         self.assertGreater(len(d), 50)
 
+    @pytest.mark.group_one
     def test_class_magic_methods_attr(self):
 
         A_attrs = {"q": "value-q", "z": "value-z"}
@@ -1258,6 +1303,7 @@ class NativeClassTypesTests(unittest.TestCase):
         AClass2()[123] = 7
         self.assertEqual(AClass2()[123], 7)
 
+    @pytest.mark.group_one
     def test_class_magic_methods_iter(self):
 
         class A_iter():
@@ -1293,6 +1339,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual([x for x in AClass()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in reversed(AClass())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
 
+    @pytest.mark.group_one
     def test_class_magic_methods_as_iterator(self):
 
         class B_iter():
@@ -1321,6 +1368,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in A.a()], [])
 
+    @pytest.mark.group_one
     def test_class_magic_methods_with(self):
         depth = 0
 
@@ -1345,6 +1393,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 self.assertEqual(depth, 2)
         self.assertEqual(depth, 0)
 
+    @pytest.mark.group_one
     def test_class_comparison_methods(self):
         class C(Class, Final):
             x = Member(int)
@@ -1372,6 +1421,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(C(x=2) >= C(x=7), True)
         self.assertEqual(C(x=0) >= C(x=1), False)
 
+    @pytest.mark.group_one
     def test_class_reverse_operators(self):
         class C(Class, Final):
             __radd__ = lambda lhs, rhs: "radd" + str(rhs)
@@ -1432,6 +1482,7 @@ class NativeClassTypesTests(unittest.TestCase):
             with self.assertRaises(TypeError):
                 C() | v
 
+    @pytest.mark.group_one
     def test_class_default_constructible(self):
         # classes without 'init' are always default constructible,
         # and we'll initialize any non-class members that are default
@@ -1454,6 +1505,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertFalse(is_default_constructible(NotDC))
 
+    @pytest.mark.group_one
     def test_class_isinstance(self):
         class BaseClass(Class):
             pass
@@ -1472,6 +1524,7 @@ class NativeClassTypesTests(unittest.TestCase):
         check()
         Entrypoint(check)()
 
+    @pytest.mark.group_one
     def test_class_delitem(self):
         class C(Class, Final):
             deleted = Member(int)
@@ -1484,6 +1537,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert c.deleted == 10
 
+    @pytest.mark.group_one
     def test_class_len_leak(self):
         class C(Class, Final):
             def __len__(self):
@@ -1507,6 +1561,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 t1 = time.time()
         assert currentMemUsageMb() - m0 < 10.0
 
+    @pytest.mark.group_one
     def test_class_inquiry_method_exception_resolution(self):
         class C(Class, Final):
             def __len__(self):
@@ -1538,6 +1593,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Cannot construct the value None from an instance of bool"):
             c[10] = 20
 
+    @pytest.mark.group_one
     def test_class_delattr(self):
         class C(Class, Final):
             x = Member(str)
@@ -1557,6 +1613,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert c.x == "bye"
 
+    @pytest.mark.group_one
     def test_class_nonempty(self):
         class CNonempty(Class, Final):
             x = Member(str, nonempty=True)
@@ -1588,6 +1645,7 @@ class NativeClassTypesTests(unittest.TestCase):
         cE.x = "hihi"
         assert hasattr(cE, 'x')
 
+    @pytest.mark.group_one
     def test_class_nonempty_forces_construction(self):
         class SomeOtherClass(Class):
             pass
@@ -1607,6 +1665,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assert hasattr(CNonempty(), 'x')
         assert not hasattr(CEmpty(), 'x')
 
+    @pytest.mark.group_one
     def test_class_mro_index_is_zero_for_self(self):
         class BaseClass(Class):
             pass
@@ -1618,6 +1677,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assert _types.classGetDispatchIndex(BaseClass, BaseClass) == 0
         assert _types.classGetDispatchIndex(ChildClass, ChildClass) == 0
 
+    @pytest.mark.group_one
     def test_method_return_type_overrides_are_sensible(self):
         def makeClassReturning(Base, T, value):
             if not T:
@@ -1674,6 +1734,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSequenceInvalid((int, 0), (None, 0), (float, 1.0))
         assertSequenceInvalid((int, 0), (int, 0), (float, 1.0))
 
+    @pytest.mark.group_one
     def test_method_return_types_depend_on_specialization(self):
         class BaseClass(Class):
             def f(self, x: OneOf(int, None)) -> int:
@@ -1690,6 +1751,7 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "promise"):
             ChildClass().f(None)
 
+    @pytest.mark.group_one
     def test_compiled_dispatch_on_class(self):
         class A(Class):
             pass
@@ -1737,6 +1799,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assert callItAs(TestClass)(Subclass(), B()) == "B"
         assert callItAs(TestClass)(Subclass(), Both()) == "Both"
 
+    @pytest.mark.group_one
     def test_dispatch_on_class_infers_type_correctly(self):
         class A(Class):
             pass
@@ -1762,6 +1825,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assert callIt.resultTypeFor(TestClass, B).typeRepresentation is OneOf(float, int)
         assert callIt.resultTypeFor(TestClass, C).typeRepresentation is OneOf(float, int)
 
+    @pytest.mark.group_one
     def test_cant_override_class_members(self):
         class A(Class):
             X = int
@@ -1770,6 +1834,7 @@ class NativeClassTypesTests(unittest.TestCase):
             class B(A):
                 X = float
 
+    @pytest.mark.group_one
     def test_mro_equivalent_to_python_diamond(self):
         def makeClasses(base):
             class B(base):
@@ -1794,6 +1859,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert mroPy == mroTP
 
+    @pytest.mark.group_one
     def test_super(self):
         class B(Class):
             def f(self, x):
@@ -1805,6 +1871,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         assert C().f(10) == 11
 
+    @pytest.mark.group_one
     def test_classmethod_has_methodOf(self):
         class B(Class):
             @classmethod
@@ -1818,6 +1885,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assert B.method.__func__.overloads[0].methodOf.Class is B
         assert B.staticMeth.overloads[0].methodOf.Class is B
 
+    @pytest.mark.group_one
     def test_decorating_class_with_generator(self):
         class C(Class):
             def __iter__(self) -> Generator(int):

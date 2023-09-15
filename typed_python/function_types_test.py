@@ -21,6 +21,7 @@ def thisIsAFunction():
 
 
 class NativeFunctionTypesTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_function_names_correct(self):
         assert type(thisIsAFunction).__name__ == 'thisIsAFunction'
         assert type(thisIsAFunction).__module__ == NativeFunctionTypesTests.__module__
@@ -30,6 +31,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
         assert thisIsAFunction.__module__ == NativeFunctionTypesTests.__module__
         assert thisIsAFunction.__qualname__ == "thisIsAFunction"
 
+    @pytest.mark.group_one
     def test_create_simple_function(self):
         @Function
         def f(x: int) -> int:
@@ -53,6 +55,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
         self.assertEqual(o.args[0].isStarArg, False)
         self.assertEqual(o.args[0].isKwarg, False)
 
+    @pytest.mark.group_one
     def test_create_function_with_kwargs_and_star_args_and_defaults(self):
         @Function
         def f(x: int,
@@ -72,6 +75,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
         self.assertEqual([a.isStarArg for a in o.args], [False, False, False, True, False])
         self.assertEqual([a.isKwarg for a in o.args], [False, False, False, False, True])
 
+    @pytest.mark.group_one
     def test_instantiate_function_type_with_untyped_closure(self):
         x = 10
 
@@ -84,6 +88,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
             # an empty cell, which throws a name error
             type(f)()()
 
+    @pytest.mark.group_one
     def test_instantiate_function_type_with_entrypointed_closure(self):
         x = 10
 
@@ -96,6 +101,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
         with self.assertRaises(NameError):
             fInst()
 
+    @pytest.mark.group_one
     def test_instantiate_function_type_with_typed_closure(self):
         @Entrypoint
         def makeF(x):

@@ -22,6 +22,7 @@ from typed_python import reduce
 
 
 class TestReduce(unittest.TestCase):
+    @pytest.mark.group_one
     def test_reduce(self):
         def f(x, y=0.0):
             return x + y
@@ -40,6 +41,7 @@ class TestReduce(unittest.TestCase):
         self.assertEqual(compiledReduce(f, aNamedTup), 3.5)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_reduce_perf(self):
         def doit(tup, times):
             res = 0.0

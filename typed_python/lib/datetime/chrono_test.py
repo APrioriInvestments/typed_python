@@ -17,6 +17,7 @@ from typed_python.lib.datetime.chrono import Chrono
 
 
 class TestChrono(unittest.TestCase):
+    @pytest.mark.group_one
     def test_is_leap_year_valid(self):
         leap_years = [
             2000,
@@ -37,12 +38,14 @@ class TestChrono(unittest.TestCase):
         for year in leap_years:
             assert Chrono.is_leap_year(year), year
 
+    @pytest.mark.group_one
     def test_is_leap_year_invalid(self):
         not_leap_years = [1700, 1800, 1900, 1997, 1999, 2100, 2022]
 
         for year in not_leap_years:
             assert not Chrono.is_leap_year(year), year
 
+    @pytest.mark.group_one
     def test_is_date_valid(self):
         # y, m, d
         dates = [(1997, 1, 1), (2020, 2, 29)]  # random date  # Feb 29 on leap year
@@ -50,6 +53,7 @@ class TestChrono(unittest.TestCase):
         for date in dates:
             assert Chrono.is_valid_date(date[0], date[1], date[2]), date
 
+    @pytest.mark.group_one
     def test_is_date_invalid(self):
         # y, m, d
         dates = [
@@ -70,6 +74,7 @@ class TestChrono(unittest.TestCase):
         for date in dates:
             assert not Chrono.is_valid_date(date[0], date[1], date[2]), date
 
+    @pytest.mark.group_one
     def test_is_time_valid(self):
         # h, m, s
         times = [
@@ -80,6 +85,7 @@ class TestChrono(unittest.TestCase):
         for time in times:
             assert Chrono.is_valid_time(time[0], time[1], time[2]), time
 
+    @pytest.mark.group_one
     def test_is_time_invalid(self):
         # h, m, s
         times = [
@@ -94,6 +100,7 @@ class TestChrono(unittest.TestCase):
         for time in times:
             assert not Chrono.is_valid_time(time[0], time[1], time[2]), time
 
+    @pytest.mark.group_one
     def test_days_from_civil(self):
         for (year, month, day) in [(1999, 2, 15), (2022, 12, 23), (0, 1, 1), (-1, 1, 1)]:
             days = Chrono.days_from_civil(year, month, day)

@@ -8,6 +8,7 @@ import unittest
 
 
 class TestMacro(unittest.TestCase):
+    @pytest.mark.group_one
     def test_main(self):
         @Macro
         def A(T):
@@ -33,6 +34,7 @@ class TestMacro(unittest.TestCase):
         self.assertFalse(A(str) is A(A(str)))
         self.assertFalse(A(str) is A(float))
 
+    @pytest.mark.group_one
     def test_more(self):
         @TypeFunction
         def F(S, T):
@@ -65,6 +67,7 @@ class TestMacro(unittest.TestCase):
         with self.assertRaises(NameError):
             H(int, float)
 
+    @pytest.mark.group_one
     def test_another(self):
         @Macro
         def A(S, T):
@@ -93,6 +96,7 @@ class TestMacro(unittest.TestCase):
         print(a)
         print(a.do())
 
+    @pytest.mark.group_one
     def test_lazy_named_tuple_row(self):
         @Macro
         def lazyWindow(T):
@@ -141,6 +145,7 @@ class TestMacro(unittest.TestCase):
         with PrintNewFunctionVisitor():
             self.assertEqual(return_b(lazy), 'b')
 
+    @pytest.mark.group_one
     def test_exception(self):
         @Macro
         def f(T):
@@ -163,6 +168,7 @@ class TestMacro(unittest.TestCase):
         with self.assertRaises(NameError):
             f(int)
 
+    @pytest.mark.group_one
     def test_namespace(self):
         @Macro
         def f(T):

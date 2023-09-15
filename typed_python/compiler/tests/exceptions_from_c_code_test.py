@@ -15,6 +15,7 @@
 from typed_python import Entrypoint, ListOf, NotCompiled, _types
 
 
+@pytest.mark.group_one
 def test_string_to_int_error_catchable():
     @Entrypoint
     def f(x):
@@ -28,6 +29,7 @@ def test_string_to_int_error_catchable():
     assert f("3.0") == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_string_to_float_error_catchable():
     @Entrypoint
     def f(x):
@@ -41,6 +43,7 @@ def test_string_to_float_error_catchable():
     assert f("asdf") == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_mod_zero_catchable():
     @Entrypoint
     def f(x):
@@ -53,6 +56,7 @@ def test_mod_zero_catchable():
     assert f(0.0) == "CAUGHT"
 
 
+@pytest.mark.group_one
 def test_throwing_exceptions_from_C_code_triggers_destructors():
     @NotCompiled
     def throws():
@@ -77,6 +81,7 @@ def test_throwing_exceptions_from_C_code_triggers_destructors():
     assert _types.refcount(aList) == 2
 
 
+@pytest.mark.group_one
 def test_throwing_exceptions_from_uncompiled_code_triggers_destructors():
     @NotCompiled
     def throws():
@@ -101,6 +106,7 @@ def test_throwing_exceptions_from_uncompiled_code_triggers_destructors():
     assert _types.refcount(aList) == 2
 
 
+@pytest.mark.group_one
 def test_exceptions_from_not_compiled():
     @NotCompiled
     def g0(x):

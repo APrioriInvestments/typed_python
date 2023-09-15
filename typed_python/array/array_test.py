@@ -23,6 +23,7 @@ from typed_python.array.array import Array, Matrix
 from typed_python import Entrypoint
 
 
+@pytest.mark.group_one
 def test_float_array_addition():
     x = Array(float)([1, 2, 3])
 
@@ -47,6 +48,7 @@ def test_float_array_addition():
     assert y[0] == 8
 
 
+@pytest.mark.group_one
 def test_float_array_subtraction():
     x = Array(float)([1, 2, 3])
 
@@ -67,6 +69,7 @@ def test_float_array_subtraction():
     assert y[0] == -4
 
 
+@pytest.mark.group_one
 def test_float_array_multiplication():
     x = Array(float)([1, 2, 3])
 
@@ -91,6 +94,7 @@ def test_float_array_multiplication():
     assert y[1] == 128
 
 
+@pytest.mark.group_one
 def test_float_array_addition_wrong_size():
     x = Array(float).ones(3)
     x2 = Array(float).zeros(4)
@@ -102,6 +106,7 @@ def test_float_array_addition_wrong_size():
         x += x2
 
 
+@pytest.mark.group_one
 def test_basic_matrix_ops():
     m = Matrix(float).identity(10)
 
@@ -115,6 +120,7 @@ def test_basic_matrix_ops():
 
 
 @flaky(max_runs=3, min_passes=1)
+@pytest.mark.group_one
 def test_matrix_speed():
     # this test requires parallelism, and the machines we're using in travis
     # don't always have free cores, so we get false negatives.
@@ -170,6 +176,7 @@ def test_matrix_speed():
     assert tpSlowdown < SLOWDOWN_THRESHOLD, tpSlowdown
 
 
+@pytest.mark.group_one
 def test_square_matrix_vector_multiply():
     m = Matrix(float).identity(3)
 
@@ -187,6 +194,7 @@ def test_square_matrix_vector_multiply():
     assert (m @ a).toList() == [1, 11, 21]
 
 
+@pytest.mark.group_one
 def test_rectangular_matrix_vector_multiply():
     m = Matrix(float).zeros(8, 4)
 
@@ -211,6 +219,7 @@ def test_rectangular_matrix_vector_multiply():
     assert (a2 @ m).toList() == m[0].toList()
 
 
+@pytest.mark.group_one
 def test_matrix_multiply():
     m = Matrix(float).identity(4)
     m2 = Matrix(float).identity(4)
@@ -233,6 +242,7 @@ def test_matrix_multiply():
     assert (m @ m2)[1][3] == 1
 
 
+@pytest.mark.group_one
 def test_rectangular_matrix_multiply():
     m = Matrix(float).zeros(5, 2)
     m2 = Matrix(float).zeros(2, 4)
@@ -249,6 +259,7 @@ def l1norm(m):
     return m.flatten().abs().sum()
 
 
+@pytest.mark.group_one
 def test_invert():
     m = Matrix(float).identity(10) * 2
 
@@ -259,24 +270,28 @@ def test_invert():
     assert l1norm((m @ ~m) - Matrix(float).identity(10)) < 1e-10
 
 
+@pytest.mark.group_one
 def test_create_matrix():
     m = Matrix(float).make(10, 10, lambda row, col: row * 20 - col)
 
     assert m[3][4] == 3 * 20 - 4
 
 
+@pytest.mark.group_one
 def test_negate_matrix():
     m = Matrix(float).identity(10)
 
     assert l1norm(+m + -m) < 1e-10
 
 
+@pytest.mark.group_one
 def test_matrix_cos_and_sin():
     m = Matrix(float).make(10, 10, lambda x, y: x**2 - y**2)
 
     assert l1norm(m.cos() ** 2 + m.sin() ** 2 - 1) < 1e-10
 
 
+@pytest.mark.group_one
 def test_increment_matrix_diagonal():
     m = Matrix(float).zeros(10, 10)
     d = m.diagonal()
@@ -285,6 +300,7 @@ def test_increment_matrix_diagonal():
     assert m.get(2, 2) == 1
 
 
+@pytest.mark.group_one
 def test_assign_matrix_row():
     m = Matrix(float).identity(10)
 
@@ -296,6 +312,7 @@ def test_assign_matrix_row():
     assert m.get(4, 4) == m.get(3, 4)
 
 
+@pytest.mark.group_one
 def test_matrix_product_with_transpose():
     def checkEqual(a, b):
         assert l1norm(a - b) < 1e-10

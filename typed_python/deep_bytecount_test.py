@@ -19,6 +19,7 @@ from typed_python import (
 )
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_listof():
     l = ListOf(int)()
 
@@ -27,6 +28,7 @@ def test_deep_bytecount_listof():
         assert sz * 8 <= deepBytecount(l) <= 8 * sz + 112
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_listof_aliasing():
     NT = NamedTuple(a=ListOf(int), b=ListOf(int))
 
@@ -39,6 +41,7 @@ def test_deep_bytecount_listof_aliasing():
     assert 1000 * 8 <= deepBytecount(x) <= 1000 * 8 + 112
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_sees_into_basic_python_objects():
     l = ListOf(int)()
     l.resize(1000)
@@ -58,6 +61,7 @@ def test_deep_bytecount_sees_into_basic_python_objects():
     assert deepBytecount((l, l, l)) < 9000
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_sees_into_Class_objects():
     class C(Class):
         x = Member(ListOf(int))
@@ -65,13 +69,16 @@ def test_deep_bytecount_sees_into_Class_objects():
     assert deepBytecount(C(x=ListOf(int)(range(1000)))) > 1000
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_sees_into_Dict_objects():
     assert deepBytecount(Dict(int, ListOf(int))({1: ListOf(int)(range(1000))}))
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_sees_into_ConstDict_objects():
     assert deepBytecount(ConstDict(int, ListOf(int))({1: ListOf(int)(range(1000))}))
 
 
+@pytest.mark.group_one
 def test_deep_bytecount_of_empty_constDict():
     assert deepBytecount(ConstDict(int, int)()) == 0

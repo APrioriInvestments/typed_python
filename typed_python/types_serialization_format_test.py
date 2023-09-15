@@ -166,6 +166,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
 
     The root-level serialization always has an initial fieldNumber of 0.
     """
+    @pytest.mark.group_one
     def test_single_values(self):
         # each value we produce should consist of a single field number (0)
         # encoding a value
@@ -191,6 +192,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         # strings encoded as utf-8
         self.assertEqual(serialize(str, "123"), BYTES(0) + unsignedVarint(3) + b"123")
 
+    @pytest.mark.group_one
     def test_message_validation(self):
         self.assertEqual(validateSerializedObject(EMPTY(0)), None)
         self.assertEqual(validateSerializedObject(EMPTY(100)), None)
@@ -223,6 +225,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         self.assertEqual(validateSerializedObject(BYTES(0) + unsignedVarint(2) + b"  "), None)
         self.assertEqual(validateSerializedObject(BYTES(0) + unsignedVarint(10) + b" " * 10), None)
 
+    @pytest.mark.group_one
     def test_roundtrip_strings(self):
         # strings are encoded as utf8.
 
@@ -271,6 +274,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
                 test(s+s2)
                 test(s+s2+s)
 
+    @pytest.mark.group_one
     def test_message_decoding(self):
         self.assertEqual(decodeSerializedObject(VARINT(0) + signedVarint(100)), 100)
         self.assertEqual(decodeSerializedObject(EMPTY(0)), [])
@@ -287,6 +291,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             [(100, -200), (200, -400)]
         )
 
+    @pytest.mark.group_one
     def test_message_validation_fuzzer(self):
         def randomMessage(depth=0, maxDepth=8):
             x = numpy.random.uniform()
@@ -333,6 +338,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         # most random submessage messages should be bad.
         self.assertTrue(badSubmessageCount > goodSubmessageCount * 10)
 
+    @pytest.mark.group_one
     def test_tuples(self):
         # tuples are a compound with indices on item numbers
         T = TupleOf(int)
@@ -364,6 +370,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             ) + END_COMPOUND()
         )
 
+    @pytest.mark.group_one
     def test_oneof(self):
         # tuples are a compound with indices on item numbers
         T = OneOf(None, int, float, "HI", TupleOf(int))
@@ -391,6 +398,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             ) + END_COMPOUND()
         )
 
+    @pytest.mark.group_one
     def test_alternative(self):
         A = Alternative(
             "A",
@@ -408,6 +416,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             SINGLE(0) + BEGIN_COMPOUND(1) + BITS_64(0) + floatToBits(10) + BITS_64(1) + floatToBits(20.2) + END_COMPOUND()
         )
 
+    @pytest.mark.group_one
     def test_recursive_list(self):
         L = Forward("L")
         L = L.define(ListOf(OneOf(int, L)))
@@ -428,6 +437,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             ) + END_COMPOUND()
         )
 
+    @pytest.mark.group_one
     def test_const_dict(self):
         T = ConstDict(int, int)
 
@@ -442,6 +452,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
             END_COMPOUND()
         )
 
+    @pytest.mark.group_one
     def test_dict(self):
         T = Dict(int, int)
 

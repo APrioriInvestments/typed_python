@@ -15,6 +15,7 @@
 from typed_python import Entrypoint, TupleOf
 
 
+@pytest.mark.group_one
 def test_compiles_any_and_all():
     @Entrypoint
     def callAny(x):

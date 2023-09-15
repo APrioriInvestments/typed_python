@@ -50,6 +50,7 @@ def compiledHash(x):
 
 
 class TestMathFunctionsCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_entrypoint_overrides(self):
         @Entrypoint
         def f(x):
@@ -62,6 +63,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         print(r2)
         print(r3)
 
+    @pytest.mark.group_one
     def test_math_functions(self):
         for funToTest in [
             lambda x: math.isinf(x),
@@ -83,6 +85,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 self.assertEqual(compiled(val), funToTest(val), val)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_math_functions_perf(self):
         def checkMany(x: float, i: int):
             count = 0
@@ -117,6 +120,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         # I get about .9x, so we're a little slower than numpy but not much
         print("speedup vs numpy is", speedupVsNumpy)
 
+    @pytest.mark.group_one
     def test_math_transcendental_fns(self):
         def f_acos(x):
             return math.acos(x)
@@ -262,6 +266,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     else:
                         self.assertEqual(r1, r2, (mathFun, v1, v2))
 
+    @pytest.mark.group_one
     def test_math_other_one(self):
         def f_fabs(x):
             return math.fabs(x)
@@ -341,6 +346,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 self.assertIsInstance(r2, float)
                 self.assertTrue(abs(r1 - r2) / r1 < 1e-15, (mathFun, v))
 
+    @pytest.mark.group_one
     def test_math_frexp_modf(self):
         def f_frexp(x):
             return math.frexp(x)
@@ -367,6 +373,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 for i in range(2):
                     self.assertLess(abs((r1[i] - r3[i])/r1[i]) if r1[i] else abs(r1[i] - r3[i]), 1e-6)
 
+    @pytest.mark.group_one
     def test_math_other_two(self):
         def f_hypot(x, y):
             return math.hypot(x, y)
@@ -487,6 +494,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                     r4 = compiled(Float32(v1), v2)
                     self.assertEqual(r3, r4, (mathFun, v1, v2))
 
+    @pytest.mark.group_one
     def test_math_fsum(self):
         def f_fsum(iterable):
             return math.fsum(iterable)
@@ -512,6 +520,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             compiled(1234)  # not iterable
 
+    @pytest.mark.group_one
     def test_math_constants(self):
         def all_constants(x):
             return (type(x), math.pi, math.e, math.tau, math.inf, math.nan)
@@ -544,6 +553,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             c_runtime_error()
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_math_functions_perf_other(self):
         count = 1000000
         element = lambda i: -5.0 + i / (count / 10.0)
@@ -606,6 +616,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
 
             print(f"{f.__name__} speedup vs numpy is", speedupVsNumpy)
 
+    @pytest.mark.group_one
     def test_math_float_overload_order(self):
         @Entrypoint
         def f(x):
@@ -626,6 +637,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
         self.assertEqual(r1, r4)
         self.assertEqual(r2, r3)
 
+    @pytest.mark.group_one
     def test_math_int_overload_order(self):
         for T1 in [UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, int]:
             for T2 in [UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, int]:
@@ -654,6 +666,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 del f
                 del g
 
+    @pytest.mark.group_one
     def test_math_functions_on_object(self):
         class ClassCeil:
             def __ceil__(self):
@@ -853,6 +866,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
                 else:
                     self.assertEqual(r1, r2, (f, v))
 
+    @pytest.mark.group_one
     def test_math_functions_on_oneof(self):
         class ClassIndex:
             def __index__(self):
@@ -904,6 +918,7 @@ class TestMathFunctionsCompilation(unittest.TestCase):
             else:
                 self.assertEqual(r1[1], r2[1], v)
 
+    @pytest.mark.group_one
     def test_math_internal_fns(self):
         self.assertEqual(sumIterable([1, 2, 3]), 6)
         self.assertEqual(sumIterable([1e100, 1e-100, -1e100]), 1e-100)

@@ -49,6 +49,7 @@ def some_fibs():
 
 
 class TestSetCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_can_copy_set(self):
         @Entrypoint
         def f(x: Set(int)):
@@ -82,6 +83,7 @@ class TestSetCompilation(unittest.TestCase):
 
             self.assertEqual(refcounts, refcounts2)
 
+    @pytest.mark.group_one
     def test_compile_iter_call_on_set(self):
         @Entrypoint
         def iterate(x: Set(int)):
@@ -97,6 +99,7 @@ class TestSetCompilation(unittest.TestCase):
 
         assert set(iterate([1, 2, 3])) == set([1, 2, 3])
 
+    @pytest.mark.group_one
     def test_compile_iterate_on_set(self):
         @Entrypoint
         def iterate(x: Set(int)):
@@ -108,6 +111,7 @@ class TestSetCompilation(unittest.TestCase):
 
         assert set(iterate([1, 2, 3])) == set([1, 2, 3])
 
+    @pytest.mark.group_one
     def test_set_length(self):
         @Entrypoint
         def set_len(x):
@@ -127,6 +131,7 @@ class TestSetCompilation(unittest.TestCase):
         x.clear()
         self.assertEqual(set_len(x), 0)
 
+    @pytest.mark.group_one
     def test_set_in(self):
         @Entrypoint
         def set_in(x, y):
@@ -152,6 +157,7 @@ class TestSetCompilation(unittest.TestCase):
         assert set_in(x1, 1)
         assert 1 in x1
 
+    @pytest.mark.group_one
     def test_set_add(self):
         S = Set(int)
 
@@ -212,6 +218,7 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(f("a"), {"initial", "value", "a", "aa"})
         self.assertEqual(f("xyz" * 100), {"initial", "value", "xyz" * 100, "xyz" * 200})
 
+    @pytest.mark.group_one
     def test_set_remove_discard(self):
         @Entrypoint
         def set_remove(s, k):
@@ -269,6 +276,7 @@ class TestSetCompilation(unittest.TestCase):
         set_discard(s, 'dd')
         self.assertEqual(s, set())
 
+    @pytest.mark.group_one
     def test_set_clear(self):
         @Entrypoint
         def set_clear(s):
@@ -288,6 +296,7 @@ class TestSetCompilation(unittest.TestCase):
         set_clear(s2)
         self.assertEqual(len(s2), 0)
 
+    @pytest.mark.group_one
     def test_set_assign_and_copy(self):
 
         @Entrypoint
@@ -309,6 +318,7 @@ class TestSetCompilation(unittest.TestCase):
         s = Set(str)(set("abc"))
         self.assertEqual(set_copy_and_modify_original(s, 'q', 'b'), set("abc"))
 
+    @pytest.mark.group_one
     def test_adding_to_sets(self):
 
         @Entrypoint
@@ -328,6 +338,7 @@ class TestSetCompilation(unittest.TestCase):
 
         self.assertTrue(f(20000))
 
+    @pytest.mark.group_one
     def test_set_destructors(self):
         @Entrypoint
         def f():
@@ -339,6 +350,7 @@ class TestSetCompilation(unittest.TestCase):
 
         f()
 
+    @pytest.mark.group_one
     def test_set_pop(self):
         @Entrypoint
         def set_pop(s):
@@ -374,6 +386,7 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(original_set, new_set)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_set_perf(self):
         def set_copy_discard(s: Set(int), count: int):
             for i in range(2, count):
@@ -401,6 +414,7 @@ class TestSetCompilation(unittest.TestCase):
 
         print("Speedup was ", ratio)
 
+    @pytest.mark.group_one
     def test_set_binop(self):
         S = Set(int)
         sets = []
@@ -576,6 +590,7 @@ class TestSetCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Compiled(symmetric_difference_update2)(S(x), S(y), S(z))
 
+    @pytest.mark.group_one
     def test_set_iterable_comparisons(self):
         S = Set(int)
 
@@ -628,6 +643,7 @@ class TestSetCompilation(unittest.TestCase):
                 with self.assertRaises(TypeError):
                     Entrypoint(f)(s, v)
 
+    @pytest.mark.group_one
     def test_set_iterable_updates(self):
         S = Set(int)
 
@@ -742,6 +758,7 @@ class TestSetCompilation(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_set_binop_perf(self):
         for T in [int, str]:
             S = Set(T)
@@ -806,6 +823,7 @@ class TestSetCompilation(unittest.TestCase):
                 # performance could be improved
                 self.assertGreater(ratio, threshold)
 
+    @pytest.mark.group_one
     def test_set_iteration(self):
         def set_to_list(s: Set(str)) -> ListOf(str):
             result = ListOf(str)()
@@ -818,6 +836,7 @@ class TestSetCompilation(unittest.TestCase):
         r2 = Compiled(set_to_list)(s)
         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_set_refcounting(self):
         TOI = TupleOf(int)
         aTup = TOI((1, 2, 3))
@@ -859,6 +878,7 @@ class TestSetCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(aTup2), 1)
         self.assertEqual(_types.refcount(aTup3), 1)
 
+    @pytest.mark.group_one
     def test_set_pop_many(self):
         @Entrypoint
         def f(x: Set(str)):
@@ -880,6 +900,7 @@ class TestSetCompilation(unittest.TestCase):
 
         self.assertEqual(len(x), 0)
 
+    @pytest.mark.group_one
     def test_set_up_and_down(self):
         @Entrypoint
         def f(targets):
@@ -907,6 +928,7 @@ class TestSetCompilation(unittest.TestCase):
                         for i5 in range(C):
                             f(ListOf(int)([i1, i2, i3, i4, i5]))
 
+    @pytest.mark.group_one
     def test_set_fuzz(self):
         # try adding and removing items repeatedly, in an effort to fill the table up
         @Entrypoint
@@ -936,6 +958,7 @@ class TestSetCompilation(unittest.TestCase):
                     print(actions)
                     raise
 
+    @pytest.mark.group_one
     def test_set_destructor_complex(self):
         NT = NamedTuple(x=TupleOf(str), y=TupleOf(str))
         aTup = TupleOf(str)(['a'])
@@ -953,6 +976,7 @@ class TestSetCompilation(unittest.TestCase):
 
         self.assertEqual(tupRefcount, _types.refcount(aTup))
 
+    @pytest.mark.group_one
     def test_set_with_neg_one(self):
         # negative one is special because it hashes to -1. Python
         # treats a -1 as an error code (indicating there was
@@ -978,6 +1002,7 @@ class TestSetCompilation(unittest.TestCase):
         set_remove(s, -1)
         self.assertFalse(set_in(-1, s))
 
+    @pytest.mark.group_one
     def test_set_internal_functions(self):
         # These internal functions are already tested, as compiled python functions, in other tests
         # But these tests ensure that codecov counts these functions as "tested"
@@ -1031,6 +1056,7 @@ class TestSetCompilation(unittest.TestCase):
         initialize_set_from_other_implicit_containers(p1, [1, 2], True)
         initialize_set_from_other_upcast_containers(p1, [1, 2], True)
 
+    @pytest.mark.group_one
     def test_compiled_set_constructors(self):
         def f_set(x):
             return Set(int)(x)
@@ -1114,6 +1140,7 @@ class TestSetCompilation(unittest.TestCase):
         with self.assertRaises(TypeError):
             Entrypoint(f_set_t)({t1, t2, t4})
 
+    @pytest.mark.group_one
     def test_set_aliasing(self):
         T = Set(int)
 
@@ -1124,6 +1151,7 @@ class TestSetCompilation(unittest.TestCase):
 
         assert len(t2) == 0
 
+    @pytest.mark.group_one
     def test_set_aliasing_compiled(self):
         T = Set(int)
 
@@ -1140,6 +1168,7 @@ class TestSetCompilation(unittest.TestCase):
 
         assert len(t2) == 0
 
+    @pytest.mark.group_one
     def test_set_adding_allows_container_upcast(self):
         T = Set(TupleOf(float))
 
@@ -1167,6 +1196,7 @@ class TestSetCompilation(unittest.TestCase):
                 aT.add([1, 2, "3"])
             addIt()
 
+    @pytest.mark.group_one
     def test_set_size_change_during_iteration_raises(self):
         @Entrypoint
         def checkIt():
@@ -1179,6 +1209,7 @@ class TestSetCompilation(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "set size changed"):
             checkIt()
 
+    @pytest.mark.group_one
     def test_cant_convert_none_to_set(self):
         from typed_python import Class
 
@@ -1192,6 +1223,7 @@ class TestSetCompilation(unittest.TestCase):
 
         callC([1])
 
+    @pytest.mark.group_one
     def test_set_of_specific_alternative(self):
         A = Alternative(
             "A",

@@ -81,26 +81,32 @@ def checkDeepcopySimple(obj, requiresSlab, objectIsSlabRoot=False):
     assert currentMemUsageMb() - m0 < 1.0
 
 
+@pytest.mark.group_one
 def test_deepcopy_pod_tuple():
     checkDeepcopySimple(Tuple(int, int)(), False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_named_tuple():
     checkDeepcopySimple(NamedTuple(x=int, y=str)(x=10, y="hi"), True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_listof():
     checkDeepcopySimple(ListOf(int)(range(1000)), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_setof():
     checkDeepcopySimple(Set(int)(range(1000)), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_tupleof():
     checkDeepcopySimple(TupleOf(int)(range(1000)), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_oneof():
     checkDeepcopySimple(
         TupleOf(OneOf(None, "hi", int))(list(range(1000)) + ["hi", None, "hi", 3]),
@@ -108,38 +114,47 @@ def test_deepcopy_oneof():
     )
 
 
+@pytest.mark.group_one
 def test_deepcopy_pystring():
     checkDeepcopySimple("hi", False, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_tupleof_str():
     checkDeepcopySimple(TupleOf(str)(["hi"]), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_empty_tup():
     checkDeepcopySimple((), False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_pytuple():
     checkDeepcopySimple((1, 2, 3), False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_pylist():
     checkDeepcopySimple([1, 2, 3], False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_pydict():
     checkDeepcopySimple({1: 2, 3: 4}, False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_pyset():
     checkDeepcopySimple({1, 2, 3, 4}, False)
 
 
+@pytest.mark.group_one
 def test_untyped_holding_typed():
     checkDeepcopySimple([ListOf(int)(range(100))], True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_Class():
     class C(Class):
         x = Member(ListOf(int))
@@ -153,6 +168,7 @@ def test_deepcopy_Class():
     checkDeepcopySimple(C(x=ListOf(int)(range(1000))), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_PySubClass():
     class C(NamedTuple(x=int)):
         pass
@@ -160,6 +176,7 @@ def test_deepcopy_PySubClass():
     checkDeepcopySimple(ListOf(C)([C(x=10)]), True, True)
 
 
+@pytest.mark.group_one
 def test_deepcopy_PySubClassWithSlabStuff():
     class C(NamedTuple(x=ListOf(int))):
         pass
@@ -167,6 +184,7 @@ def test_deepcopy_PySubClassWithSlabStuff():
     checkDeepcopySimple(C(x=ListOf(int)([10])), True, False)
 
 
+@pytest.mark.group_one
 def test_deepcopy_class():
     class C:
         def __init__(self, x):
@@ -178,6 +196,7 @@ def test_deepcopy_class():
     checkDeepcopySimple(C(10), False, True)
 
 
+@pytest.mark.group_one
 def test_holding_interior_item_keeps_slab_alive():
     initSlabBytes = totalBytesAllocatedInSlabs()
 
@@ -197,6 +216,7 @@ def test_holding_interior_item_keeps_slab_alive():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_external_pyobj_doesnt_leak():
     mem = currentMemUsageMb()
 
@@ -206,6 +226,7 @@ def test_deepcopy_with_external_pyobj_doesnt_leak():
     assert currentMemUsageMb() - mem < 10
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_tuple_doesnt_leak():
     mem = currentMemUsageMb()
 
@@ -215,6 +236,7 @@ def test_deepcopy_with_tuple_doesnt_leak():
     assert currentMemUsageMb() - mem < 10
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_mutually_recursive_objects_doesnt_leak():
     mem = currentMemUsageMb()
 
@@ -229,6 +251,7 @@ def test_deepcopy_with_mutually_recursive_objects_doesnt_leak():
     assert currentMemUsageMb() - mem < 10
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_Class():
     initSlabBytes = totalBytesAllocatedInSlabs()
 
@@ -255,6 +278,7 @@ def test_deepcopy_with_Class():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_Dict():
     initSlabBytes = totalBytesAllocatedInSlabs()
     mem = currentMemUsageMb()
@@ -276,6 +300,7 @@ def test_deepcopy_with_Dict():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_Set():
     initSlabBytes = totalBytesAllocatedInSlabs()
     mem = currentMemUsageMb()
@@ -294,6 +319,7 @@ def test_deepcopy_with_Set():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_ConstDict():
     initSlabBytes = totalBytesAllocatedInSlabs()
     mem = currentMemUsageMb()
@@ -312,6 +338,7 @@ def test_deepcopy_with_ConstDict():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_deepcopy_with_Alternative():
     initSlabBytes = totalBytesAllocatedInSlabs()
     mem = currentMemUsageMb()
@@ -335,6 +362,7 @@ def test_deepcopy_with_Alternative():
     assert totalBytesAllocatedInSlabs() == initSlabBytes
 
 
+@pytest.mark.group_one
 def test_see_slabs():
     list1 = deepcopyContiguous(ListOf(int)(range(1000)), trackInternalTypes=True)
     list2 = deepcopyContiguous(ListOf(int)(range(1000)), trackInternalTypes=True)
@@ -347,6 +375,7 @@ def test_see_slabs():
         assert slab.allocCount()
 
 
+@pytest.mark.group_one
 def test_deepcopy_class_with_dual_references():
     class C(Class):
         x = Member(Dict(int, int))
@@ -363,6 +392,7 @@ def test_deepcopy_class_with_dual_references():
     assert refcount(c2.x) == 3
 
 
+@pytest.mark.group_one
 def test_bytes_on_free_store_basic():
     bytecount0 = totalBytesAllocatedOnFreeStore()
 
@@ -387,6 +417,7 @@ def test_bytes_on_free_store_basic():
     assert bytecount0 == totalBytesAllocatedOnFreeStore()
 
 
+@pytest.mark.group_one
 def test_deepcopy_perf():
     x = ListOf(str)()
 
@@ -410,6 +441,7 @@ def test_deepcopy_perf():
     print("deepcopyContiguous", t1 - t0)
 
 
+@pytest.mark.group_one
 def test_deepcopy_typeMap():
     aTup = ([1], [2])
 
@@ -422,6 +454,7 @@ def test_deepcopy_typeMap():
     assert res[1] == [2, 2]
 
 
+@pytest.mark.group_one
 def test_deepcopy_typeMap_typed():
     class C(Class):
         x = Member(int)
@@ -434,6 +467,7 @@ def test_deepcopy_typeMap_typed():
     assert res.x == 11
 
 
+@pytest.mark.group_one
 def test_deepcopy_typeMap_baseclass():
     class C(object):
         def __init__(self, x):
@@ -450,6 +484,7 @@ def test_deepcopy_typeMap_baseclass():
     assert res.x == 11
 
 
+@pytest.mark.group_one
 def test_deepcopy_typeMap_baseclass_tp_type():
     class C(Class):
         x = Member(int)
@@ -465,6 +500,7 @@ def test_deepcopy_typeMap_baseclass_tp_type():
     assert res.x == 11
 
 
+@pytest.mark.group_one
 def test_deepcopy_empty_alternatives():
     X = Alternative("X", A=dict(), B=dict())
     Y = Alternative("Y", C=dict(x=X))
@@ -472,6 +508,7 @@ def test_deepcopy_empty_alternatives():
     print(deepcopy(y))
 
 
+@pytest.mark.group_one
 def test_deepcopy_class_subclass():
     class Base(Class):
         pass
@@ -484,12 +521,14 @@ def test_deepcopy_class_subclass():
         deepcopyContiguous(x)
 
 
+@pytest.mark.group_one
 def test_deepcopy_tuple_of_strings():
     for i in range(100):
         x = ListOf(OneOf(str, float))(['h'] * i)
         deepcopyContiguous(x)
 
 
+@pytest.mark.group_one
 def test_deepcopy_numpy_array():
     x = numpy.array([1, 2, 3])
 
@@ -513,6 +552,7 @@ class ClassWithReduce:
         self.state = state[0]
 
 
+@pytest.mark.group_one
 def test_deepcopy_class_with_custom_reduce():
     c = ClassWithReduce("state")
 
@@ -532,6 +572,7 @@ class ClassWithCustomSetState:
         self.state = state[0]
 
 
+@pytest.mark.group_one
 def test_deepcopy_class_with_custom_setState():
     c = ClassWithCustomSetState("state")
 
@@ -555,6 +596,7 @@ class ClassWithIterators:
         self.kvs[x] = y
 
 
+@pytest.mark.group_one
 def test_deepcopy_class_with_custom_reduce_iterators():
     c = ClassWithIterators()
 

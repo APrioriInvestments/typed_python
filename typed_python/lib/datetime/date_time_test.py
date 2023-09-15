@@ -19,6 +19,7 @@ from typed_python import Timestamp, NamedTuple
 from typed_python.lib.datetime.date_parser_test import get_datetimes_in_range
 
 
+@pytest.mark.group_one
 def test_last_weekday_of_month():
     assert last_weekday_of_month(2023, 1, 2) == Date(2023, 1, 31)
     assert last_weekday_of_month(2023, 1, 1) == Date(2023, 1, 30)
@@ -37,10 +38,12 @@ def test_last_weekday_of_month():
     assert last_weekday_of_month(1965, 2, 1) == Date(1965, 2, 22)
 
 
+@pytest.mark.group_one
 def test_DateTime_str():
     assert str(DateTime(2022, 1, 10, 10, 7, 45.12432)) == "2022-01-10 10:07:45"
 
 
+@pytest.mark.group_one
 def test_DateTime_to_timestamp():
     ymdhms = (2022, 12, 23, 18, 40, 46)
     dateTime = DateTime(*ymdhms)
@@ -53,6 +56,7 @@ def test_DateTime_to_timestamp():
     assert timestamp == ts
 
 
+@pytest.mark.group_one
 def test_DateTime_nonexistent_DateTime():
     dateTime = DateTime(2022, 3, 13, 2, 30, 0)
 
@@ -60,6 +64,7 @@ def test_DateTime_nonexistent_DateTime():
         NYC.timestamp(dateTime)
 
 
+@pytest.mark.group_one
 def test_DateTime_from_timestamp():
     dateTime = DateTime(2022, 11, 6, 1, 30, 0)
 
@@ -68,6 +73,7 @@ def test_DateTime_from_timestamp():
     assert newDateTime == dateTime
 
 
+@pytest.mark.group_one
 def test_DateTime_to_timestamp_daylight_savings():
     utcDateTime = DateTime(2022, 11, 6, 5, 30, 0)
     oneThirtyAmNycFirstFold = UTC.timestamp(utcDateTime)
@@ -81,6 +87,7 @@ def test_DateTime_to_timestamp_daylight_savings():
     )
 
 
+@pytest.mark.group_one
 def test_fixed_offset():
     ymdhms = (2022, 11, 6, 5, 30, 0)
 
@@ -93,6 +100,7 @@ def test_fixed_offset():
     assert ts == res
 
 
+@pytest.mark.group_one
 def test_datetime_to_timestamp_and_back():
     for tz in [NYC, EST, UTC]:
         dtime = DateTime(2022, 11, 6, 1, 30, 0)
@@ -101,6 +109,7 @@ def test_datetime_to_timestamp_and_back():
         assert dtime == dtime2
 
 
+@pytest.mark.group_one
 def test_EST_against_datetime():
     tz = pytz.timezone("America/Atikokan")
     externalTimestamp = tz.localize(
@@ -112,6 +121,7 @@ def test_EST_against_datetime():
     )
 
 
+@pytest.mark.group_one
 def test_timestamp_parse_around_daylight_savings_switch():
     nycDateStringsToUtcDateStrings = {
         "2022-03-12 00:30:00nyc": "2022-03-12 05:30:00",
@@ -233,6 +243,7 @@ def test_timestamp_parse_around_daylight_savings_switch():
         assert res == expected, (res, expected)
 
 
+@pytest.mark.group_one
 def test_TimeOfDay():
     assert TimeOfDay(12, 3, 30) < TimeOfDay(12, 3, 31)
     assert TimeOfDay(11, 10, 30) < TimeOfDay(12, 3, 31)
@@ -249,6 +260,7 @@ def test_TimeOfDay():
             TimeOfDay(hour, minute, second)
 
 
+@pytest.mark.group_one
 def test_afterFold_dst_end():
     with pytest.raises(OneFoldOnlyError):
         NYC.timestamp(DateTime(2022, 11, 2, 1, 30, 0), afterFold=True)
@@ -263,6 +275,7 @@ def test_afterFold_dst_end():
     assert NYC.timestamp(DateTime(*ymdhms), afterFold=True) == tsSecondFold
 
 
+@pytest.mark.group_one
 def test_nyc_1918_10_27():
     nycDateStringsToUtcDateStrings = {
         "1918-10-27 00:30:00nyc": "1918-10-27 04:30:00",
@@ -278,6 +291,7 @@ def test_nyc_1918_10_27():
         assert res == expected, (res, expected)
 
 
+@pytest.mark.group_one
 def test_nyc_since_1902():
     nyc = pytz.timezone("America/New_York")
     NYC = PytzTimezone.fromName("America/New_York")
@@ -319,6 +333,7 @@ def test_nyc_since_1902():
             )
 
 
+@pytest.mark.group_one
 def test_nyc_vs_chi():
     ts_chi = PytzTimezone.fromName("America/Chicago").timestamp(
         DateTime(2019, 7, 2, 8, 30, 0)
@@ -327,6 +342,7 @@ def test_nyc_vs_chi():
     assert ts_nyc - ts_chi == -3600
 
 
+@pytest.mark.group_one
 def test_Date_methods():
     assert Date(1970, 1, 1).daysSinceEpoch() == 0
     assert Date(1970, 1, 2).daysSinceEpoch() == 1
@@ -339,10 +355,12 @@ def test_Date_methods():
         Date(2022, 2, 29)
 
 
+@pytest.mark.group_one
 def test_Date_0000():
     Date(0, 1, 1)
 
 
+@pytest.mark.group_one
 def test_DateTime_add_and_subtract():
     assert DateTime(2022, 1, 1, 2, 30, 17) - 17 == DateTime(2022, 1, 1, 2, 30, 0)
     assert DateTime(2022, 1, 1, 2, 30, 17) - 18 - 30 * 60 - 2 * 3600 == DateTime(
@@ -350,6 +368,7 @@ def test_DateTime_add_and_subtract():
     )
 
 
+@pytest.mark.group_one
 def test_PytzTimezone():
     # check time
     ymdhms = (2022, 1, 11, 18, 0, 0)
@@ -385,6 +404,7 @@ def test_PytzTimezone():
     assert dt_them.second == dt_us.timeOfDay.second
 
 
+@pytest.mark.group_one
 def test_Date_next():
     assert Date(2023, 1, 12).next() == Date(2023, 1, 13)
     assert Date(2023, 1, 12).next(2) == Date(2023, 1, 14)
@@ -399,6 +419,7 @@ def test_Date_next():
     assert Date(2024, 2, 29).nextYear(-1) == Date(2023, 2, 28)
 
 
+@pytest.mark.group_one
 def test_asNamedTuple():
     x = Date(2023, 1, 12).asNamedTuple()
     assert isinstance(x, NamedTuple)

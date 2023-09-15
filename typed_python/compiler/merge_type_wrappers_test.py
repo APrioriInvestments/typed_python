@@ -10,6 +10,7 @@ class Child(Base):
     pass
 
 
+@pytest.mark.group_one
 def test_merge_types():
     assert mergeTypes([float, int]) == OneOf(float, int)
     assert mergeTypes([float, Value(1)]) == OneOf(1, float)

@@ -85,6 +85,7 @@ def returnSerializedValue(filesToWrite, expression, printComments=False):
     )
 
 
+@pytest.mark.group_one
 def test_identity_ignores_function_file_accesses():
     # make sure these functions succeed
     assert looksAtFilename()
@@ -97,11 +98,13 @@ def test_identity_ignores_function_file_accesses():
     assert '__file__' not in walk2
 
 
+@pytest.mark.group_one
 def test_identities_of_basic_types_different():
     assert identityHash(int) != identityHash(float)
     assert identityHash(TupleOf(int)) != identityHash(TupleOf(float))
 
 
+@pytest.mark.group_one
 def test_object_graph_instability_is_noticed():
     class C:
         pass
@@ -116,6 +119,7 @@ def test_object_graph_instability_is_noticed():
     resetCompilerVisibleObjectHashCache()
 
 
+@pytest.mark.group_one
 def test_object_graph_instability_is_noticed_globally():
     class C:
         pass
@@ -129,6 +133,7 @@ def test_object_graph_instability_is_noticed_globally():
     resetCompilerVisibleObjectHashCache()
 
 
+@pytest.mark.group_one
 def test_identity_of_function_with_annotation():
     def f(x: int):
         pass
@@ -155,6 +160,7 @@ def functionAccessingModuleLevelThreadLocal():
     return hasattr(moduleLevelThreadLocal, "anything")
 
 
+@pytest.mark.group_one
 def test_identity_of_function_accessing_thread_local():
     print(typesAndObjectsVisibleToCompilerFrom(type(functionAccessingModuleLevelThreadLocal)))
 
@@ -169,11 +175,13 @@ def test_identity_of_function_accessing_thread_local():
         raise Exception("hash instability found")
 
 
+@pytest.mark.group_one
 def test_identity_of_method_descriptors():
     assert identityHash(ListOf(int).append) != identityHash(ListOf(float).append)
     assert identityHash(ListOf(int).append) != identityHash(ListOf(int).extend)
 
 
+@pytest.mark.group_one
 def test_class_and_held_class_in_group():
     class C(Class):
         pass
@@ -187,6 +195,7 @@ def test_class_and_held_class_in_group():
     assert C in recursiveTypeGroup(C)
 
 
+@pytest.mark.group_one
 def test_identity_of_register_types():
     assert isinstance(identityHash(UInt64), bytes)
     assert len(identityHash(UInt64)) == 20
@@ -194,12 +203,14 @@ def test_identity_of_register_types():
     assert identityHash(UInt64) != identityHash(UInt32)
 
 
+@pytest.mark.group_one
 def test_identity_of_list_of():
     assert identityHash(ListOf(int)) != identityHash(ListOf(float))
     assert identityHash(ListOf(int)) == identityHash(ListOf(int))
     assert identityHash(ListOf(int)) != identityHash(TupleOf(int))
 
 
+@pytest.mark.group_one
 def test_identity_of_named_tuple_and_tuple():
     assert identityHash(NamedTuple(x=int)) != identityHash(NamedTuple(x=float))
     assert identityHash(NamedTuple(x=int)) == identityHash(NamedTuple(x=int))
@@ -209,15 +220,18 @@ def test_identity_of_named_tuple_and_tuple():
     assert identityHash(NamedTuple(x=int, y=float)) != identityHash(NamedTuple(y=float, x=int))
 
 
+@pytest.mark.group_one
 def test_identity_of_dict():
     assert identityHash(Dict(int, float)) != identityHash(Dict(int, int))
     assert identityHash(Dict(int, float)) != identityHash(Dict(float, int))
 
 
+@pytest.mark.group_one
 def test_identity_of_oneof():
     assert identityHash(OneOf(None, int)) != identityHash(OneOf(None, float))
 
 
+@pytest.mark.group_one
 def test_identity_of_recursive_types():
     X = Forward("X")
     X = X.define(TupleOf(OneOf(int, X)))
@@ -232,6 +246,7 @@ def test_identity_of_recursive_types():
     assert identityHash(X3) != identityHash(X)
 
 
+@pytest.mark.group_one
 def test_identity_of_recursive_types_2():
     X = Forward("X")
     X = X.define(TupleOf(OneOf(int, TupleOf(X))))
@@ -239,6 +254,7 @@ def test_identity_of_recursive_types_2():
     identityHash(X)
 
 
+@pytest.mark.group_one
 def test_identity_of_recursive_types_produced_same_way():
     def make(name, T):
         X = Forward(name)
@@ -249,6 +265,7 @@ def test_identity_of_recursive_types_produced_same_way():
     assert identityHash(make("X", int)) != identityHash(make("X2", int))
 
 
+@pytest.mark.group_one
 def test_identity_of_lambda_functions():
     @Entrypoint
     def makeAdder(a):
@@ -263,10 +280,12 @@ def test_identity_of_lambda_functions():
     assert identityHash(type(makeAdder(10))) != identityHash(type(makeAdder(10.5)))
 
 
+@pytest.mark.group_one
 def test_checkHash_works():
     assert checkHash({"x.py": "A = TupleOf(int)\n"}, 'x.A') == Hash(identityHash(TupleOf(int)))
 
 
+@pytest.mark.group_one
 def test_mutually_recursive_group_basic():
     assert recursiveTypeGroup(TupleOf(int)) == [TupleOf(int)]
 
@@ -276,6 +295,7 @@ def test_mutually_recursive_group_basic():
     assert recursiveTypeGroup(X) == [X, OneOf(int, X)]
 
 
+@pytest.mark.group_one
 def test_mutually_recursive_group_through_functions_in_closure():
     @Entrypoint
     def f(x):
@@ -291,6 +311,7 @@ def test_mutually_recursive_group_through_functions_in_closure():
     assert recursiveTypeGroup(gType) == [gType, fType]
 
 
+@pytest.mark.group_one
 def test_mutually_recursive_group_through_functions_at_module_level():
     assert set(recursiveTypeGroup(type(gModuleLevel))) == set([
         fModuleLevel, type(fModuleLevel), gModuleLevel, type(gModuleLevel)
@@ -301,6 +322,7 @@ def test_mutually_recursive_group_through_functions_at_module_level():
     ])
 
 
+@pytest.mark.group_one
 def test_recursive_group_of_function_values():
     @Entrypoint
     def f(x):
@@ -313,6 +335,7 @@ def test_recursive_group_of_function_values():
     assert recursiveTypeGroup(f)
 
 
+@pytest.mark.group_one
 def test_checkHash_lambdas_stable():
     contents = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
 
@@ -322,6 +345,7 @@ def test_checkHash_lambdas_stable():
         assert h1 == checkHash(contents, 'type(x.f)')
 
 
+@pytest.mark.group_one
 def test_checkHash_lambdas_hash_code_correctly():
     contents1 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 1\n"}
     contents2 = {"x.py": "@Entrypoint\ndef f(x):\n    return x + 2\n"}
@@ -329,6 +353,7 @@ def test_checkHash_lambdas_hash_code_correctly():
     assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
 
+@pytest.mark.group_one
 def test_checkHash_mutable_global_constants():
     contents1 = {"x.py": "G=Dict(int, int)({1:2})\n@Entrypoint\ndef g(x):\n    return G[x]\n"}
     contents2 = {"x.py": "G=Dict(int, int)({1:3})\n@Entrypoint\ndef g(x):\n    return G[x]\n"}
@@ -338,6 +363,7 @@ def test_checkHash_mutable_global_constants():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents3, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_checkHash_lambdas_hash_dependent_functions_correctly():
     contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 1\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return x + 2\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
@@ -345,6 +371,7 @@ def test_checkHash_lambdas_hash_dependent_functions_correctly():
     assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
 
+@pytest.mark.group_one
 def test_checkHash_lambdas_hash_mutually_recursive_correctly():
     contents1 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 1)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x):\n    return f(x + 2)\n@Entrypoint\ndef f(x):\n    return g(x)\n"}
@@ -352,6 +379,7 @@ def test_checkHash_lambdas_hash_mutually_recursive_correctly():
     assert checkHash(contents1, 'type(x.f)') != checkHash(contents2, 'type(x.f)')
 
 
+@pytest.mark.group_one
 def test_checkHash_class_member_access():
     contents1 = {"x.py": "class C:\n    x=1\n@Entrypoint\ndef g(x):\n    return C.x\n"}
     contents2 = {"x.py": "class C:\n    x=2\n@Entrypoint\ndef g(x):\n    return C.x\n"}
@@ -360,6 +388,7 @@ def test_checkHash_class_member_access():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_checkHash_function_body():
     contents1 = {"x.py": "def f(x): return x + 1\n@Entrypoint\ndef g(x):\n    return f(x)\n"}
     contents2 = {"x.py": "def f(x): return x + 2\n@Entrypoint\ndef g(x):\n    return f(x)\n"}
@@ -367,6 +396,7 @@ def test_checkHash_function_body():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_checkHash_function_arg_types():
     contents1 = {"x.py": "@Entrypoint\ndef g(x: int):\n    return f(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x: float):\n    return f(x)\n"}
@@ -374,6 +404,7 @@ def test_checkHash_function_arg_types():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_checkHash_function_arg_default_vals():
     contents1 = {"x.py": "@Entrypoint\ndef g(x=1):\n    return f(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x=2):\n    return f(x)\n"}
@@ -381,6 +412,7 @@ def test_checkHash_function_arg_default_vals():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_checkHash_function_arg_default_vals_string():
     contents1 = {"x.py": "@Entrypoint\ndef g(x='1'):\n    return f(x)\n"}
     contents2 = {"x.py": "@Entrypoint\ndef g(x='2'):\n    return f(x)\n"}
@@ -388,6 +420,7 @@ def test_checkHash_function_arg_default_vals_string():
     assert checkHash(contents1, 'type(x.g)') != checkHash(contents2, 'type(x.g)')
 
 
+@pytest.mark.group_one
 def test_hash_of_oneof():
     oneOfs = [
         OneOf(None, 1),
@@ -402,10 +435,12 @@ def test_hash_of_oneof():
     assert len(hashes) == len(oneOfs)
 
 
+@pytest.mark.group_one
 def test_identityHash_of_none():
     assert not Hash(identityHash(type(None))).isPoison()
 
 
+@pytest.mark.group_one
 def test_identityHash_of_a_typefunction():
     def L(t):
         return ListOf(t)
@@ -418,6 +453,7 @@ def test_identityHash_of_a_typefunction():
     assert identityHash(L1) == identityHash(L2)
 
 
+@pytest.mark.group_one
 def test_hash_of_TP_produced_lambdas_with_different_closure_types():
     @Entrypoint
     def returnIt(x):
@@ -433,6 +469,7 @@ def test_hash_of_TP_produced_lambdas_with_different_closure_types():
     assert identityHash(returnIt(1)) != identityHash(returnIt(2.0))
 
 
+@pytest.mark.group_one
 def test_hash_of_native_lambdas_with_different_closure_types():
     def returnIt(x):
         def f():
@@ -447,6 +484,7 @@ def test_hash_of_native_lambdas_with_different_closure_types():
     assert identityHash(t1) != identityHash(t3)
 
 
+@pytest.mark.group_one
 def test_checkHash_type_functions():
     contents1 = {"x.py": "@TypeFunction\ndef L(t):\n    return ListOf(t)\n\n@Entrypoint\ndef f(x):\n    return L(type(x))()"}
     contents2 = {"x.py": "@TypeFunction\ndef L(t):\n    return TupleOf(t)\n@Entrypoint\ndef f(x):\n    return L(type(x))()"}
@@ -456,6 +494,7 @@ def test_checkHash_type_functions():
     assert checkHash(contents1, 'type(x.f)') == checkHash(contents3, 'type(x.f)')
 
 
+@pytest.mark.group_one
 def test_checkHash_mutually_recursive_function_bodies():
     contents1 = {"x.py": "def f(x): return g(x + 1)\ndef g(x):\n    return f(x)\n@Entrypoint\ndef h(x):\n    return f(x)"}
     contents2 = {"x.py": "def f(x): return g(x + 2)\ndef g(x):\n    return f(x)\n@Entrypoint\ndef h(x):\n    return f(x)"}
@@ -463,6 +502,7 @@ def test_checkHash_mutually_recursive_function_bodies():
     assert checkHash(contents1, 'type(x.h)') != checkHash(contents2, 'type(x.h)')
 
 
+@pytest.mark.group_one
 def test_checkHash_methods():
     contents1 = {"x.py": "class N(Class):\n    def f(self): return 1\n"}
     contents2 = {"x.py": "class N(Class):\n    def f(self): return 2\n"}
@@ -470,6 +510,7 @@ def test_checkHash_methods():
     assert checkHash(contents1, 'x.N.f') != checkHash(contents2, 'x.N.f')
 
 
+@pytest.mark.group_one
 def test_checkHash_methods_on_class():
     contents1 = {"x.py": "class N(Class):\n    def f(self): return 1\n"}
     contents2 = {"x.py": "class N(Class):\n    def f(self): return 2\n"}
@@ -477,6 +518,7 @@ def test_checkHash_methods_on_class():
     assert checkHash(contents1, 'x.N') != checkHash(contents2, 'x.N')
 
 
+@pytest.mark.group_one
 def test_checkHash_methods_on_empty_python_class():
     contents1 = {"x.py": "class N1:\n    pass\n"}
     contents2 = {"x.py": "class N2:\n    pass\n"}
@@ -484,6 +526,7 @@ def test_checkHash_methods_on_empty_python_class():
     assert checkHash(contents1, 'x.N1') != checkHash(contents2, 'x.N2')
 
 
+@pytest.mark.group_one
 def test_checkHash_methods_on_python_class():
     contents1 = {"x.py": "class N:\n    def f(self): return 1\n"}
     contents2 = {"x.py": "class N:\n    def f(self): return 2\n"}
@@ -491,6 +534,7 @@ def test_checkHash_methods_on_python_class():
     assert checkHash(contents1, 'x.N') != checkHash(contents2, 'x.N')
 
 
+@pytest.mark.group_one
 def test_checkHash_methods_on_named_tuple_subclass():
     contents1 = {"x.py": "class N(NamedTuple()):\n    def f(self): return 1\n"}
     contents2 = {"x.py": "class N(NamedTuple()):\n    def f(self): return 2\n"}
@@ -507,6 +551,7 @@ def makeAdder(x):
 """
 
 
+@pytest.mark.group_one
 def test_checkHash_references_to_typed_free_objects():
     contents1 = {"x.py": FUNCMAKER + "A = makeAdder(1)\ndef f(x):\n    return A(x)"}
     contents2 = {"x.py": FUNCMAKER + "A = makeAdder(2)\ndef f(x):\n    return A(x)"}
@@ -516,10 +561,12 @@ def test_checkHash_references_to_typed_free_objects():
     assert checkHash(contents1, 'x.f') != checkHash(contents3, 'x.f')
 
 
+@pytest.mark.group_one
 def test_hash_of_builtins():
     assert not Hash(identityHash(isinstance)).isPoison()
 
 
+@pytest.mark.group_one
 def test_hash_of_classObj():
     class C(Class, Final):
         x = Member(int)
@@ -594,24 +641,28 @@ def deserializeTwiceAndConfirmEquivalent(rep):
 }
 
 
+@pytest.mark.group_one
 def test_repeated_deserialize_externally_defined_named_tuple():
     ser = returnSerializedValue(MODULE, 'x.NT')
 
     assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
+@pytest.mark.group_one
 def test_repeated_deserialize_externally_defined_class_is_stable():
     ser = returnSerializedValue(MODULE, 'x.S()')
 
     assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
+@pytest.mark.group_one
 def test_repeated_deserialize_externally_defined_alternative_is_stable():
     ser = returnSerializedValue(MODULE, 'x.MakeA()')
 
     assert SerializationContext().deserialize(ser) is SerializationContext().deserialize(ser)
 
 
+@pytest.mark.group_one
 def test_repeated_deserialize_externally_defined_anonymous_classes():
     ser = returnSerializedValue(MODULE, 'x.C()')
 
@@ -621,6 +672,7 @@ def test_repeated_deserialize_externally_defined_anonymous_classes():
     )
 
 
+@pytest.mark.group_one
 def test_serialization_of_anonymous_functions_preserves_references():
     ser = returnSerializedValue(MODULE, 'x.addToTypedGlobalMaker()')
 
@@ -635,6 +687,7 @@ def test_serialization_of_anonymous_functions_preserves_references():
     assert vals == (1, 2)
 
 
+@pytest.mark.group_one
 def test_hash_stability():
     idHash = evaluateExprInFreshProcess({
         'x.py': 'from typed_python.compiler.native_ast import NamedCallTarget\n'
@@ -651,6 +704,7 @@ def test_hash_stability():
     assert idHash == idHashDeserialized
 
 
+@pytest.mark.group_one
 def test_deserialize_external_recursive_class():
     ser = returnSerializedValue(MODULE, 'x.RecursiveClass()')
 
@@ -661,6 +715,7 @@ def test_deserialize_external_recursive_class():
     )
 
 
+@pytest.mark.group_one
 def test_dot_accesses():
     def f():
         return typed_python._types
@@ -682,6 +737,7 @@ def test_dot_accesses():
     assert getCodeGlobalDotAccesses(f3.__code__) == [['typed_python', 'f']]
 
 
+@pytest.mark.group_one
 def test_identity_of_entrypointed_functions():
     def f():
         return 0
@@ -689,10 +745,12 @@ def test_identity_of_entrypointed_functions():
     assert identityHash(Function(f)) != identityHash(Entrypoint(f))
 
 
+@pytest.mark.group_one
 def test_identity_of_singleton_classes():
     assert identityHash(A) != identityHash(B)
 
 
+@pytest.mark.group_one
 def test_type_walk_for_named_tuple_subclass():
     class N(NamedTuple()):
         def f(self):

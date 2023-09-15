@@ -22,6 +22,7 @@ from typed_python._types import recursiveTypeGroup, isRecursive
 
 
 class ForwardTypesTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic_forward_type_resolution(self):
         f = Forward("f")
         T = TupleOf(f)
@@ -32,6 +33,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(f.get(), int)
 
+    @pytest.mark.group_one
     def test_class_in_forward(self):
         class C(Class):
             x = Member(int)
@@ -41,6 +43,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         Fwd(C())
 
+    @pytest.mark.group_one
     def test_recursive_forwards(self):
         Value = Forward("Value")
         Value.define(OneOf(
@@ -48,6 +51,7 @@ class ForwardTypesTests(unittest.TestCase):
             ConstDict(str, Value)
         ))
 
+    @pytest.mark.group_one
     def test_forward_type_resolution_sequential(self):
         F0 = Forward("f0")
         T0 = TupleOf(F0)
@@ -60,6 +64,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(T1.__name__, "TupleOf(TupleOf(int))")
 
+    @pytest.mark.group_one
     def test_recursive_alternative(self):
         List = Forward("List")
         List = List.define(Alternative(
@@ -77,6 +82,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(list(lst.unpack()), list(reversed(range(100))))
 
+    @pytest.mark.group_one
     def test_mutually_recursive_classes(self):
         B0 = Forward("B")
 
@@ -95,6 +101,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertTrue(a.bvals[0].avals[0] == a)
 
+    @pytest.mark.group_one
     def test_recursives_held_infinitely_throws(self):
         X = Forward("X")
 
@@ -107,6 +114,7 @@ class ForwardTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "type-containment cycle"):
             X = X.define(Tuple(X))
 
+    @pytest.mark.group_one
     def test_tuple_of_one_of(self):
         X = Forward("X")
         T = TupleOf(OneOf(None, X))
@@ -123,6 +131,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(anotherX[0], anX)
 
+    @pytest.mark.group_one
     def test_deep_forwards_work(self):
         X = Forward("X")
         X = X.define(TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, X))))))
@@ -135,6 +144,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(anotherX[0][0][0][0], anX)
 
+    @pytest.mark.group_one
     def test_recursive_dicts(self):
         D = Forward("D")
         D = D.define(Dict(int, OneOf(int, D)))
@@ -150,6 +160,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(dInst, dInst[10])
 
+    @pytest.mark.group_one
     def test_forward_types_not_instantiatable(self):
         F = Forward("int")
         F.define(int)
@@ -157,6 +168,7 @@ class ForwardTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't construct"):
             F(10)
 
+    @pytest.mark.group_one
     def test_recursive_alternatives(self):
         X = Forward("X")
         X = X.define(
@@ -172,6 +184,7 @@ class ForwardTypesTests(unittest.TestCase):
         self.assertEqual(anX.y, 21)
         self.assertTrue(anX.x.matches.B)
 
+    @pytest.mark.group_one
     def test_recursive_oneof(self):
         OneOfTupleOfSelf = Forward("OneOfTupleOfSelf")
         OneOfTupleOfSelf = OneOfTupleOfSelf.define(OneOf(None, TupleOf(OneOfTupleOfSelf)))
@@ -186,6 +199,7 @@ class ForwardTypesTests(unittest.TestCase):
         self.assertTrue(isRecursive(TO.ElementType))
         self.assertEqual(TO.ElementType.__qualname__, "OneOf(None, TO)")
 
+    @pytest.mark.group_one
     def test_forward_types_identity_container(self):
         for ContainerKind in [TupleOf]:
             module = Module("M")
@@ -196,6 +210,7 @@ class ForwardTypesTests(unittest.TestCase):
             self.assertEqual(type(aRecursiveThing), module.RecursiveThing.Types[1])
             self.assertEqual(type(aRecursiveThing), ContainerKind(module.RecursiveThing))
 
+    @pytest.mark.group_one
     def test_forward_types_identity_dict(self):
         for DictKind in [Dict, ConstDict]:
             module = Module("M")
@@ -207,6 +222,7 @@ class ForwardTypesTests(unittest.TestCase):
             aRecursiveThing = module.RecursiveThing({None: 1})
             self.assertEqual(type(aRecursiveThing), DictKind(module.RecursiveThing, int))
 
+    @pytest.mark.group_one
     def test_forward_types_twice(self):
         module = Module("M")
         module.RecursiveThing = OneOf(
@@ -222,6 +238,7 @@ class ForwardTypesTests(unittest.TestCase):
             module.RecursiveThing.Types[2].ValueType, TupleOf(module.RecursiveThing)
         )
 
+    @pytest.mark.group_one
     def test_forwards_resolve_to_forward_in_cycle(self):
         Fs = [Forward(f"f{i}") for i in range(4)]
 
@@ -232,6 +249,7 @@ class ForwardTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "Can't resolve a forward to itself!"):
             Fs[3].define(Fs[0])
 
+    @pytest.mark.group_one
     def test_forwards_resolve_to_forward(self):
         Intermediate1 = Forward("Intermediate1")
         Intermediate2 = Forward("Intermediate2")
@@ -248,6 +266,7 @@ class ForwardTypesTests(unittest.TestCase):
 
         T0(((1, 2), (3, 4)))
 
+    @pytest.mark.group_one
     def test_check_recursive_group(self):
         module = Module("M")
 
@@ -264,6 +283,7 @@ class ForwardTypesTests(unittest.TestCase):
         self.assertTrue(A in recursiveTypeGroup(A))
         self.assertTrue(B in recursiveTypeGroup(A))
 
+    @pytest.mark.group_one
     def test_call_function_with_unresolved_forward_fails(self):
         X = Forward("X")
 

@@ -34,6 +34,7 @@ def timeIt(f):
 
 
 class TestGeneratorsAndComprehensions(unittest.TestCase):
+    @pytest.mark.group_one
     def test_list_comp(self):
         @Entrypoint
         def listComp(x):
@@ -44,6 +45,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(lst, list)
         assert lst == [a + 1 for a in range(10)]
 
+    @pytest.mark.group_one
     def test_set_comprehension(self):
         @Entrypoint
         def setComp(x):
@@ -54,6 +56,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(st, set)
         assert st == {a + 1 for a in range(10)}
 
+    @pytest.mark.group_one
     def test_tuple_comprehension(self):
         @Entrypoint
         def tupComp(x):
@@ -64,6 +67,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(tup, tuple)
         assert tup == tuple(a + 1 for a in range(10))
 
+    @pytest.mark.group_one
     def test_dict_comprehension(self):
         @Entrypoint
         def dictComp(x):
@@ -74,6 +78,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(d, dict)
         assert d == {a: a + 1 for a in range(10)}
 
+    @pytest.mark.group_one
     def test_dict_comprehension_multiple_types(self):
         def dictComp(x):
             return {k if (k%3) else "Boo": k + 1 if (k % 2) else "hi" for k in range(10)}
@@ -85,6 +90,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert d == dictComp(10)
 
+    @pytest.mark.group_one
     def test_list_from_listcomp(self):
         @Entrypoint
         def listComp(x):
@@ -95,6 +101,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert isinstance(lst, ListOf(int))
         assert lst == [a + 1 for a in range(10)]
 
+    @pytest.mark.group_one
     def test_generator_exp_is_generator(self):
         @Entrypoint
         def generatorComp(x):
@@ -107,6 +114,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert list(g) == [x + 1 for x in range(10)]
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_list_from_listcomp_perf(self):
         def sum(iterable):
             res = 0
@@ -164,6 +172,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert untypedTime / avgCompiledTime > 10
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_untyped_tuple_from_listcomp_perf(self):
         import time
 
@@ -227,6 +236,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         self.assertLess(currentMemUsageMb() - memUsage, threshold)
 
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_listcomp_doesnt_leak(self):
         @Entrypoint
         def listComp(x):
@@ -245,6 +255,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         self.executeInLoop(lambda: sumListComp(1000000), duration=.1, threshold=20.0)
         self.executeInLoop(lambda: sumListComp(1000000), duration=.25, threshold=1.0)
 
+    @pytest.mark.group_one
     def test_call_generator(self):
         @Entrypoint
         def generateInts(ct):
@@ -253,6 +264,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(100)) == [1, 2]
 
+    @pytest.mark.group_one
     def test_call_generator_with_branch(self):
         @Entrypoint
         def generateInts(ct):
@@ -268,6 +280,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert list(generateInts(1)) == [1, 2, 4]
         assert list(generateInts(-1)) == [1, 3, 4]
 
+    @pytest.mark.group_one
     def test_call_generator_with_loop(self):
         @Entrypoint
         def generateInts(ct):
@@ -282,6 +295,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert list(generateInts(10)) == list(range(10)) + [-1, -2]
         assert list(generateInts(0)) == list(range(0)) + [-1, -2]
 
+    @pytest.mark.group_one
     def test_call_generator_with_closure_var(self):
         xInClosure = 100
 
@@ -294,6 +308,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(10)) == [1, 100, 10, 2]
 
+    @pytest.mark.group_one
     def test_call_generator_with_arg_assign(self):
         @Entrypoint
         def generateInts(ct):
@@ -303,6 +318,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(10)) == [10, 2]
 
+    @pytest.mark.group_one
     def test_call_generator_with_aug_assign(self):
         @Entrypoint
         def generateInts(ct):
@@ -316,6 +332,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(0)) == [0, 1, 3, 6]
 
+    @pytest.mark.group_one
     def test_call_generator_with_ann_assign(self):
         @Entrypoint
         def generateInts(ct):
@@ -325,6 +342,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(0)) == [0, 1]
 
+    @pytest.mark.group_one
     def test_call_generator_with_pass(self):
         @Entrypoint
         def generateInts(ct):
@@ -335,6 +353,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(100)) == [100]
 
+    @pytest.mark.group_one
     def test_call_generator_with_continue(self):
         @Entrypoint
         def generateInts(ct):
@@ -351,6 +370,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(5)) == [0, 1, 1, 2, 3, 3, 4, 5]
 
+    @pytest.mark.group_one
     def test_call_generator_with_break(self):
         @Entrypoint
         def generateInts(ct):
@@ -367,6 +387,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(5)) == [0, 1, 1]
 
+    @pytest.mark.group_one
     def test_call_generator_with_closure_var_cant_assign(self):
         xInClosure = 100
 
@@ -381,6 +402,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         with self.assertRaises(NameError):
             assert list(generateInts(10)) == [1, 100, 10, 2]
 
+    @pytest.mark.group_one
     def test_call_generator_with_assert(self):
         @Entrypoint
         def generateInts(ct):
@@ -393,6 +415,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts(15)) == [15, 5]
 
+    @pytest.mark.group_one
     def test_call_generator_with_try_finally(self):
         @Entrypoint
         def generateInts():
@@ -409,6 +432,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts()) == [1, 2, 3, 4, 5]
 
+    @pytest.mark.group_one
     def test_call_generator_with_try(self):
         @Entrypoint
         def generateInts():
@@ -435,6 +459,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(generateInts()) == [1, 2, 3, 4, 5, 6]
 
+    @pytest.mark.group_one
     def test_generator_produces_stop_iteration_when_done(self):
         @Entrypoint
         def generateInts():
@@ -456,6 +481,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         with pytest.raises(StopIteration):
             g.__next__()
 
+    @pytest.mark.group_one
     def test_raise_in_generator_stops_iteration(self):
         @Entrypoint
         def generateInts():
@@ -480,6 +506,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
             g.__next__()
 
     @pytest.mark.skip(reason='not implemented yet')
+    @pytest.mark.group_one
     def test_reraise_in_generator_after_yield(self):
         @Entrypoint
         def generateInts():
@@ -503,6 +530,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         with pytest.raises(Exception, match="catch me"):
             g.__next__()
 
+    @pytest.mark.group_one
     def test_return_in_generator(self):
         @Entrypoint
         def generateInts():
@@ -524,6 +552,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         except StopIteration as i:
             assert i.args == ()
 
+    @pytest.mark.group_one
     def test_argless_return_in_generator(self):
         @Entrypoint
         def generateInts():
@@ -545,6 +574,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         except StopIteration as i:
             assert i.args == ()
 
+    @pytest.mark.group_one
     def test_with_in_generator(self):
         class ContextManager(Class, Final):
             entered = Member(int)
@@ -598,6 +628,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert g.__next__() == 6
         assert cm.entered == 0
 
+    @pytest.mark.group_one
     def test_for_in_generator(self):
         @Entrypoint
         def generateInts(x):
@@ -624,6 +655,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         with self.assertRaises(StopIteration):
             assert g.__next__() == -3
 
+    @pytest.mark.group_one
     def test_for_in_generator_over_various_builtin_types(self):
         @Entrypoint
         def generate(l):
@@ -638,6 +670,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         ]:
             assert list(generate(toIterate)) == list(toIterate)
 
+    @pytest.mark.group_one
     def test_can_iterate_class(self):
         class C(Class, Final):
             x = Member(int)
@@ -660,6 +693,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         print(list(c))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_can_iterate_class_perf(self):
         class C(Class, Final):
             x = Member(int)
@@ -710,6 +744,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         # I get about 12.
         assert elapsedUntyped / elapsedTyped > 4
 
+    @pytest.mark.group_one
     def test_can_use_lambdas_in_generators(self):
         @Entrypoint
         def iterate(x):
@@ -720,6 +755,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [2, 20]
 
+    @pytest.mark.group_one
     def test_can_use_lambdas_in_generators_with_renamed_variables(self):
         @Entrypoint
         def iterate(x):
@@ -730,6 +766,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [2, 20]
 
+    @pytest.mark.group_one
     def test_can_make_closures_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -741,6 +778,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [2, 20]
 
+    @pytest.mark.group_one
     def test_generator_interior_closures_masked_correctly(self):
         @Entrypoint
         def iterate(x):
@@ -753,6 +791,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [2, 20]
 
+    @pytest.mark.group_one
     def test_generator_interior_closures_capture(self):
         @Entrypoint
         def iterate(x):
@@ -763,6 +802,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [11]
 
+    @pytest.mark.group_one
     def test_generator_doubly_interior_closures_masked_correctly(self):
         @Entrypoint
         def iterate(x):
@@ -777,6 +817,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [2, 20]
 
+    @pytest.mark.group_one
     def test_generator_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -792,6 +833,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [3, 5, 12, 14]
 
+    @pytest.mark.group_one
     def test_generator_in_generator_reading_parent(self):
         @Entrypoint
         def iterate(x):
@@ -802,6 +844,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [11]
 
+    @pytest.mark.group_one
     def test_list_comp_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -809,6 +852,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [list(range(10))]
 
+    @pytest.mark.group_one
     def test_set_comp_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -816,6 +860,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [set(range(10))]
 
+    @pytest.mark.group_one
     def test_tuple_comp_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -823,6 +868,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert list(iterate(10)) == [tuple(range(10))]
 
+    @pytest.mark.group_one
     def test_dict_comp_in_generator(self):
         @Entrypoint
         def iterate(x):
@@ -831,6 +877,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert list(iterate(10)) == [{z: z + 1 for z in range(10)}]
 
     @pytest.mark.skip("not implemented yet")
+    @pytest.mark.group_one
     def test_list_comp_masking(self):
         # check that the masking behavior of nested variables in list comps is right
         # technically, each successive listcomp is its own scope
@@ -843,6 +890,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         x = 10
         assert iterate(10) == [x+1 for x in range(x) for x in range(x - 3)]
 
+    @pytest.mark.group_one
     def test_type_annotations_on_generator(self):
         @Entrypoint
         def iterate(x) -> Generator(OneOf(None, int)):
@@ -850,6 +898,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert isinstance(iterate(10), Generator(OneOf(None, int)))
 
+    @pytest.mark.group_one
     def test_generators_come_precompiled(self):
         # verify that once we trigger a generator
         # we don't force it to compile when we actually use it -
@@ -887,6 +936,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
         assert secondTime < 0.0001
         assert thirdTime < 0.0001
 
+    @pytest.mark.group_one
     def test_generators_on_object_instances(self):
         @Entrypoint
         def callAll(x: object):
@@ -894,6 +944,7 @@ class TestGeneratorsAndComprehensions(unittest.TestCase):
 
         assert callAll(['1', '2']) == ['1', '2']
 
+    @pytest.mark.group_one
     def test_generator_on_object_instance_type(self):
         def startIterating(x):
             for y in x:

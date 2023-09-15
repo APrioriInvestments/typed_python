@@ -17,6 +17,7 @@ import unittest
 
 
 class ModuleTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_definining_members(self):
         m = Module("M")
         m.Int = int
@@ -28,6 +29,7 @@ class ModuleTest(unittest.TestCase):
 
         self.assertEqual(m.T, TupleOf(int))
 
+    @pytest.mark.group_one
     def test_defining_classes(self):
         m = Module("M")
 
@@ -44,6 +46,7 @@ class ModuleTest(unittest.TestCase):
 
         self.assertTrue(y.x.y.x is None)
 
+    @pytest.mark.group_one
     def test_cant_assign_lower_case(self):
         m = Module("M")
         with self.assertRaises(AttributeError):
@@ -52,6 +55,7 @@ class ModuleTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             m._int = int
 
+    @pytest.mark.group_one
     def test_freezing_prevents_defining(self):
         m = Module("M")
         m.Int = int
@@ -60,6 +64,7 @@ class ModuleTest(unittest.TestCase):
         with self.assertRaises(Exception):
             m.Float = float
 
+    @pytest.mark.group_one
     def test_freezing_fails_if_undefined(self):
         m = Module("M")
         m.T = TupleOf(m.I)

@@ -32,6 +32,7 @@ A = Alternative(
 
 
 class TestTypeInference(unittest.TestCase):
+    @pytest.mark.group_one
     def test_basic_inference(self):
         @Function
         def f(x, y):
@@ -41,6 +42,7 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(int, float).typeRepresentation, float)
         self.assertEqual(f.resultTypeFor(int, str), None)
 
+    @pytest.mark.group_one
     def test_sequential_assignment(self):
         @Function
         def f(x):
@@ -50,6 +52,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(int).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_if_short_circuit(self):
         @Function
         def f(x):
@@ -61,6 +64,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(int).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_if_merging(self):
         @Function
         def f(x):
@@ -72,6 +76,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(set(f.resultTypeFor(int).typeRepresentation.Types), set([int, str]))
 
+    @pytest.mark.group_one
     def test_isinstance_propagates(self):
         @Function
         def f(x):
@@ -82,6 +87,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(OneOf(str, int)).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_alternative_inference(self):
         @Function
         def f(anA):
@@ -89,6 +95,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(set(f.resultTypeFor(A).typeRepresentation.Types), set([int, str]))
 
+    @pytest.mark.group_one
     def test_alternative_inference_with_branch(self):
         @Function
         def f(anA):
@@ -99,6 +106,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(A).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_alternative_inference_with_nonsense_branch(self):
         @Function
         def f(anA):
@@ -109,6 +117,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(A).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_no_result_from_while_true(self):
         @Function
         def f(x):
@@ -120,6 +129,7 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(int).typeRepresentation, int)
         self.assertEqual(Entrypoint(f)(10), 10001)
 
+    @pytest.mark.group_one
     def test_infer_type_object(self):
         @Function
         def f(x):
@@ -131,6 +141,7 @@ class TestTypeInference(unittest.TestCase):
             set([Value(int), Value(str)])
         )
 
+    @pytest.mark.group_one
     def test_infer_result_of_uint8(self):
         @Entrypoint
         def f(x):
@@ -138,6 +149,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor(float).typeRepresentation, UInt8)
 
+    @pytest.mark.group_one
     def test_infer_result_of_uint8_constant(self):
         @Entrypoint
         def f():
@@ -145,6 +157,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f.resultTypeFor().typeRepresentation, UInt8)
 
+    @pytest.mark.group_one
     def test_infer_list_item(self):
         @Function
         def f(a: ListOf(str), x: int):
@@ -157,6 +170,7 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(ListOf(str), int).typeRepresentation, str)
         self.assertEqual(g.resultTypeFor(object, int).typeRepresentation, object)
 
+    @pytest.mark.group_one
     def test_infer_conditional_eval_exception(self):
         @Function
         def exc():
@@ -198,6 +212,7 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(set(or3.resultTypeFor(int, float).typeRepresentation.Types), set([int, float]))
         self.assertEqual(set(or3.resultTypeFor(float, int).typeRepresentation.Types), set([int, float]))
 
+    @pytest.mark.group_one
     def test_infer_type_of_assignment_with_guard(self):
         @Function
         def f(x):
@@ -214,6 +229,7 @@ class TestTypeInference(unittest.TestCase):
         self.assertEqual(f.resultTypeFor(None).typeRepresentation, int)
         self.assertEqual(f.resultTypeFor(float).typeRepresentation, int)
 
+    @pytest.mark.group_one
     def test_infer_type_of_nocompile(self):
         @NotCompiled
         def f() -> int:
@@ -229,6 +245,7 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(f2.resultTypeFor().typeRepresentation, object)
 
+    @pytest.mark.group_one
     def test_compiler_can_see_through_explicitly_constructed_typed_tuples(self):
         @Entrypoint
         def returnTupElts(x):
@@ -236,6 +253,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTupElts.resultTypeFor(int).typeRepresentation == int
 
+    @pytest.mark.group_one
     def test_compiler_can_see_through_untyped_tuples(self):
         @Entrypoint
         def returnTupElts(x):
@@ -243,6 +261,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTupElts.resultTypeFor(int).typeRepresentation == int
 
+    @pytest.mark.group_one
     def test_compiler_can_merge_like_untyped_tuples(self):
         @Entrypoint
         def returnTupElts(x):
@@ -255,6 +274,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTupElts.resultTypeFor(int).typeRepresentation == int
 
+    @pytest.mark.group_one
     def test_compiler_can_converts_unlike_untyped_tuples_to_object(self):
         @Entrypoint
         def returnTupElts(x):
@@ -267,6 +287,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTupElts.resultTypeFor(int).typeRepresentation is tuple
 
+    @pytest.mark.group_one
     def test_tuple_as_variable_traces_properly(self):
         @Entrypoint
         def returnTupElts(x):
@@ -276,6 +297,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTupElts.resultTypeFor(float).typeRepresentation is Tuple(int, int, float)
 
+    @pytest.mark.group_one
     def test_compiler_knows_type_of_arguments(self):
         @Entrypoint
         def returnTypeOfArgument(x):
@@ -285,6 +307,7 @@ class TestTypeInference(unittest.TestCase):
         assert returnTypeOfArgument(10.5) is float
         assert returnTypeOfArgument(float) is Value(float)
 
+    @pytest.mark.group_one
     def test_compiler_knows_it_has_oneofs(self):
         @Entrypoint
         def returnTypeOfArgument(x):
@@ -297,6 +320,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert returnTypeOfArgument(10) is OneOf(float, int)
 
+    @pytest.mark.group_one
     def test_compiler_knows_that_isinstance_constrains_types(self):
         @Entrypoint
         def returnTypeOfArgument(x):
@@ -313,6 +337,7 @@ class TestTypeInference(unittest.TestCase):
         assert returnTypeOfArgument(10) is int
         assert returnTypeOfArgument(0) is float
 
+    @pytest.mark.group_one
     def test_compiler_knows_local_variable_types(self):
         @Entrypoint
         def localVariableTypes(x):
@@ -326,6 +351,7 @@ class TestTypeInference(unittest.TestCase):
         res = localVariableTypes(10)
         assert res == dict(x=int, y=OneOf(float, int))
 
+    @pytest.mark.group_one
     def test_type_inference_perf(self):
         t0 = time.time()
         f = Function(lambda o: o + 1)
@@ -338,6 +364,7 @@ class TestTypeInference(unittest.TestCase):
         # I get around 0.03 on my desktop with the caching, and .7 without it
         assert time.time() - t0 < .4
 
+    @pytest.mark.group_one
     def test_type_inference_with_exceptions(self):
         # check that if we catch an arbitrary exception, then we can't really
         # know what the type of a variable coming out of the exception block.
@@ -383,6 +410,7 @@ class TestTypeInference(unittest.TestCase):
 
         assert check3()['y'] == OneOf(float, str)
 
+    @pytest.mark.group_one
     def test_restricts_based_on_isinstance(self):
         # check that the compiler understands how to restrict a OneOf based on 'is None'
         @Entrypoint
@@ -393,6 +421,7 @@ class TestTypeInference(unittest.TestCase):
         assert f("hi")['x'] == str
 
     @pytest.mark.skipif("sys.version_info.minor < 8")
+    @pytest.mark.group_one
     def test_restricts_based_on_None(self):
         # check that the compiler understands how to restrict a OneOf based on 'is None'
         @Entrypoint
@@ -412,6 +441,7 @@ class TestTypeInference(unittest.TestCase):
         assert f("hi")['x'] == str
 
     @pytest.mark.skipif("sys.version_info.minor < 8")
+    @pytest.mark.group_one
     def test_assertion_prunes_types(self):
         @Entrypoint
         def f(x: OneOf(None, str)):
@@ -423,6 +453,7 @@ class TestTypeInference(unittest.TestCase):
         assert f.resultTypeFor(type(None)).typeRepresentation is str
 
     @pytest.mark.skipif("sys.version_info.minor < 8")
+    @pytest.mark.group_one
     def test_branch_with_raise_prunes_types(self):
         @Entrypoint
         def f(x: OneOf(None, str)):

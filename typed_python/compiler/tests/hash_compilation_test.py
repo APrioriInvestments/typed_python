@@ -28,6 +28,7 @@ def compiledHash(x):
 
 
 class TestHashCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_hashes_equivalent_integers(self):
         someIntegers = []
 
@@ -39,6 +40,7 @@ class TestHashCompilation(unittest.TestCase):
             for intVal in someIntegers:
                 self.assertEqual(hash(intType(intVal)), int(compiledHash(intType(intVal))), (intType, intVal, intType(intVal)))
 
+    @pytest.mark.group_one
     def test_hashes_equivalent_floats(self):
         # we have to do this through tuples because if we 'hash' a normal python str,
         # we use python's hash function which is not the same as the typed_python one.
@@ -51,6 +53,7 @@ class TestHashCompilation(unittest.TestCase):
 
                 self.assertEqual(hash(tup), compiledHash(tup))
 
+    @pytest.mark.group_one
     def test_hash_tuples(self):
         for valueMaker in [
             lambda: Tuple()(()),
@@ -59,6 +62,7 @@ class TestHashCompilation(unittest.TestCase):
         ]:
             self.assertEqual(hash(valueMaker()), compiledHash(valueMaker()))
 
+    @pytest.mark.group_one
     def test_hash_strings_and_bytes(self):
         # we have to do this through tuples because if we 'hash' a normal python str,
         # we use python's hash function which is not the same as the typed_python one.

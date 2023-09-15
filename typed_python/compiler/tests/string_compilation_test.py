@@ -64,6 +64,7 @@ def callOrExceptNoType(f, *args):
 
 
 class TestStringCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_string_passing_and_refcounting(self):
         @Compiled
         def takeFirst(x: str, y: str):
@@ -78,6 +79,7 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(s, takeFirst(s, s2))
                 self.assertEqual(s2, takeSecond(s, s2))
 
+    @pytest.mark.group_one
     def test_string_len(self):
         @Compiled
         def compiledLen(x: str):
@@ -86,6 +88,7 @@ class TestStringCompilation(unittest.TestCase):
         for s in someStrings:
             self.assertEqual(len(s), compiledLen(s))
 
+    @pytest.mark.group_one
     def test_string_concatenation(self):
         @Compiled
         def concat(x: str, y: str):
@@ -100,6 +103,7 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(s+s2, concat(s, s2))
                 self.assertEqual(len(s+s2), concatLen(s, s2))
 
+    @pytest.mark.group_one
     def test_string_comparison(self):
         @Compiled
         def lt(x: str, y: str):
@@ -134,6 +138,7 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(gt(s, s2), s > s2)
                 self.assertEqual(lt(s, s2), s < s2)
 
+    @pytest.mark.group_one
     def test_string_constants(self):
         def makeConstantConcatenator(s):
             def returner():
@@ -146,6 +151,7 @@ class TestStringCompilation(unittest.TestCase):
 
             self.assertEqual(s, s_from_code, (repr(s), repr(s_from_code)))
 
+    @pytest.mark.group_one
     def test_string_getitem(self):
         @Compiled
         def getitem(x: str, y: int):
@@ -155,6 +161,7 @@ class TestStringCompilation(unittest.TestCase):
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
+    @pytest.mark.group_one
     def test_string_ord(self):
         @Compiled
         def callOrd(x: str):
@@ -168,6 +175,7 @@ class TestStringCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "of length 4 found"):
             callOrd("asdf")
 
+    @pytest.mark.group_one
     def test_string_chr(self):
         @Compiled
         def callChr(x: int):
@@ -176,6 +184,7 @@ class TestStringCompilation(unittest.TestCase):
         for i in range(0, 0x10ffff + 1):
             self.assertEqual(ord(callChr(i)), i)
 
+    @pytest.mark.group_one
     def test_string_startswith_endswith(self):
         def startswith(x: str, y: str):
             return x.startswith(y)
@@ -213,6 +222,7 @@ class TestStringCompilation(unittest.TestCase):
                             (s1, s2, start, end)
                         )
 
+    @pytest.mark.group_one
     def test_string_tuple_startswith_endswith(self):
         def startswith(x, y):
             return x.startswith(y)
@@ -258,6 +268,7 @@ class TestStringCompilation(unittest.TestCase):
                             (s, t, start, end)
                         )
 
+    @pytest.mark.group_one
     def test_string_replace(self):
         def replace(x: str, y: str, z: str):
             return x.replace(y, z)
@@ -281,6 +292,7 @@ class TestStringCompilation(unittest.TestCase):
                     for i in [-1, 0, 1, 2]:
                         self.assertEqual(replace2(s1, s2, s3, i), replace2Compiled(s1, s2, s3, i), (s1, s2, s3, i))
 
+    @pytest.mark.group_one
     def test_string_getitem_slice(self):
         def getitem1(x: str, y: int):
             return x[:y]
@@ -303,6 +315,7 @@ class TestStringCompilation(unittest.TestCase):
                 for j in range(-5, 10):
                     self.assertEqual(getitem3(s, i, j), getitem3Compiled(s, i, j), (s, i, j))
 
+    @pytest.mark.group_one
     def test_string_lower_upper(self):
 
         @Compiled
@@ -349,6 +362,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s), s)
             self.assertEqual(callOrExceptType(c_upper2, s, s), callOrExceptType(s.upper, s), s)
 
+    @pytest.mark.group_one
     def test_string_find(self):
 
         @Compiled
@@ -363,6 +377,7 @@ class TestStringCompilation(unittest.TestCase):
         def c_find_2(s: str, sub: str):
             return s.find(sub)
 
+        @pytest.mark.group_one
         def test_find(t):
             substrings = ["", "x", "xyz", "a"*100, t[0:-2] + t[-1] if len(t) > 2 else ""]
             for start in range(0, min(len(t), 8)):
@@ -417,6 +432,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2))
             self.assertEqual(callOrExceptType(c_find_1, s), callOrExceptType(s.find))
 
+    @pytest.mark.group_one
     def test_string_find2(self):
         def f_find(x, sub):
             return x.find(sub)
@@ -494,6 +510,7 @@ class TestStringCompilation(unittest.TestCase):
                                 with self.assertRaises(ValueError):
                                     Entrypoint(g)(v, sub, start, end)
 
+    @pytest.mark.group_one
     def test_string_count(self):
         def f_count(x, sub):
             return x.count(sub)
@@ -525,6 +542,7 @@ class TestStringCompilation(unittest.TestCase):
                         r2 = Entrypoint(f)(v, sub, start, end)
                         self.assertEqual(r1, r2, (v, sub, start, end))
 
+    @pytest.mark.group_one
     def test_string_from_float(self):
         @Compiled
         def toString(f: float):
@@ -535,6 +553,7 @@ class TestStringCompilation(unittest.TestCase):
         self.assertEqual(toString(1), "1.0")
 
     @pytest.mark.skipif("sys.version_info.minor >= 8", reason="differences in unicode handling between 3.7 and 3.8")
+    @pytest.mark.group_one
     def test_string_is_something(self):
         @Compiled
         def c_isalpha(s: str):
@@ -621,6 +640,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(c_istitle(s), s.istitle(), s)
 
     @pytest.mark.skipif("sys.version_info.minor >= 8", reason="differences in unicode handling between 3.7 and 3.8")
+    @pytest.mark.group_one
     def test_string_case(self):
         def f_lower(x):
             return x.lower()
@@ -660,6 +680,7 @@ class TestStringCompilation(unittest.TestCase):
                 r2 = Entrypoint(f)(v)
                 self.assertEqual(r1, r2, (f, v))
 
+    @pytest.mark.group_one
     def test_string_strip(self):
         @Compiled
         def strip(s: str):
@@ -701,6 +722,7 @@ class TestStringCompilation(unittest.TestCase):
                     self.assertEqual(r1, r2, (f, s, p))
 
     @pytest.mark.skip(reason='just for comparing performance when changing implementation')
+    @pytest.mark.group_one
     def test_string_find_perf(self):
         @Compiled
         def c_find(c: str, s: str) -> int:
@@ -721,6 +743,7 @@ class TestStringCompilation(unittest.TestCase):
         self.assertTrue(False)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_string_strip_perf(self):
         bigS = " " * 1000000
         littleS = " "
@@ -748,6 +771,7 @@ class TestStringCompilation(unittest.TestCase):
 
             self.assertLess(ratio, expectedRatio)
 
+    @pytest.mark.group_one
     def test_string_split(self):
         def f_split(s: str, *args) -> ListOf(str):
             return s.split(*args)
@@ -815,6 +839,7 @@ class TestStringCompilation(unittest.TestCase):
         self.assertLess(endusage, startusage + 1)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_string_split_perf(self):
         def splitAndCount(s: str, sep: str, times: int):
             res = 0
@@ -836,6 +861,7 @@ class TestStringCompilation(unittest.TestCase):
             f"Compiler was {compiled / uncompiled} times slower."
         )
 
+    @pytest.mark.group_one
     def test_type_of_string_split(self):
         def splitType():
             return type("asdf".split("s"))
@@ -892,6 +918,7 @@ class TestStringCompilation(unittest.TestCase):
             res = function(separator, make_obj(items))
             self.assertEqual(expected, res, description)
 
+    @pytest.mark.group_one
     def test_string_join_for_tuple_of_str(self):
         # test passing tuple of strings
         @Compiled
@@ -900,6 +927,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.validate_joining_strings(f, lambda items: TupleOf(str)(items))
 
+    @pytest.mark.group_one
     def test_string_join_for_list_of_str(self):
         # test passing list of strings
         @Compiled
@@ -908,6 +936,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.validate_joining_strings(f, lambda items: ListOf(str)(items))
 
+    @pytest.mark.group_one
     def test_string_join_for_dict_of_str(self):
         # test passing list of strings
         @Compiled
@@ -916,6 +945,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.validate_joining_strings(f, lambda items: Dict(str, str)({i: "a" for i in items}))
 
+    @pytest.mark.group_one
     def test_string_join_for_const_dict_of_str(self):
         # test passing list of strings
         @Compiled
@@ -924,6 +954,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.validate_joining_strings(f, lambda items: ConstDict(str, str)({i: "a" for i in items}))
 
+    @pytest.mark.group_one
     def test_string_join_for_bad_types(self):
         """str.join supports only joining ListOf(str) or TupleOf(str)."""
 
@@ -943,6 +974,7 @@ class TestStringCompilation(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, ""):
             f_int(",", ListOf(int)([1, 2, 3]))
 
+    @pytest.mark.group_one
     def test_fstring(self):
         @Compiled
         def f():
@@ -957,6 +989,7 @@ class TestStringCompilation(unittest.TestCase):
         # Note: this test fails with 1.23456 instead of 1.234567
         # due to inexact representation of that value as 1.2345600000000001
 
+    @pytest.mark.group_one
     def test_fstring_exception(self):
         @Compiled
         def f():
@@ -965,6 +998,7 @@ class TestStringCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "not_valid"):
             f()
 
+    @pytest.mark.group_one
     def test_string_contains_string(self):
         @Entrypoint
         def f(x, y):
@@ -984,6 +1018,7 @@ class TestStringCompilation(unittest.TestCase):
         self.assertTrue(fNot("b", ListOf(str)(["asfd"])))
         self.assertFalse(fNot("asdf", ListOf(str)(["asdf"])))
 
+    @pytest.mark.group_one
     def test_string_of_global_function(self):
         def f():
             return str(callOrExcept)
@@ -995,6 +1030,7 @@ class TestStringCompilation(unittest.TestCase):
         self.assertEqual(callit(f), str(callOrExcept))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_compare_strings_to_constant(self):
         @Entrypoint
         def countEqualTo(z):
@@ -1016,6 +1052,7 @@ class TestStringCompilation(unittest.TestCase):
         # I get about .03
         self.assertLess(elapsed, .1)
 
+    @pytest.mark.group_one
     def test_add_constants(self):
         @Entrypoint
         def addConstants(count):
@@ -1032,6 +1069,7 @@ class TestStringCompilation(unittest.TestCase):
         # llvm should recognize that this is just 'N' and so it should take no time.
         self.assertLess(time.time() - t0, 1e-4)
 
+    @pytest.mark.group_one
     def test_bad_string_index(self):
         @Entrypoint
         def doIt(x: OneOf(str, ConstDict(str, str))):
@@ -1039,6 +1077,7 @@ class TestStringCompilation(unittest.TestCase):
 
         doIt({'bd': 'yes'})
 
+    @pytest.mark.group_one
     def test_iterate_list_of_strings(self):
         @Entrypoint
         def sumSplit(x: str):
@@ -1050,6 +1089,7 @@ class TestStringCompilation(unittest.TestCase):
         assert sumSplit("1") == 1
         assert sumSplit("1,2") == 3
 
+    @pytest.mark.group_one
     def test_can_split_result_of_split(self):
         @Entrypoint
         def sumSplit(x: str):
@@ -1062,6 +1102,7 @@ class TestStringCompilation(unittest.TestCase):
         assert sumSplit("1") == 1
         assert sumSplit("1.2,2") == 5
 
+    @pytest.mark.group_one
     def test_can_index_into_result_of_split(self):
         @Entrypoint
         def sumSplit(x: str):
@@ -1077,6 +1118,7 @@ class TestStringCompilation(unittest.TestCase):
 
         assert sumSplit("1.2,2") == 3
 
+    @pytest.mark.group_one
     def test_call_int_on_object(self):
         @Entrypoint
         def f(x: object):
@@ -1084,6 +1126,7 @@ class TestStringCompilation(unittest.TestCase):
 
         assert f("1") == 1
 
+    @pytest.mark.group_one
     def test_string_iteration(self):
         def iter(x: str):
             r = ListOf(str)()
@@ -1119,6 +1162,7 @@ class TestStringCompilation(unittest.TestCase):
             r2 = Compiled(contains_space)(v)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_string_mult(self):
         def f_mult(x, n):
             return x * n
@@ -1129,6 +1173,7 @@ class TestStringCompilation(unittest.TestCase):
             r2 = Entrypoint(f_mult)(v, n)
             self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_string_decode(self):
         # various permutation of parameters (positional, keyword, missing)
         def f_1(x, enc, err):
@@ -1151,6 +1196,7 @@ class TestStringCompilation(unittest.TestCase):
                         r2 = callOrExceptType(Entrypoint(f), v, enc, err)
                         self.assertEqual(r1, r2)
 
+    @pytest.mark.group_one
     def test_string_encode(self):
         # various permutation of parameters (positional, keyword, missing)
         def f_1(x, enc, err):
@@ -1174,6 +1220,7 @@ class TestStringCompilation(unittest.TestCase):
                         self.assertEqual(r1, r2, (f, v, enc, err))
 
     @pytest.mark.skip(reason='not performant')
+    @pytest.mark.group_one
     def test_string_codec(self):
         s1 = ''.join([chr(i) for i in range(0, 0x10ffff, 13) if i < 0xD800 or i > 0xDFFF])
         s2 = ''.join([chr(i) for i in range(1, 0x10ffff, 17) if i < 0xD800 or i > 0xDFFF])
@@ -1201,6 +1248,7 @@ class TestStringCompilation(unittest.TestCase):
             self.assertTrue(c_endecode(v))
 
     @pytest.mark.skip(reason='not performant')
+    @pytest.mark.group_one
     def test_string_codec_perf(self):
         repeat = 500
         s1 = ''.join([chr(i) for i in range(0, 0x10ffff, 13) if i < 0xD800 or i > 0xDFFF])
@@ -1255,6 +1303,7 @@ class TestStringCompilation(unittest.TestCase):
         t3 = time.time()
         print("compiled2 ", t3 - t2)
 
+    @pytest.mark.group_one
     def test_string_partition(self):
         def f_partition(x, sep):
             return x.partition(sep)
@@ -1275,6 +1324,7 @@ class TestStringCompilation(unittest.TestCase):
                 with self.assertRaises(TypeError):
                     Entrypoint(f)(v, b'abc')
 
+    @pytest.mark.group_one
     def test_string_just(self):
         def f_center(x, w, fill):
             if fill == ' ':
@@ -1309,6 +1359,7 @@ class TestStringCompilation(unittest.TestCase):
                     with self.assertRaises(TypeError):
                         Entrypoint(f)(v, w, b'X')
 
+    @pytest.mark.group_one
     def test_string_tabs(self):
         def f_expandtabs(x, t):
             return x.expandtabs(t)
@@ -1335,6 +1386,7 @@ class TestStringCompilation(unittest.TestCase):
                 r2 = Entrypoint(f_splitlines)(v, k)
                 self.assertEqual(r1, r2, (v, k))
 
+    @pytest.mark.group_one
     def test_string_zfill(self):
         def f_zfill(x, w):
             return x.zfill(w)
@@ -1345,6 +1397,7 @@ class TestStringCompilation(unittest.TestCase):
                 r2 = Entrypoint(f_zfill)(v, w)
                 self.assertEqual(r1, r2, (v, w))
 
+    @pytest.mark.group_one
     def test_string_translate(self):
         def f_translate(s, t):
             return s.translate(t)
@@ -1364,6 +1417,7 @@ class TestStringCompilation(unittest.TestCase):
                 r2 = c_translate(s, t)
                 self.assertEqual(r1, r2, s)
 
+    @pytest.mark.group_one
     def test_string_maketrans(self):
         def f_maketrans(*args):
             return str.maketrans(*args)
@@ -1403,6 +1457,7 @@ class TestStringCompilation(unittest.TestCase):
                 r4 = s.translate(r2[1])
                 self.assertEqual(r3, r4, args)
 
+    @pytest.mark.group_one
     def test_string_internal_fns(self):
         """
         These are functions that are normally not called directly.

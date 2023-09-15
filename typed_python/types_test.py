@@ -184,10 +184,12 @@ class RandomValueProducer:
 
 
 class TypesTests(unittest.TestCase):
+    @pytest.mark.group_one
     def test_alternative_module(self):
         assert AnAlternative.__module__ == 'typed_python.types_test'
         assert AForwardAlternative.__module__ == 'typed_python.types_test'
 
+    @pytest.mark.group_one
     def test_refcount_bug_with_simple_string(self):
         with self.assertRaisesRegex(TypeError, "first argument to refcount '111' not a permitted Type"):
             _types.refcount(111)
@@ -205,6 +207,7 @@ class TypesTests(unittest.TestCase):
             .format(expected=expected, elapsed=elapsed)
         )
 
+    @pytest.mark.group_one
     def test_object_binary_compatibility(self):
         ibc = _types.isBinaryCompatible
 
@@ -228,6 +231,7 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(ibc(OneOf(int, float), OneOf(float, int)))
         self.assertTrue(ibc(OneOf(int, X), OneOf(int, Y)))
 
+    @pytest.mark.group_one
     def test_binary_compatibility_incompatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 
@@ -245,6 +249,7 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.X, A2.X))
         self.assertFalse(ibc(A1.Y, A2.Y))
 
+    @pytest.mark.group_one
     def test_binary_compatibility_compatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 
@@ -257,12 +262,14 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.X, A2.Y))
         self.assertFalse(ibc(A1.Y, A2.X))
 
+    @pytest.mark.group_one
     def test_name_of_type_as_value_instances(self):
         T1 = Alternative("T1")
 
         assert Value(T1).__name__ == 'Value(' + T1.__name__ + ")"
         assert Value(2).__name__ == '2'
 
+    @pytest.mark.group_one
     def test_callable_alternatives(self):
         def myCall(self):
             if self.matches.One:
@@ -289,15 +296,18 @@ class TypesTests(unittest.TestCase):
             two = alt.Two()
             two()
 
+    @pytest.mark.group_one
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(type(None)), 0)
         self.assertEqual(_types.bytecount(Int8), 1)
         self.assertEqual(_types.bytecount(int), 8)
 
+    @pytest.mark.group_one
     def test_type_stringification(self):
         self.assertEqual(str(_types.Int8), "<class 'typed_python._types.Int8'>")
         self.assertEqual(str(Tuple(int)), "<class 'Tuple(int)'>")
 
+    @pytest.mark.group_one
     def test_tuple_of(self):
         tupleOfInt = TupleOf(int)
         i = tupleOfInt(())
@@ -315,6 +325,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "has no attribute 'x'"):
             tupleOfInt((1, 2, 3)).x = 2
 
+    @pytest.mark.group_one
     def test_one_of_and_types(self):
         # when we use types in OneOf, we need to wrap them in Value. Otherwise we can't
         # tell the difference between OneOf(int) and OneOf(Value(int))
@@ -342,6 +353,7 @@ class TypesTests(unittest.TestCase):
         X2(int)
         X2(float)
 
+    @pytest.mark.group_one
     def test_const_dict_add_mappable(self):
         T = ConstDict(int, int)
 
@@ -360,6 +372,7 @@ class TypesTests(unittest.TestCase):
             {1: 2, 2: 3}
         )
 
+    @pytest.mark.group_one
     def test_const_dict_add_mappable_with_exceptions(self):
         T = ConstDict(int, TupleOf(int))
 
@@ -383,12 +396,14 @@ class TypesTests(unittest.TestCase):
         # the refcount of 'to' should not have increased
         self.assertEqual(_types.refcount(to), 2)
 
+    @pytest.mark.group_one
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
         Ox = OneOf(None, X)
 
         self.assertEqual(Ox(X.V(a=10)), X.V(a=10))
 
+    @pytest.mark.group_one
     def test_one_of_py_subclass(self):
         class X(NamedTuple(x=int)):
             def f(self):
@@ -400,6 +415,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(X(x=10).f(), 10)
         self.assertEqual(Ox(X(x=10)).f(), 10)
 
+    @pytest.mark.group_one
     def test_one_of_distinguishes_py_subclasses(self):
         class X(NamedTuple(x=int)):
             def f(self):
@@ -414,6 +430,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(isinstance(XorX2(X()), X))
         self.assertTrue(isinstance(XorX2(X2()), X2))
 
+    @pytest.mark.group_one
     def test_function_as_type_arg(self):
         @Function
         def f(x: int):
@@ -427,6 +444,7 @@ class TypesTests(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_tuple_of_tuple_of_perf(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)
@@ -451,6 +469,7 @@ class TypesTests(unittest.TestCase):
 
     @flaky(max_runs=3, min_passes=1)
     @pytest.mark.skipif('sys.platform=="darwin"')
+    @pytest.mark.group_one
     def test_tuple_of_string_perf(self):
         t = NamedTuple(a=str, b=str)
 
@@ -462,10 +481,12 @@ class TypesTests(unittest.TestCase):
         print("Took ", elapsed, " to do 1mm")
         self.check_expected_performance(elapsed, expected=1.5)
 
+    @pytest.mark.group_one
     def test_default_initializer_oneof(self):
         x = OneOf(None, int)
         self.assertTrue(x() is None, repr(x()))
 
+    @pytest.mark.group_one
     def test_tuple_of_various_things(self):
         for thing, typeOfThing in [("hi", str), (b"somebytes", bytes),
                                    (1.0, float), (2, int),
@@ -476,12 +497,14 @@ class TypesTests(unittest.TestCase):
             self.assertTrue(type(t[0]) is typeOfThing)
             self.assertEqual(t[0], thing)
 
+    @pytest.mark.group_one
     def test_tuple_assign_fails(self):
         with self.assertRaisesRegex(TypeError, "does not support item assignment"):
             (1, 2, 3)[10] = 20
         with self.assertRaisesRegex(TypeError, "does not support item assignment"):
             TupleOf(int)((1, 2, 3))[10] = 20
 
+    @pytest.mark.group_one
     def test_list_of(self):
         L = ListOf(int)
         self.assertEqual(L.__qualname__, "ListOf(int)")
@@ -514,6 +537,7 @@ class TypesTests(unittest.TestCase):
         l3.append(23)
         self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11, 23])
 
+    @pytest.mark.group_one
     def test_list_resize(self):
         l1 = ListOf(TupleOf(int))()
 
@@ -554,6 +578,7 @@ class TypesTests(unittest.TestCase):
         l1.clear()
         self.assertEqual(len(l1), 0)
 
+    @pytest.mark.group_one
     def test_one_of(self):
         o = OneOf(None, str)
 
@@ -580,6 +605,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             o(False)
 
+    @pytest.mark.group_one
     def test_use_of_None(self):
         o1 = OneOf(None, str)
         o2 = OneOf(type(None), str)
@@ -593,21 +619,26 @@ class TypesTests(unittest.TestCase):
         s2 = Set(type(None))
         assert s1.ElementType == s2.ElementType == type(None)  # noqa
 
+    @pytest.mark.group_one
     def test_dict_equality_with_python(self):
         assert Dict(int, int)({1: 2}) == {1: 2}
 
+    @pytest.mark.group_one
     def test_ordering(self):
         # TODO: investigate and correct: with the ordering 1, True, the assertion o(True) is True fails
         o = OneOf(None, "hi", 1.5, True, 1, b"hi2")
 
         self.assertIs(o(True), True)
 
+    @pytest.mark.group_one
     def test_one_of_flattening(self):
         self.assertEqual(OneOf(OneOf(None, 1.0), OneOf(2.0, 3.0)), OneOf(None, 1.0, 2.0, 3.0))
 
+    @pytest.mark.group_one
     def test_one_of_order_matters(self):
         self.assertNotEqual(OneOf(1.0, 2.0), OneOf(2.0, 1.0))
 
+    @pytest.mark.group_one
     def test_type_filter(self):
         EvenInt = TypeFilter(int, lambda i: i % 2 == 0)
 
@@ -626,6 +657,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             e2 + (1,)
 
+    @pytest.mark.group_one
     def test_tuple_of_one_of_fixed_size(self):
         t = TupleOf(OneOf(0, 1, 2, 3, 4))
 
@@ -636,6 +668,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(len(serialize(t, typedInts)), len(ints) * 2 + 6)  # 3 bytes for extra flags
         self.assertEqual(tuple(typedInts), ints)
 
+    @pytest.mark.group_one
     def test_tuple_of_one_of_multi(self):
         t = TupleOf(OneOf(int, bool))
 
@@ -653,6 +686,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(tuple(typedThings), someThings)
 
+    @pytest.mark.group_one
     def test_compound_oneof(self):
         producer = RandomValueProducer()
         producer.addEvenly(1000, 2)
@@ -671,12 +705,14 @@ class TypesTests(unittest.TestCase):
             for i in range(len(vals)):
                 self.assertEqual(tupInst[i], vals[i], vals)
 
+    @pytest.mark.group_one
     def test_one_of_conversion_failure(self):
         o = OneOf(None, str)
 
         with self.assertRaises(TypeError):
             o(b"bytes")
 
+    @pytest.mark.group_one
     def test_one_of_in_tuple(self):
         t = Tuple(OneOf(None, str), str)
 
@@ -689,6 +725,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(IndexError):
             t((None, "hi2"))[2]
 
+    @pytest.mark.group_one
     def test_one_of_composite(self):
         t = OneOf(TupleOf(str), TupleOf(float))
 
@@ -698,6 +735,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             t((1.0, "2.0"))
 
+    @pytest.mark.group_one
     def test_comparisons_in_one_of(self):
         t = OneOf(None, float)
 
@@ -722,6 +760,7 @@ class TypesTests(unittest.TestCase):
                 for t2 in ts:
                     self.assertTrue(f(t1, t2) is f(t(t1), t(t2)))
 
+    @pytest.mark.group_one
     def test_comparisons_equivalence(self):
         t = TupleOf(OneOf(None, str, bytes, float, int, TupleOf(int), bool),)
 
@@ -767,6 +806,7 @@ class TypesTests(unittest.TestCase):
                             (f, t1, t2, t((t1,)), t((t2,)), f(t1, t2), f(t((t1,)), t((t2,))))
                         )
 
+    @pytest.mark.group_one
     def test_const_dict(self):
         t = ConstDict(str, str)
 
@@ -784,6 +824,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue("c" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
         self.assertTrue("def" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
 
+    @pytest.mark.group_one
     def test_const_dict_get(self):
         a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
 
@@ -791,6 +832,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(a.get('asdf'), None)
         self.assertEqual(a.get('asdf', 20), 20)
 
+    @pytest.mark.group_one
     def test_const_dict_items_keys_and_values(self):
         a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
 
@@ -798,11 +840,13 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(sorted(a.keys()), ['a', 'c'])
         self.assertEqual(sorted(a.values()), ['b', 'd'])
 
+    @pytest.mark.group_one
     def test_empty_string(self):
         a = ConstDict(str, str)({'a': ''})
 
         print(a['a'])
 
+    @pytest.mark.group_one
     def test_dict_to_oneof(self):
         t = ConstDict(str, OneOf("A", "B", "ABCDEF"))
         a = t({'a': 'A', 'b': 'ABCDEF'})
@@ -812,6 +856,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(a, deserialize(t, serialize(t, a)))
 
+    @pytest.mark.group_one
     def test_dict_assign_coercion(self):
         T = Dict(str, int)
 
@@ -820,6 +865,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(t, {"hi": 1})
 
+    @pytest.mark.group_one
     def test_dict_update(self):
         T = Dict(str, int)
         t = T()
@@ -836,6 +882,7 @@ class TypesTests(unittest.TestCase):
         t.update(T({"hi": 2}))
         self.assertEqual(t, {"hi": 2})
 
+    @pytest.mark.group_one
     def test_dict_clear(self):
         T = Dict(str, TupleOf(int))
 
@@ -857,6 +904,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(len(a), 0)
 
+    @pytest.mark.group_one
     def test_dict_clear_large(self):
         T = Dict(str, str)
 
@@ -882,10 +930,12 @@ class TypesTests(unittest.TestCase):
             d["1"] = "1"
             self.assertTrue("1" in d)
 
+    @pytest.mark.group_one
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x, str))
 
+    @pytest.mark.group_one
     def test_dict_containment(self):
         for _ in range(100):
             producer = RandomValueProducer()
@@ -899,6 +949,7 @@ class TypesTests(unittest.TestCase):
                     for k in v:
                         self.assertTrue(k in v)
 
+    @pytest.mark.group_one
     def test_dict_keys_values_and_items(self):
         # check that 'Dict().keys' behaves correctly.
         T = Dict(str, int)
@@ -953,6 +1004,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(Exception):
             aDict.keys().keys()
 
+    @pytest.mark.group_one
     def test_const_dict_keys_values_and_items(self):
         # check that 'ConstDict().keys' behaves correctly.
         T = ConstDict(str, int)
@@ -1010,6 +1062,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(Exception):
             aDict.keys().keys()
 
+    @pytest.mark.group_one
     def test_const_dict_mixed(self):
         t = ConstDict(str, int)
         self.assertTrue(t({"a": 10})["a"] == 10)
@@ -1017,12 +1070,14 @@ class TypesTests(unittest.TestCase):
         t = ConstDict(int, str)
         self.assertTrue(t({10: "a"})[10] == "a")
 
+    @pytest.mark.group_one
     def test_const_dict_comparison(self):
         t = ConstDict(str, str)
 
         self.assertEqual(t({'a': 'b'}), t({'a': 'b'}))
         self.assertLess(t({}), t({'a': 'b'}))
 
+    @pytest.mark.group_one
     def test_const_dict_lookup(self):
         for type_to_use, vals in [(int, list(range(20))),
                                   (bytes, [b'1', b'2', b'3', b'4', b'5'])]:
@@ -1049,6 +1104,7 @@ class TypesTests(unittest.TestCase):
                     assert last_k is None or k > last_k, (k, last_k)
                     last_k = k
 
+    @pytest.mark.group_one
     def test_const_dict_lookup_time(self):
         int_dict = ConstDict(int, int)
 
@@ -1058,6 +1114,7 @@ class TypesTests(unittest.TestCase):
             self.assertTrue(k in d)
             self.assertTrue(d[k] == k)
 
+    @pytest.mark.group_one
     def test_const_dict_of_dict(self):
         int_dict = ConstDict(int, int)
         int_dict_2 = ConstDict(int_dict, int_dict)
@@ -1072,6 +1129,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(big[d] == d2)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_dict_hash_perf(self):
         str_dict = ConstDict(str, str)
 
@@ -1085,11 +1143,13 @@ class TypesTests(unittest.TestCase):
         print(elapsed, " to do 1mm")
         self.check_expected_performance(elapsed)
 
+    @pytest.mark.group_one
     def test_mutable_dict_not_hashable(self):
         with self.assertRaisesRegex(Exception, "not hashable"):
             hash(Dict(int, int)())
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_const_dict_str_perf(self):
         t = ConstDict(str, str)
 
@@ -1102,6 +1162,7 @@ class TypesTests(unittest.TestCase):
         self.check_expected_performance(elapsed)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_const_dict_int_perf(self):
         t = ConstDict(int, int)
 
@@ -1113,6 +1174,7 @@ class TypesTests(unittest.TestCase):
         print("Took ", elapsed, " to do 1mm")
         self.check_expected_performance(elapsed)
 
+    @pytest.mark.group_one
     def test_const_dict_iter_int(self):
         t = ConstDict(int, int)
 
@@ -1120,6 +1182,7 @@ class TypesTests(unittest.TestCase):
         for k in aDict:
             self.assertEqual(aDict[k], k+1)
 
+    @pytest.mark.group_one
     def test_const_dict_iter_str(self):
         t = ConstDict(str, str)
 
@@ -1127,6 +1190,7 @@ class TypesTests(unittest.TestCase):
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
 
+    @pytest.mark.group_one
     def test_alternative_matcher_type(self):
         A = Alternative("A", X=dict(x=int))
 
@@ -1136,6 +1200,7 @@ class TypesTests(unittest.TestCase):
         assert A.X().matches.X
         assert not A.X().matches.NotX
 
+    @pytest.mark.group_one
     def test_alternative_bytecounts(self):
         alt = Alternative(
             "Empty",
@@ -1147,6 +1212,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(_types.bytecount(alt.X), 1)
         self.assertEqual(_types.bytecount(alt.Y), 1)
 
+    @pytest.mark.group_one
     def test_alternatives_with_Bytes(self):
         alt = Alternative(
             "Alt",
@@ -1154,6 +1220,7 @@ class TypesTests(unittest.TestCase):
         )
         self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
 
+    @pytest.mark.group_one
     def test_alternatives_with_str_func(self):
         alt = Alternative(
             "Alt",
@@ -1165,6 +1232,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(alt.x_0().f(), 1)
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
 
+    @pytest.mark.group_one
     def test_alternatives_with_str_and_repr(self):
         A = Alternative(
             "A",
@@ -1178,6 +1246,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(repr(ListOf(A)([A.X()])), "[alt_repr]")
         self.assertEqual(str(ListOf(A)([A.X()])), "[alt_repr]")
 
+    @pytest.mark.group_one
     def test_alternative_magic_methods(self):
         A_attrs = {"q": "value-q", "z": "value-z"}
 
@@ -1341,6 +1410,7 @@ class TypesTests(unittest.TestCase):
         A2.b()[123] = 7
         self.assertEqual(A2.b()[123], 7)
 
+    @pytest.mark.group_one
     def test_alternative_iter(self):
 
         class A_iter():
@@ -1376,6 +1446,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in reversed(A.a())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
 
+    @pytest.mark.group_one
     def test_alternative_as_iterator(self):
 
         class B_iter():
@@ -1403,6 +1474,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in A.a()], [])
 
+    @pytest.mark.group_one
     def test_alternative_with(self):
         depth = 0
 
@@ -1428,6 +1500,7 @@ class TypesTests(unittest.TestCase):
                 self.assertEqual(depth, 2)
         self.assertEqual(depth, 0)
 
+    @pytest.mark.group_one
     def test_empty_alternatives(self):
         a = Alternative(
             "Alt",
@@ -1443,6 +1516,7 @@ class TypesTests(unittest.TestCase):
         self.assertNotEqual(a.A(), a.B())
         self.assertNotEqual(a.B(), a.A())
 
+    @pytest.mark.group_one
     def test_extracted_alternatives_have_correct_type(self):
         Alt = Alternative(
             "Alt",
@@ -1457,6 +1531,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(a, aTup[0])
         self.assertTrue(type(a) is type(aTup[0]))  # noqa
 
+    @pytest.mark.group_one
     def test_alternatives(self):
         alt = Alternative(
             "Alt",
@@ -1483,6 +1558,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "immutable"):
             a.x = 20
 
+    @pytest.mark.group_one
     def test_alternatives_comparison(self):
         empty = Alternative("X", A={}, B={})
 
@@ -1505,6 +1581,7 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(a.C(c="") == a.C(c="hi"))
         self.assertNotEqual(a.D(d=b""), a.D(d=b"hi"))
 
+    @pytest.mark.group_one
     def test_alternatives_add_operator(self):
         alt = Alternative(
             "Alt",
@@ -1517,6 +1594,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(a+a, (a, a))
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_alternatives_radd_operator(self):
         alt = Alternative(
             "Alt",
@@ -1534,6 +1612,7 @@ class TypesTests(unittest.TestCase):
                 print(a + v)
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",
@@ -1552,6 +1631,7 @@ class TypesTests(unittest.TestCase):
         print("Took ", elapsed, " to do 1mm")
         self.check_expected_performance(elapsed, expected=2.0)
 
+    @pytest.mark.group_one
     def test_object_hashing_and_equality(self):
         for _ in range(100):
             producer = RandomValueProducer()
@@ -1571,6 +1651,7 @@ class TypesTests(unittest.TestCase):
                         if type(v1) is type(v2):
                             self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1), type(v2)))
 
+    @pytest.mark.group_one
     def test_bytes_repr(self):
         # macos has some weird behavior where it can't convert the numpy array
         # to bytes because of a unicode error.
@@ -1584,6 +1665,7 @@ class TypesTests(unittest.TestCase):
             someBytes = b'"' + numpy.random.uniform(size=2).tobytes()
             self.assertEqual(repr(makeTuple(someBytes)), repr((someBytes,)))
 
+    @pytest.mark.group_one
     def test_equality_with_native_python_objects(self):
         tups = [(1, 2, 3), (), ("2",), (b"2",), (1, 2, 3, "b"), (2,), (None,)]
 
@@ -1601,6 +1683,7 @@ class TypesTests(unittest.TestCase):
                 if tup1 != tup2:
                     self.assertNotEqual( makeTupleOf(*tup1), tup2 )
 
+    @pytest.mark.group_one
     def test_add_tuple_of(self):
         tupleOfInt = TupleOf(int)
 
@@ -1611,11 +1694,13 @@ class TypesTests(unittest.TestCase):
                 self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
                 self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1+tup2))
 
+    @pytest.mark.group_one
     def test_stringification_of_none(self):
         T = TupleOf(OneOf(None, str))
 
         self.assertEqual(str(T([None, 'hi'])), '(None, "hi")')
 
+    @pytest.mark.group_one
     def test_slice_tuple_of(self):
         tupleOfInt = TupleOf(int)
 
@@ -1635,6 +1720,7 @@ class TypesTests(unittest.TestCase):
                 with self.assertRaises(IndexError):
                     aTuple[i]
 
+    @pytest.mark.group_one
     def test_dictionary_subtraction_basic(self):
         intDict = ConstDict(int, int)
 
@@ -1642,6 +1728,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(intDict({1: 2, 3: 4}) - (1,), intDict({3: 4}))
         self.assertEqual(intDict({1: 2, 3: 4}) - (3,), intDict({1: 2}))
 
+    @pytest.mark.group_one
     def test_dictionary_addition_and_subtraction(self):
         someDicts = [{i: choice([1, 2, 3, 4, 5]) for i in range(choice([4, 6, 10, 20]))} for _ in range(20)]
         intDict = ConstDict(int, int)
@@ -1667,6 +1754,7 @@ class TypesTests(unittest.TestCase):
 
                     self.assertEqual(res, intDict(addResult))
 
+    @pytest.mark.group_one
     def test_serialization_primitives(self):
         def checkCanSerialize(x):
             self.assertEqual(x, deserialize(type(x), serialize(type(x), x)), x)
@@ -1690,6 +1778,7 @@ class TypesTests(unittest.TestCase):
         checkCanSerialize(True)
         checkCanSerialize(False)
 
+    @pytest.mark.group_one
     def test_serialization_bytecounts(self):
         ints = TupleOf(int)((1, 2, 3, 4))
 
@@ -1714,6 +1803,7 @@ class TypesTests(unittest.TestCase):
 
             print(time.time() - t0, " for ", len(ints))
 
+    @pytest.mark.group_one
     def test_serialization_roundtrip(self):
         for _ in range(100):
             producer = RandomValueProducer()
@@ -1732,10 +1822,12 @@ class TypesTests(unittest.TestCase):
                 self.assertEqual(str(v), str(v2))
                 self.assertEqual(v, v2, (v, v2, type(v), type(v2), type(v) is type(v2)))
 
+    @pytest.mark.group_one
     def test_create_invalid_tuple(self):
         with self.assertRaises(TypeError):
             Tuple((int, int))
 
+    @pytest.mark.group_one
     def test_roundtrip_tuple(self):
         T = Tuple(str, bool, str)
         v = T(('1', False, ''))
@@ -1744,6 +1836,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(v, v2)
 
+    @pytest.mark.group_one
     def test_roundtrip_alternative(self):
         A = Alternative("A", a0=dict(x_0=None))
         T = NamedTuple(x0=A, x1=bool)
@@ -1754,6 +1847,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(v, v2)
 
+    @pytest.mark.group_one
     def test_serialize_doesnt_leak(self):
         T = TupleOf(int)
 
@@ -1769,6 +1863,7 @@ class TypesTests(unittest.TestCase):
 
             self.assertTrue(getMem() < m0 + 100)
 
+    @pytest.mark.group_one
     def test_const_dict_of_tuple(self):
         K = NamedTuple(a=OneOf(float, int), b=OneOf(float, int))
         someKs = [K(a=0, b=0), K(a=1), K(a=10), K(b=10), K()]
@@ -1798,6 +1893,7 @@ class TypesTests(unittest.TestCase):
                 self.assertTrue(k in x)
                 x[k]
 
+    @pytest.mark.group_one
     def test_conversion_of_binary_compatible(self):
         class T1(NamedTuple(a=int)):
             pass
@@ -1814,6 +1910,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(_types.isBinaryCompatible(T1Comp, T2Comp))
         self.assertTrue(_types.isBinaryCompatible(T1, T2))
 
+    @pytest.mark.group_one
     def test_binary_compatible_nested(self):
         def make():
             class Interior(NamedTuple(a=int)):
@@ -1829,6 +1926,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertTrue(_types.isBinaryCompatible(E1, E2))
 
+    @pytest.mark.group_one
     def test_python_objects_in_tuples(self):
         class NormalPyClass:
             pass
@@ -1842,6 +1940,7 @@ class TypesTests(unittest.TestCase):
         self.assertIsInstance(nt.x, NormalPyClass)
         self.assertIsInstance(nt.y, NormalPySubclass)
 
+    @pytest.mark.group_one
     def test_construct_alternatives_with_positional_arguments(self):
         a = Alternative("A", HasOne={'a': str}, HasTwo={'a': str, 'b': str})
 
@@ -1856,6 +1955,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             a.HasOne(a.HasTwo(a='1', b='b'))
 
+    @pytest.mark.group_one
     def test_unsafe_pointers_to_list_internals(self):
         x = ListOf(int)()
         x.resize(100)
@@ -1882,6 +1982,7 @@ class TypesTests(unittest.TestCase):
         aPointer.initialize(30)
         self.assertEqual(x[10], 30)
 
+    @pytest.mark.group_one
     def test_pointer_to_has_no_len_and_is_not_iterable(self):
         x = ListOf(int)([1, 2])
 
@@ -1892,6 +1993,7 @@ class TypesTests(unittest.TestCase):
             for i in x.pointerUnsafe(0):
                 break
 
+    @pytest.mark.group_one
     def test_unsafe_pointers_to_uninitialized_list_items(self):
         # because this is testing unsafe operations, the test is
         # really just that we don't segfault!
@@ -1913,6 +2015,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aLeakedTuple), 2)
 
+    @pytest.mark.group_one
     def test_list_extend(self):
         LI = ListOf(int)
         LF = ListOf(float)
@@ -1934,6 +2037,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(li, list(range(10)))
 
+    @pytest.mark.group_one
     def test_list_copy_operation_duplicates_list(self):
         T = ListOf(int)
 
@@ -1944,6 +2048,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertNotEqual(y[0], 100)
 
+    @pytest.mark.group_one
     def test_list_and_tuple_conversion_to_numpy(self):
         for T in [ListOf(bool), TupleOf(bool)]:
             for arr in [
@@ -1988,6 +2093,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(str(ListOf(float)([1, 2, 3, 4]).toArray().dtype), 'float64')
         self.assertEqual(str(ListOf(Float32)([1, 2, 3, 4]).toArray().dtype), 'float32')
 
+    @pytest.mark.group_one
     def test_list_of_equality(self):
         x = ListOf(int)([1, 2, 3, 4])
         y = ListOf(int)([1, 2, 3, 5])
@@ -1995,6 +2101,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(x, x)
         self.assertNotEqual(x, y)
 
+    @pytest.mark.group_one
     def test_tuple_r_add(self):
         self.assertEqual(
             (1, 2, 4, 5, 6) + TupleOf(int)([1, 2]),
@@ -2009,15 +2116,18 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             [1, 2, "hi", 5, 6] + TupleOf(int)([1, 2])
 
+    @pytest.mark.group_one
     def test_tuple_r_cmp(self):
         self.assertEqual(
             (1, 2, 3), TupleOf(int)([1, 2, 3])
         )
 
+    @pytest.mark.group_one
     def test_can_convert_numpy_scalars(self):
         self.assertEqual(OneOf(int, float)(numpy.int64(10)), 10)
         self.assertEqual(OneOf(int, float)(numpy.float64(10.5)), 10.5)
 
+    @pytest.mark.group_one
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
@@ -2061,6 +2171,7 @@ class TypesTests(unittest.TestCase):
                     #  numpy.int16(numpy.float64(10000000000))
                     pass
 
+    @pytest.mark.group_one
     def test_other_bitness_types_operators(self):
         def add(x, y):
             return x + y
@@ -2178,6 +2289,7 @@ class TypesTests(unittest.TestCase):
                             if bitness(T1) > 1 and bitness(T2) > 1:
                                 self.assertEqual(res, op(10, 10))
 
+    @pytest.mark.group_one
     def test_comparing_arbitrary_objects(self):
         x = TupleOf(object)(["a"])
         y = TupleOf(object)([1])
@@ -2189,10 +2301,12 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(y, y)
         self.assertNotEqual(x, y)
 
+    @pytest.mark.group_one
     def test_list_of_indexing_with_numpy_ints(self):
         x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
 
+    @pytest.mark.group_one
     def test_error_message_on_bad_dispatch(self):
         @Function
         def f(x: int):
@@ -2204,6 +2318,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "argname="):
             f(argname=1)
 
+    @pytest.mark.group_one
     def test_const_dict_comparison_more(self):
         N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
         D = ConstDict(str, N)
@@ -2214,6 +2329,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(D({'a': n1}), D({'a': n1}))
         self.assertNotEqual(D({'a': n1}), D({'a': n2}))
 
+    @pytest.mark.group_one
     def test_mutable_dict(self):
         T = Dict(int, int)
 
@@ -2258,6 +2374,7 @@ class TypesTests(unittest.TestCase):
             del d[0]
         self.assertLess(currentMemUsageMb(), usage+1)
 
+    @pytest.mark.group_one
     def test_mutable_dict_fuzz(self):
         native_d = Dict(int, int)()
         py_d = {}
@@ -2279,6 +2396,7 @@ class TypesTests(unittest.TestCase):
             for i in range(dictSize):
                 self.assertEqual(z in py_d, z in native_d)
 
+    @pytest.mark.group_one
     def test_mutable_dict_refcounts(self):
         native_d = Dict(str, ListOf(int))()
         i = ListOf(int)()
@@ -2307,12 +2425,14 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(_types.refcount(i), 1)
 
+    @pytest.mark.group_one
     def test_mutable_dict_create_many(self):
         for ct in range(100):
             d = Dict(int, int)()
             for i in range(ct):
                 d[i] = i + 1
 
+    @pytest.mark.group_one
     def test_mutable_dict_methods(self):
         d = Dict(int, int)({i: i+1 for i in range(10)})
 
@@ -2330,12 +2450,14 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.assertEqual(d.get("1000"), None)
 
+    @pytest.mark.group_one
     def test_mutable_dict_setdefault_bad_arguments(self):
         d = Dict(int, str)()
 
         with self.assertRaises(TypeError):
             d.setdefault(1, 2, 3)
 
+    @pytest.mark.group_one
     def test_mutable_dict_setdefault(self):
         d = Dict(int, str)()
         d[1] = "a"
@@ -2360,6 +2482,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(d.setdefault(3), "")
 
+    @pytest.mark.group_one
     def test_mutable_dict_pop(self):
         d = Dict(int, str)()
         d[1] = 'a'
@@ -2376,6 +2499,7 @@ class TypesTests(unittest.TestCase):
         ):
             d.pop("hihi")
 
+    @pytest.mark.group_one
     def test_mutable_dict_pop_with_conversion(self):
         d = Dict(Tuple(int, str), Tuple(int, str))()
         d[(1, "hi")] = (1, "bye")
@@ -2385,6 +2509,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(d.pop(d.KeyType((2, "hi"))), (2, "bye"))
         self.assertTrue(len(d) == 0)
 
+    @pytest.mark.group_one
     def test_mutable_dict_setdefault_refcount(self):
         d = Dict(int, ListOf(int))()
         aList = ListOf(int)([1, 2, 3])
@@ -2404,6 +2529,7 @@ class TypesTests(unittest.TestCase):
         d.setdefault(3, aList)
         self.assertEqual(_types.refcount(aList), 3)
 
+    @pytest.mark.group_one
     def test_mutable_dict_iteration_order(self):
         d = Dict(int, int)()
 
@@ -2415,6 +2541,7 @@ class TypesTests(unittest.TestCase):
         del d[1]
         self.assertEqual(list(d), [10, 2])
 
+    @pytest.mark.group_one
     def test_simplicity(self):
         isSimple = _types.isSimple
 
@@ -2466,6 +2593,7 @@ class TypesTests(unittest.TestCase):
         self.assertFalse(isSimple(OneOf(int, X)))
         self.assertTrue(isSimple(OneOf(int, float)))
 
+    @pytest.mark.group_one
     def test_oneof_picks_best_choice(self):
         T = OneOf(float, int, bool)
 
@@ -2473,6 +2601,7 @@ class TypesTests(unittest.TestCase):
         self.assertIsInstance(T(1), int)
         self.assertIsInstance(T(True), bool)
 
+    @pytest.mark.group_one
     def test_dict_equality(self):
         for d in [{1: 2}, {1: 2, 3: 4}]:
             self.assertEqual(Dict(int, int)(d), d)
@@ -2486,11 +2615,13 @@ class TypesTests(unittest.TestCase):
         T = Dict(OneOf(int, float), OneOf(int, float))
         self.assertEqual(T({1: 2.5}), {1: 2.5})
 
+    @pytest.mark.group_one
     def test_dict_equality_with_python_and_object(self):
         self.assertTrue(Dict(int, object)({1: 2}) == {1: 2})
         self.assertTrue(Dict(int, object)({1: (7, 8, 9)}) == {1: (7, 8, 9)})
         self.assertTrue(Dict(int, object)({1: 'two'}) == {1: 'two'})
 
+    @pytest.mark.group_one
     def test_const_dict_with_noncomparable_things(self):
         DictType = ConstDict(OneOf(int, str), int)
 
@@ -2499,6 +2630,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(aDict[1], 100)
         self.assertEqual(aDict['hi'], 200)
 
+    @pytest.mark.group_one
     def test_const_dict_with_noncomparable_things_as_object(self):
         DictType = ConstDict(object, int)
 
@@ -2507,6 +2639,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(aDict[1], 100)
         self.assertEqual(aDict['hi'], 200)
 
+    @pytest.mark.group_one
     def test_oneof_conversion(self):
         BrokenOutBool = OneOf(False, True, int)
 
@@ -2518,6 +2651,7 @@ class TypesTests(unittest.TestCase):
         self.assertIs(type(BrokenOutBoolReordered(0)), int)
         self.assertIs(type(BrokenOutBoolReordered(False)), bool)
 
+    @pytest.mark.group_one
     def test_set_constructor_identity(self):
         s = Set(int)
         self.assertEqual(s.__qualname__, "Set(int)")
@@ -2530,6 +2664,7 @@ class TypesTests(unittest.TestCase):
         s2 = Set(int)([1])
         self.assertNotEqual(id(s2), id(s1))
 
+    @pytest.mark.group_one
     def test_set_update(self):
         s1 = Set(int)([1, 2, 3])
 
@@ -2541,11 +2676,13 @@ class TypesTests(unittest.TestCase):
 
         self.assertEqual(s1, Set(int)(range(1, 10)))
 
+    @pytest.mark.group_one
     def test_set_len(self):
         s1 = Set(int)([1, 2, 3])
         s2 = Set(int)([1, 2, 3])
         self.assertEqual(len(s1), len(s2))
 
+    @pytest.mark.group_one
     def test_set_discard(self):
         s = Set(int)([1, 2, 3])
         s.discard(2)
@@ -2561,12 +2698,14 @@ class TypesTests(unittest.TestCase):
         s = Set(int)()
         s.discard(1)
 
+    @pytest.mark.group_one
     def test_set_clear(self):
         s = Set(int)([1, 2, 3])
         s.clear()
         self.assertEqual(set(s), set())
         self.assertEqual(len(s), 0)
 
+    @pytest.mark.group_one
     def test_set_contains(self):
         letters = ['a', 'b', 'c']
         s1 = Set(str)()
@@ -2578,6 +2717,7 @@ class TypesTests(unittest.TestCase):
             self.assertEqual(c in s1, c in s2)
         self.assertRaises(TypeError, s1.__contains__, [[]])
 
+    @pytest.mark.group_one
     def test_set_remove(self):
         s = Set(str)()
         s.add("a")
@@ -2587,6 +2727,7 @@ class TypesTests(unittest.TestCase):
         self.assertRaises(KeyError, s.remove, "Q")
         self.assertRaises(TypeError, s.remove, [])
 
+    @pytest.mark.group_one
     def test_set_add(self):
         s = Set(int)()
         self.assertEqual(len(s), 0)
@@ -2605,6 +2746,7 @@ class TypesTests(unittest.TestCase):
             s = Set(int)(i)
             self.assertEqual(len(s), 3)
 
+    @pytest.mark.group_one
     def test_set_pop(self):
         s = Set(int)([1, 2, 3])
 
@@ -2613,6 +2755,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             s.pop()
 
+    @pytest.mark.group_one
     def test_set_refcounts(self):
         native_d = Dict(str, Set(int))()
         i = Set(int)()
@@ -2691,6 +2834,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(i2), 1)
         self.assertEqual(_types.refcount(i3), 1)
 
+    @pytest.mark.group_one
     def test_set_equality(self):
         s = Set(str)()
         s.add('hello')
@@ -2706,15 +2850,18 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(s != other_s, True)
         self.assertEqual(s == another_s, True)
 
+    @pytest.mark.group_one
     def test_set_self_equality(self):
         s = Set(int)()
         self.assertEqual(s, s)
 
+    @pytest.mark.group_one
     def test_set_repr(self):
         repr_s = '{1, 2, 3}'
         s = Set(int)([1, 2, 3])
         self.assertEqual(repr(s), repr_s)
 
+    @pytest.mark.group_one
     def test_set_literal(self):
         s = Set(int)([1, 2, 3])
         t = {1, 2, 3}
@@ -2724,6 +2871,7 @@ class TypesTests(unittest.TestCase):
         t = {"a", "b", "c"}
         self.assertEqual(t, set(s))
 
+    @pytest.mark.group_one
     def test_set_iterating(self):
         s = Set(int)()
         it = iter(s)
@@ -2740,6 +2888,7 @@ class TypesTests(unittest.TestCase):
                 break
         self.assertEqual(count, len(s))
 
+    @pytest.mark.group_one
     def test_set_assign_from_existing_dict_key_nothrow(self):
         d = Dict(str, Set(int))()
         i = Set(int)()
@@ -2747,6 +2896,7 @@ class TypesTests(unittest.TestCase):
         d['a'] = i
         d['a'] = Set(int)()
 
+    @pytest.mark.group_one
     def test_set_uniquification(self):
         word = 'simsalabim'
         s = Set(str)()
@@ -2756,6 +2906,7 @@ class TypesTests(unittest.TestCase):
         ds = sorted(dict.fromkeys(word))
         self.assertEqual(ss, ds)
 
+    @pytest.mark.group_one
     def test_set_copy(self):
         s = Set(int)([1])
         dup = s.copy()
@@ -2774,6 +2925,7 @@ class TypesTests(unittest.TestCase):
         self.assertRaises(TypeError, s.copy, s)
         self.assertRaises(TypeError, s.copy, [])
 
+    @pytest.mark.group_one
     def test_set_construct_from_str(self):
         word = 'symbolic'
         s = Set(str)(word)
@@ -2785,6 +2937,7 @@ class TypesTests(unittest.TestCase):
         for c in word:
             self.assertIn(c, s)
 
+    @pytest.mark.group_one
     def test_set_ops_throws_diff_type(self):
         s = Set(int)([1])
         self.assertRaises(TypeError, s.union, 1.0)
@@ -2798,6 +2951,7 @@ class TypesTests(unittest.TestCase):
 
         self.assertRaises(TypeError, s.difference, [[]])
 
+    @pytest.mark.group_one
     def test_set_union_deleted(self):
         x = Set(int)()
         y = Set(int)()
@@ -2814,6 +2968,7 @@ class TypesTests(unittest.TestCase):
 
         assert len(x | y) == 10
 
+    @pytest.mark.group_one
     def test_set_union_refcounts(self):
         s = Set(int)([1])
         s2 = Set(int)([2])
@@ -2826,6 +2981,7 @@ class TypesTests(unittest.TestCase):
         self.assertIn(2, k)
         self.assertNotEqual(id(s), id(s2), id(k))
 
+    @pytest.mark.group_one
     def test_set_union(self):
         word = 'symbolic'
         word2 = 'word'
@@ -2865,6 +3021,7 @@ class TypesTests(unittest.TestCase):
         s = Set(int)()
         self.assertEqual(s.union(Set(int)([1]), s, Set(int)([2])), Set(int)([1, 2]))
 
+    @pytest.mark.group_one
     def test_set_ops_with_other_containers(self):
         S = Set(str)
         # operators require type matching; but methods accept iterables
@@ -2973,6 +3130,7 @@ class TypesTests(unittest.TestCase):
             self.assertFalse(S('abcba').isdisjoint(C('abcdecad')), C)
             self.assertFalse(S('abcba').isdisjoint(C('ccb')), C)
 
+    @pytest.mark.group_one
     def test_set_intersection(self):
         word1 = 'symbolic'
         word2 = 'words'
@@ -2994,6 +3152,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(z, s1)
         self.assertEqual(_types.refcount(s1), 1)
 
+    @pytest.mark.group_one
     def test_set_difference(self):
         word1 = 'symbolic'
         word2 = 'symbolism'
@@ -3009,6 +3168,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
 
+    @pytest.mark.group_one
     def test_set_symmetric_difference(self):
         word1 = 'symbolic'
         word2 = 'symbolism'
@@ -3024,6 +3184,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(s1, Set(str)(word1))
         self.assertEqual(type(i), Set(str))
 
+    @pytest.mark.group_one
     def test_set_listof_tupleof_constructors(self):
         s1 = Set(int)(ListOf(int)([1, 1]))
         self.assertEqual(len(s1), 1)
@@ -3031,6 +3192,7 @@ class TypesTests(unittest.TestCase):
         s2 = Set(int)(TupleOf(int)((1, 1)))
         self.assertEqual(len(s2), 1)
 
+    @pytest.mark.group_one
     def test_list_of_tuples_transpose(self):
         listOfTuples = ListOf(NamedTuple(x=int, y=str, z=bool))()
         listOfTuples.append(dict(x=1, y="hi", z=False))
@@ -3042,6 +3204,7 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(tupleOfLists.y, ['hi', 'hihi'])
         self.assertEqual(tupleOfLists.z, [False, True])
 
+    @pytest.mark.group_one
     def test_const_dict_equality_with_python(self):
         CD = ConstDict(OneOf(int, str), OneOf(int, str))
 
@@ -3053,6 +3216,7 @@ class TypesTests(unittest.TestCase):
                 self.assertEqual(CD(d1) == d2, d1 == d2)
                 self.assertEqual(d1 == CD(d2), d1 == d2)
 
+    @pytest.mark.group_one
     def test_alternative_reverse_operators(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __radd__=lambda lhs, rhs: "radd",
@@ -3114,6 +3278,7 @@ class TypesTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 A.a() | v
 
+    @pytest.mark.group_one
     def test_alternative_missing_inplace_operators_fallback(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __add__=lambda self, other: "worked",
@@ -3171,6 +3336,7 @@ class TypesTests(unittest.TestCase):
         v ^= 10
         self.assertEqual(v, "worked")
 
+    @pytest.mark.group_one
     def test_list_and_tuple_of_compare(self):
         things = [
             ListOf(int)([1, 2]),
@@ -3240,6 +3406,7 @@ class TypesTests(unittest.TestCase):
                     self.assertEqual(t1 != t2, t1Untyped != t2Untyped)
                     self.assertEqual(t1 == t2, t1Untyped == t2Untyped)
 
+    @pytest.mark.group_one
     def test_docstrings_all_types(self):
         # TODO: actually test all types
         types = [
@@ -3300,6 +3467,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(good)  # see output for specific problems
 
     @flaky(max_runs=3, min_passes=1)
+    @pytest.mark.group_one
     def test_list_of_uint8_from_bytes_perf(self):
         someBytes = b"asdf" * 1024 * 1024
 
@@ -3312,6 +3480,7 @@ class TypesTests(unittest.TestCase):
         # I get .001, but if we use the normal interpreter loop, .2
         assert elapsed < .02
 
+    @pytest.mark.group_one
     def test_iterate_dict_and_change_size_throws(self):
         x = Dict(int, int)({1: 2})
 
@@ -3319,6 +3488,7 @@ class TypesTests(unittest.TestCase):
             for k in x:
                 x[k + 1] = 2
 
+    @pytest.mark.group_one
     def test_iterate_set_and_change_size_throws(self):
         x = Set(int)([1])
 
@@ -3326,6 +3496,7 @@ class TypesTests(unittest.TestCase):
             for k in x:
                 x.add(k + 1)
 
+    @pytest.mark.group_one
     def test_construct_named_tuple_with_other_named_tuple(self):
         # we should be matching the names up correctly
         T1 = NamedTuple(x=int, y=str)
@@ -3341,6 +3512,7 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             T2(T3(x=10, y='hello'))
 
+    @pytest.mark.group_one
     def test_dict_update_refcounts(self):
         d = Dict(TupleOf(int), TupleOf(int))()
         k = TupleOf(int)([1])
@@ -3389,6 +3561,7 @@ class TypesTests(unittest.TestCase):
         assert _types.refcount(k) == 1
         assert _types.refcount(v) == 1
 
+    @pytest.mark.group_one
     def test_dict_from_const_dict_refcounts(self):
         D = Dict(TupleOf(int), TupleOf(int))
         CD = ConstDict(TupleOf(int), TupleOf(int))
@@ -3415,6 +3588,7 @@ class TypesTests(unittest.TestCase):
         assert _types.refcount(k1) == 1
         assert _types.refcount(k2) == 1
 
+    @pytest.mark.group_one
     def test_set_refcounts_tupleof_int(self):
         s = Set(TupleOf(int))()
 
@@ -3432,6 +3606,7 @@ class TypesTests(unittest.TestCase):
 
         assert _types.refcount(k1) == 1
 
+    @pytest.mark.group_one
     def test_const_dict_from_dict_refcounts(self):
         CD = ConstDict(TupleOf(int), TupleOf(int))
 
@@ -3460,6 +3635,7 @@ class TypesTests(unittest.TestCase):
         assert _types.refcount(k1) == 1
         assert _types.refcount(k2) == 1
 
+    @pytest.mark.group_one
     def test_list_of_constructor_from_numpy(self):
         array = numpy.array([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]])
 
@@ -3469,6 +3645,7 @@ class TypesTests(unittest.TestCase):
 
         assert ListOf(float)(array.transpose()[2]) == ListOf(float)([2.0, 5.0])
 
+    @pytest.mark.group_one
     def test_subclass_of(self):
         class C(Class):
             pass
@@ -3514,6 +3691,7 @@ class TypesTests(unittest.TestCase):
         lst.append(F)
         assert lst[0] == F
 
+    @pytest.mark.group_one
     def test_call_iter(self):
         def manualIter(x):
             iterator = x.__iter__()

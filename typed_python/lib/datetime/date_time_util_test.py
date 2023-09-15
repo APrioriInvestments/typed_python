@@ -3,6 +3,7 @@ from typed_python.lib.datetime.date_time_util import daterange
 from typed_python.lib.datetime.date_time import Date
 
 
+@pytest.mark.group_one
 def test_daterange():
     # days by 1
     assert daterange(Date(2022, 1, 2), Date(2022, 1, 10)) == ListOf(Date)(

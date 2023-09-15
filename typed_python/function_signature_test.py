@@ -17,6 +17,7 @@ from typed_python import Entrypoint, Function, ListOf, isCompiled, OneOf, NotCom
 
 
 class FunctionSignatureTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_function_with_signature(self):
         @Function
         def f(x) -> lambda X: ListOf(X):
@@ -24,6 +25,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert f.overloads[0].signatureFunction(int) == ListOf(int)
 
+    @pytest.mark.group_one
     def test_function_signature_casts(self):
         @Function
         def f(x) -> lambda X: int:
@@ -31,6 +33,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert isinstance(f(1.0), int)
 
+    @pytest.mark.group_one
     def test_function_signature_result_not_convertible(self):
         def notAType():
             pass
@@ -42,6 +45,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Cannot convert .* to"):
             f(10)
 
+    @pytest.mark.group_one
     def test_function_signature_sig_func_throws(self):
         def sigFunc(X):
             raise Exception("Error in signature function")
@@ -53,6 +57,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Error in signature function"):
             f(10)
 
+    @pytest.mark.group_one
     def test_function_signature_sig_func_wrong_number_of_arguments(self):
         def sigFunc(X, Y):
             return X
@@ -64,6 +69,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "missing 1 required positional argument: 'Y'"):
             f(10)
 
+    @pytest.mark.group_one
     def test_function_signature_compiles(self):
         def sigFunc(X, Y):
             return X
@@ -87,6 +93,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callFAsObject.resultTypeFor(int, float).typeRepresentation is object
         assert callFAsObject(1, 1.5) == 2
 
+    @pytest.mark.group_one
     def test_compile_function_signature_with_value(self):
         @Entrypoint
         def f(x, y) -> lambda X, Y: 1:
@@ -99,6 +106,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callF.resultTypeFor(int, float).typeRepresentation.Value == 1
         assert callF(1, 1.5) == 1
 
+    @pytest.mark.group_one
     def test_compile_function_with_oneof(self):
         @Entrypoint
         def f(x) -> lambda X: X:
@@ -110,6 +118,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert callF.resultTypeFor(OneOf(int, float)).typeRepresentation is object
 
+    @pytest.mark.group_one
     def test_compile_function_with_overloads(self):
         @Entrypoint
         def f(x: int, y: float) -> lambda X, Y: X:
@@ -131,6 +140,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callF(1, 1.5) == 1
         assert callF(1.5, 1) == 1.5
 
+    @pytest.mark.group_one
     def test_compile_function_with_overloads_indeterminate(self):
         @Entrypoint
         def f(x: int, y) -> lambda X, Y: Y:
@@ -151,6 +161,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callF(1, 1.5) == 1.0
         assert callF(1.5, 1) == 1
 
+    @pytest.mark.group_one
     def test_nocompile_function_with_signatures(self):
         @NotCompiled
         def f(x, y) -> lambda X, Y: X:
@@ -174,6 +185,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callFAsObject(1, 1.5) == 1
         assert callFAsObject(1.5, 1) == 1.5
 
+    @pytest.mark.group_one
     def test_class_function_signatures_work(self):
         class AClass(Class):
             def f(self, x) -> lambda SELF, X: X:
@@ -181,6 +193,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert AClass().f(10) == 10
 
+    @pytest.mark.group_one
     def test_compiling_final_class_method_with_signature(self):
         class AClass(Class, Final):
             def f(self, x, y) -> lambda SELF, X, Y: Y:
@@ -192,6 +205,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert callIt.resultTypeFor(int, float).typeRepresentation is float
 
+    @pytest.mark.group_one
     def test_compiling_final_class_method_with_signature_and_overloads(self):
         class AClass(Class, Final):
             def f(self, x: float, y) -> lambda SELF, X, Y: Y:
@@ -206,6 +220,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert callIt.resultTypeFor(OneOf(int, float), float).typeRepresentation is float
 
+    @pytest.mark.group_one
     def test_compiling_nonfinal_signature_methods(self):
         class BaseClass(Class):
             def f(self, x, y) -> lambda SELF, X, Y: Y:
@@ -229,6 +244,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callItAsBase(BaseClass(), 1.5, 1) == 1
         assert callItAsBase(ChildClass(), 1.5, 1) == 2
 
+    @pytest.mark.group_one
     def test_compiling_nonfinal_signature_methods_with_type_change(self):
         class BaseClass(Class):
             def f(self, x, y) -> lambda SELF, X, Y: Y:
@@ -267,6 +283,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "promised a return type"):
             assert callItAsBase(ChildClass(), 1.5, 1) == 2
 
+    @pytest.mark.group_one
     def test_conflicting_types_dont_affect_refined_filters(self):
         class BaseClass(Class):
             def f(self, x: int) -> int:
@@ -281,6 +298,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "promised a return type"):
             ChildClass().f(0)
 
+    @pytest.mark.group_one
     def test_compiler_honors_elided_suclass_return_type(self):
         class BaseClass(Class):
             def f(self) -> int:
@@ -304,6 +322,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callItAsBase(BaseClass()) == 1
         assert callItAsBase(ChildClass()) == 2
 
+    @pytest.mark.group_one
     def test_dispatch_to_function_overload(self):
         @Function
         def f(x: str):
@@ -324,6 +343,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert callF("a") == "str"
         assert callF(0) == "int"
 
+    @pytest.mark.group_one
     def test_invalid_multi_dispatch(self):
         class BaseClass(Class):
             def f(self, x) -> int:
@@ -357,6 +377,7 @@ class FunctionSignatureTest(unittest.TestCase):
 
         assert callIt(ChildChildClass(), 1) == 1
 
+    @pytest.mark.group_one
     def test_type_signature_conflict(self):
         class A(Class):
             pass
@@ -479,6 +500,7 @@ class FunctionSignatureTest(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "proposed to return 'str'"):
             callItAs(ChildClass, A)(ChildClass(), Both())
 
+    @pytest.mark.group_one
     def test_type_inference_classes(self):
         class A(Class):
             pass
@@ -494,6 +516,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert f.resultTypeFor(A).typeRepresentation != ListOf(A)
         assert f.resultTypeFor(B).typeRepresentation == ListOf(B)
 
+    @pytest.mark.group_one
     def test_typeof(self):
         @Function
         def f(x) -> TypeOf(lambda x: x + x):
@@ -502,6 +525,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert f.resultTypeFor(int).typeRepresentation == int
         assert f.resultTypeFor(float).typeRepresentation == float
 
+    @pytest.mark.group_one
     def test_typeof_with_class_arg(self):
         class A(Class):
             def f(self, x) -> float:
@@ -514,6 +538,7 @@ class FunctionSignatureTest(unittest.TestCase):
         assert f.resultTypeFor(A, int).typeRepresentation == float
         assert f.resultTypeFor(A, float).typeRepresentation == float
 
+    @pytest.mark.group_one
     def test_typeof_with_mutual_recursion(self):
         class A(Class):
             def f(self, x) -> TypeOf(lambda self, x: B().f(x - 1) + 1 if x > 0 else x):

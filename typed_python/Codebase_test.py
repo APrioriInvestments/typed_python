@@ -19,6 +19,7 @@ from typed_python.Codebase import Codebase
 
 
 class CodebaseTest(unittest.TestCase):
+    @pytest.mark.group_one
     def test_instantiated_codebase(self):
         codebase = Codebase.FromFileMap({
             'codebase_test_test_module/__init__.py': '',
@@ -46,6 +47,7 @@ class CodebaseTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Module codebase_test_test_module is"):
             codebaseAlternativeCode.instantiate()
 
+    @pytest.mark.group_one
     def test_grab_native_codebase(self):
         codebase = Codebase.FromRootlevelModule(typed_python)
 

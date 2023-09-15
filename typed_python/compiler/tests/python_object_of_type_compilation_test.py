@@ -50,9 +50,11 @@ class AClassWithBool(Class, Final):
 
 
 class TestPythonObjectOfTypeCompilation(unittest.TestCase):
+    @pytest.mark.group_one
     def test_typeWrapper_for_object(self):
         self.assertIs(typedPythonTypeToTypeWrapper(object).typeRepresentation, object)
 
+    @pytest.mark.group_one
     def test_can_pass_object_in_and_out(self):
         @Compiled
         def f(x: object):
@@ -61,6 +63,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         for thing in [0, 10, f, str]:
             self.assertIs(f(thing), thing)
 
+    @pytest.mark.group_one
     def test_can_assign(self):
         @Compiled
         def f(x: object):
@@ -71,6 +74,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             for i in range(10000):
                 self.assertIs(f(thing), thing)
 
+    @pytest.mark.group_one
     def test_member_access(self):
         @Compiled
         def f(x: object):
@@ -81,6 +85,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             f(10)
 
+    @pytest.mark.group_one
     def test_set_attribute(self):
         @Compiled
         def f_int(x: object, y: int):
@@ -101,6 +106,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "'dict' object has no attribute 'a'"):
             f(dict(), "hi")
 
+    @pytest.mark.group_one
     def test_getitem(self):
         @Compiled
         def f(x: object):
@@ -111,6 +117,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "string index out of range"):
             f("a")
 
+    @pytest.mark.group_one
     def test_delitem(self):
         @Compiled
         def f(x: object, item: object):
@@ -124,6 +131,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "1"):
             f(d, 1)
 
+    @pytest.mark.group_one
     def test_binary_ops(self):
         fcn = []
 
@@ -175,6 +183,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             with self.assertRaises(Exception):
                 compiled(2.5, "hi")
 
+    @pytest.mark.group_one
     def test_unary_ops(self):
         fcn = []
 
@@ -201,6 +210,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(compiled(0), f(0))
             self.assertEqual(compiled(-1), f(-1))
 
+    @pytest.mark.group_one
     def test_setitem(self):
         @Compiled
         def f(x: object, item: object, y: object):
@@ -213,6 +223,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "unhashable type"):
             f({}, [], [])
 
+    @pytest.mark.group_one
     def test_call_with_args_and_kwargs(self):
         @Compiled
         def f(x: object, a: object, k: object):
@@ -223,6 +234,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(f(aFunc, 'arg', 'the kwarg'), (('arg',), ({'keyword': 'the kwarg'})))
 
+    @pytest.mark.group_one
     def test_len(self):
         @Compiled
         def f(x: object):
@@ -230,6 +242,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(f([1, 2, 3]), 3)
 
+    @pytest.mark.group_one
     def test_convert_pyobj_to_oneof_with_string(self):
         @Function
         def toObject(x: object):
@@ -241,6 +254,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertEqual(fro_and_to("ab"), "ab")
 
+    @pytest.mark.group_one
     def test_object_conversions_2(self):
         T = ListOf(int)
 
@@ -257,6 +271,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         to_and_fro(t)
         self.assertEqual(refcount(t), 1)
 
+    @pytest.mark.group_one
     def test_object_conversions1(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=str, t=TupleOf(int))
@@ -331,6 +346,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
             self.assertTrue(finalMem < initMem + 2)
 
+    @pytest.mark.group_one
     def test_bool_cast_and_conv(self):
 
         IDict = Dict(int, int)
@@ -459,6 +475,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(r1, r4)
             self.assertEqual(r1, r5)
 
+    @pytest.mark.group_one
     def test_obj_to_bool(self):
 
         def bool_f(x: object):
@@ -550,6 +567,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             self.assertEqual(r1, r3)
             self.assertEqual(r1, r4)
 
+    @pytest.mark.group_one
     def test_some_object_operations(self):
         @Compiled
         def f(x: object, y: object):
@@ -565,6 +583,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f(1, 2), 8)
         self.assertEqual(g("a", "b"), False)
 
+    @pytest.mark.group_one
     def test_create_lists(self):
         @Compiled
         def f():
@@ -573,6 +592,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         res = f()
         self.assertEqual(res, [1, 2, 3, 4])
 
+    @pytest.mark.group_one
     def test_create_tuples(self):
         @Compiled
         def f():
@@ -581,6 +601,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         res = f()
         self.assertEqual(res, (1, 2, 3, 4))
 
+    @pytest.mark.group_one
     def test_create_set(self):
         @Compiled
         def f():
@@ -589,6 +610,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         res = f()
         self.assertEqual(res, {1, 2, 3, 4})
 
+    @pytest.mark.group_one
     def test_create_dict(self):
         @Compiled
         def f():
@@ -597,6 +619,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         res = f()
         self.assertEqual(res, {1: 2, "hi": "bye"})
 
+    @pytest.mark.group_one
     def test_iterate_object(self):
         def toList(x: object):
             res = list()
@@ -634,6 +657,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "Boo!"):
                 form(generator(10))
 
+    @pytest.mark.group_one
     def test_bool_of_arbitrary(self):
         class C:
             def __bool__(self):
@@ -649,6 +673,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f([1]), True)
         self.assertEqual(f(C()), False)
 
+    @pytest.mark.group_one
     def test_int_of_arbitrary(self):
         class C:
             def __int__(self):
@@ -661,6 +686,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertEqual(f(C()), 123)
 
+    @pytest.mark.group_one
     def test_float_of_arbitrary(self):
         class C:
             def __float__(self):
@@ -674,6 +700,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10.0)
         self.assertEqual(f(C()), 123.5)
 
+    @pytest.mark.group_one
     def test_str_of_arbitrary(self):
         class C:
             def __str__(self):
@@ -687,6 +714,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f([]), "[]")
         self.assertEqual(f(C()), "hihi")
 
+    @pytest.mark.group_one
     def test_bytes_of_arbitrary(self):
         class C:
             def __bytes__(self):
@@ -700,6 +728,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(f(list(b"12")), b"12")
         self.assertEqual(f(C()), b"hihi")
 
+    @pytest.mark.group_one
     def test_exception_in_arbitrary_pyobj_conversion(self):
         class C:
             def __bool__(self):
@@ -787,6 +816,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "bad float call"):
             callFloatTyped(C())
 
+    @pytest.mark.group_one
     def test_invalid_return_value_in_arbitrary_pyobj_conversion(self):
         class C:
             def __bool__(self):
@@ -839,6 +869,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "__float__ returned non-float"):
             callFloat(C())
 
+    @pytest.mark.group_one
     def test_check_is(self):
         @Entrypoint
         def g(x: object, y: object):
@@ -851,6 +882,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertEqual(g([], aList), False)
         self.assertEqual(g(aList, aList), True)
 
+    @pytest.mark.group_one
     def test_instantiate_python_class(self):
         class C():
             pass
@@ -861,6 +893,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         self.assertTrue(isinstance(makeAC(), C))
 
+    @pytest.mark.group_one
     def test_reverse_comparision_ops(self):
         @Entrypoint
         def ltOI(x: object, y: int):
@@ -873,6 +906,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         assert ltOI(1, 2) == ltIO(1, 2)
         assert ltOI(2, 1) == ltIO(2, 1)
 
+    @pytest.mark.group_one
     def test_call_type_object_from_interpreter(self):
         @Entrypoint
         def callIt(x: object):
@@ -880,6 +914,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert callIt(Dict(int, int)) == Dict(int, int)()
 
+    @pytest.mark.group_one
     def test_gil_contention(self):
         @NotCompiled
         def f(x: int) -> int:
@@ -909,6 +944,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         t2.join()
         print(time.time() - t0, " to do 2mm in two threads")
 
+    @pytest.mark.group_one
     def test_slice_object(self):
         @Entrypoint
         def sliceIt(x: object) -> str:
@@ -916,6 +952,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert sliceIt("hi") == "hi"
 
+    @pytest.mark.group_one
     def test_type_of_object_in_compiled_code_accurate(self):
         @Entrypoint
         def typeOf(x: object):
@@ -924,6 +961,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         assert typeOf(10) is int
         assert typeOf(object) is type
 
+    @pytest.mark.group_one
     def test_type_of_module_in_compiled_code_accurate(self):
         @Entrypoint
         def typeOf():
@@ -931,6 +969,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert typeOf() is type(threading)
 
+    @pytest.mark.group_one
     def test_type_of_global_fun_in_compiled_code_accurate(self):
         @Entrypoint
         def typeOf():
@@ -938,6 +977,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert typeOf() is type(globalFun)
 
+    @pytest.mark.group_one
     def test_type_of_print_in_compiled_code_accurate(self):
         @Entrypoint
         def typeOf():
@@ -945,6 +985,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         assert typeOf() is type(print)
 
+    @pytest.mark.group_one
     def test_isinstance_on_objects(self):
         @Entrypoint
         def isinstanceC(o: object, t: object):
@@ -953,6 +994,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         assert isinstanceC(10, int)
         assert not isinstanceC(10, str)
 
+    @pytest.mark.group_one
     def test_isinstance_on_objects_with_known_type(self):
         @Entrypoint
         def isinstanceC(o: object, t):
@@ -961,6 +1003,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         assert isinstanceC(10, int)
         assert not isinstanceC(10, str)
 
+    @pytest.mark.group_one
     def test_isinstance_on_objects_with_known_type_and_value(self):
         @Entrypoint
         def isinstanceC(o, t):
@@ -969,6 +1012,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         assert isinstanceC(10, int)
         assert not isinstanceC(10, str)
 
+    @pytest.mark.group_one
     def test_call_with_global_function(self):
         @Entrypoint
         def call(f: object):
