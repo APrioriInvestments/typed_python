@@ -7,6 +7,7 @@ PYTHON ?= $(shell which python3)
 COMMIT ?= $(shell git rev-parse HEAD)
 
 PWD = $(shell pwd)
+UNAME_S := $(shell uname -s)
 
 PYTHON_VERSION = $(shell python3 -c 'import sys; print("3_" + str(sys.version_info.minor))')
 
@@ -23,6 +24,7 @@ TP_BUILD_PATH ?= build/temp.linux-x86_64/typed_python
 TP_LIB_PATH ?= build/lib.linux-x86_64/typed_python
 
 TP_BUILD_OPT_LEVEL ?= 2
+
 
 # location of python include paths
 PYINCLUDE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
@@ -43,10 +45,27 @@ CPP_FLAGS = -std=c++14  -O$(TP_BUILD_OPT_LEVEL)  -Wall  -pthread  -DNDEBUG  -g  
             -I$(NUMPYINCLUDE)											    \
 
 
-LINKER_FLAGS = -Wl,-O1 \
-               -Wl,-Bsymbolic-functions \
-               -Wl,-z,relro
+LINKER_FLAGS = -Wl,-O1
 LINK_FLAGS_POST = -lssl -lcrypto
+
+ifneq ($(UNAME_S), Darwin)
+	LINKER_FLAGS += -Bsymbolic-functions  -z relro
+endif
+
+ifeq ($(UNAME_S),Darwin)
+    OPENSSL_ROOT := $(shell brew --prefix openssl 2>/dev/null)
+    ifneq ($(OPENSSL_ROOT),)
+        LINKER_FLAGS += -L$(OPENSSL_ROOT)/lib
+		PYTHON_LIB_DIR := $(shell python3-config --prefix)/lib
+		PYTHON_DOTVERSION := $(shell python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+		LINK_FLAGS_POST += -L$(PYTHON_LIB_DIR) -lpython$(PYTHON_DOTVERSION) $(shell python3-config --ldflags)
+        CPP_FLAGS += -I$(OPENSSL_ROOT)/include
+    else
+        $(error OpenSSL not found. Install it via Homebrew or specify the paths manually)
+    endif
+endif
+
+
 
 SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
                   -Wformat -Werror=format-security -Wdate-time \

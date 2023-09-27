@@ -75,7 +75,11 @@ public:
             std::cerr << "somehow another thread got the threadstate in ReleaseableThreadState" << std::endl;
 
             // this is a fatal error
-            asm("int3");
+                    #ifdef __APPLE__
+                        __builtin_trap();
+                    #else
+                         asm("int3");
+                    #endif        
         }
 
         // release the GIL. we're not holding it but it should be OK to release it from
@@ -96,8 +100,12 @@ public:
                 if (waitingPyThreadState != this) {
                     std::cerr << "somehow we are not yet released, and yet not also waiting." << std::endl;
 
-                    // this is a fatal error
+                // this is a fatal error
+                #ifdef __APPLE__
+                    __builtin_trap();
+                #else
                     asm("int3");
+                #endif
                 }
 
                 waitingPyThreadState = nullptr;
@@ -155,7 +163,11 @@ PyEnsureGilAcquired::~PyEnsureGilAcquired() {
 void assertHoldingTheGil() {
     if (curPyThreadState) {
         std::cerr << "WARNING: assertHoldingTheGil() is failing.\n";
-        asm("int3");
+        #ifdef __APPLE__
+            __builtin_trap();
+        #else
+            asm("int3");
+        #endif
         throw std::runtime_error("We're not holding the gil!");
     }
 }

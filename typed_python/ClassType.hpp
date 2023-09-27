@@ -78,7 +78,11 @@ public:
         if (dispatchIndex >= 65535) {
             std::cerr << "somehow we got a corrupt class object" << std::endl;
 
-            asm("int3");
+            #ifdef __APPLE__
+                __builtin_trap();
+            #else
+                asm("int3");
+            #endif        
         }
 
         if (((size_t)layoutPtr) >> 48) {
