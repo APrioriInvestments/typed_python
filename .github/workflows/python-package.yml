@@ -69,6 +69,7 @@ jobs:
         pip install -v -e .
 
     - name: Test with pytest
+      timeout-minutes: 20
       env:
         TRAVIS_CI: 1
       run: |
