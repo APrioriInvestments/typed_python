@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "llvmlite==0.38",
     "numpy",
+    "scipy",
     "psutil",
     "pytz",
     "sortedcontainers",

@@ -37,10 +37,6 @@ jobs:
         pip install pytest flaky
         pip install -v -e .
 
-    - name: Install BLAS (Linux)
-      if: startsWith(runner.os, 'Linux')
-      run: sudo apt-get install -y libopenblas-dev
-
     - name: Test with pytest
       run: |
         pytest --verbose --capture=no --log-level=info --log-cli-level=info
