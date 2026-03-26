@@ -1,6 +1,5 @@
 import os
 import ctypes
-import ctypes.util
 
 from typed_python import Int32, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -9,90 +8,49 @@ from typed_python.compiler.type_wrappers.runtime_functions import externalCallTa
 import typed_python.compiler.native_compiler.native_ast as native_ast
 
 
-def _isValidBlas(libPath):
-    """Check if a shared library exports the BLAS symbols we need."""
-    if 'cython' in libPath:
-        return False
-    try:
-        lib = ctypes.CDLL(libPath, mode=ctypes.RTLD_GLOBAL)
-        lib.daxpy_
-        lib.dgemm_
-        return True
-    except Exception:
-        return False
+def _findScipyOpenBlas():
+    """Find scipy's bundled OpenBLAS shared library.
 
-
-def _searchForBlasLib():
-    """Find a shared library with a full BLAS/LAPACK implementation.
-
-    Search order:
-        1. scipy's bundled BLAS (most reliable when scipy is installed)
-        2. System BLAS/LAPACK via ctypes.util.find_library (uses ldconfig)
-        3. Well-known library names loaded directly
-        4. numpy's bundled libraries (fallback)
+    Scipy ships its own OpenBLAS in a '<site-packages>/scipy.libs/' directory.
+    All BLAS symbols are prefixed with 'scipy_' (e.g. scipy_dgemm_).
     """
-    # 1. scipy bundles a full BLAS
-    try:
-        import scipy.linalg._fblas as fblas
-        return fblas.__file__
-    except Exception:
-        pass
+    import scipy
+    libs_dir = os.path.join(
+        os.path.dirname(os.path.dirname(scipy.__file__)),
+        'scipy.libs'
+    )
+    if not os.path.isdir(libs_dir):
+        return None
 
-    # 2. System libraries via find_library (calls ldconfig / ld.so on Linux)
-    for name in ['openblas', 'blas', 'mkl_rt', 'lapack']:
-        path = ctypes.util.find_library(name)
-        if path and _isValidBlas(path):
-            return path
-
-    # 3. Try loading well-known library names directly
-    for name in [
-        'libopenblas.so', 'libopenblas.so.0',
-        'libblas.so', 'libblas.so.3',
-        'libmkl_rt.so', 'libmkl_rt.so.2',
-        'liblapack.so', 'liblapack.so.3',
-    ]:
-        try:
-            if _isValidBlas(name):
-                return name
-        except Exception:
-            pass
-
-    # 4. Fall back to searching inside numpy/scipy installation dirs
-    for modname in ['numpy', 'scipy']:
-        try:
-            mod = __import__(modname)
-            libdir = os.path.dirname(mod.__file__)
-        except Exception:
-            continue
-
-        for root, dirs, files in os.walk(libdir):
-            for fname in files:
-                if not any(s in fname for s in ['blas', 'lapack_lite']):
-                    continue
-                fpath = os.path.join(root, fname)
-                if _isValidBlas(fpath):
-                    return fpath
+    for fname in os.listdir(libs_dir):
+        if 'openblas' in fname and fname.endswith('.so'):
+            return os.path.join(libs_dir, fname)
 
     return None
 
 
-blasLibPath = _searchForBlasLib()
+blasLibPath = _findScipyOpenBlas()
 
 if blasLibPath is None:
     raise Exception(
-        "Couldn't find a valid BLAS/LAPACK implementation. "
-        "Install one of: libopenblas-dev, libblas-dev, or scipy."
+        "Couldn't find scipy's bundled OpenBLAS. "
+        "Make sure scipy is installed: pip install scipy"
     )
 
 # Load BLAS as a global library so our LLVM-compiled code can resolve
-# symbols like daxpy_ and dgemm_ at link time.
+# symbols at link time.
 blas = ctypes.CDLL(blasLibPath, mode=ctypes.RTLD_GLOBAL)
 
 try:
-    blas.daxpy_
-    blas.dgemm_
+    blas.scipy_daxpy_
+    blas.scipy_dgemm_
 except Exception:
-    raise Exception("Couldn't find a valid implementation of lapack.")
+    raise Exception(
+        f"scipy's OpenBLAS at {blasLibPath} doesn't export expected symbols."
+    )
+
+# Scipy's bundled OpenBLAS prefixes all symbols with 'scipy_'
+BLAS_PREFIX = "scipy_"
 
 
 def makePointer(e, viableOutputTypes):
@@ -167,7 +125,7 @@ class axpy_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "daxpy_" if T is float else "faxpy_",
+            BLAS_PREFIX + ("daxpy_" if T is float else "saxpy_"),
             native_ast.Void,
             native_ast.Int32.pointer(),
             nativeT.pointer(),
@@ -258,7 +216,7 @@ class gemm_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgemm_" if T is float else "fgemm_",
+            BLAS_PREFIX + ("dgemm_" if T is float else "sgemm_"),
             native_ast.Void,
             native_ast.UInt8.pointer(),
             native_ast.UInt8.pointer(),
@@ -362,7 +320,7 @@ class gemv_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgemv_" if T is float else "fgemv_",
+            BLAS_PREFIX + ("dgemv_" if T is float else "sgemv_"),
             native_ast.Void,
             native_ast.UInt8.pointer(),
             native_ast.Int32.pointer(),
@@ -446,7 +404,7 @@ class getrf_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgetrf_" if T is float else "fgetrf_",
+            BLAS_PREFIX + ("dgetrf_" if T is float else "sgetrf_"),
             native_ast.Void,
             native_ast.Int32.pointer(),
             native_ast.Int32.pointer(),
@@ -526,7 +484,7 @@ class getri_(CompilableBuiltin):
             return
 
         targetFun = externalCallTarget(
-            "dgetri_" if T is float else "fgetri_",
+            BLAS_PREFIX + ("dgetri_" if T is float else "sgetri_"),
             native_ast.Void,
             native_ast.Int32.pointer(),
             nativeT.pointer(),

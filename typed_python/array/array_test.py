@@ -20,7 +20,7 @@ import os
 
 from typed_python.test_util import estimateFunctionMultithreadSlowdown
 from typed_python.array.array import Array, Matrix
-from typed_python import Entrypoint
+from typed_python import Entrypoint, Float32
 
 
 def test_float_array_addition():
@@ -294,6 +294,45 @@ def test_assign_matrix_row():
 
     m.transpose()[4] = m.transpose()[3]
     assert m.get(4, 4) == m.get(3, 4)
+
+
+def test_float32_array_addition():
+    x = Array(Float32)([1, 2, 3])
+
+    y = x + x
+    assert y[0] == 2
+
+
+def test_float32_matrix_vector_multiply():
+    m = Matrix(Float32).identity(3)
+
+    a = Array(Float32)([1, 0, 0])
+
+    for i in range(3):
+        for j in range(3):
+            m[i][j] = i * 10 + j
+
+    assert (m @ a).toList() == [0, 10, 20]
+
+
+def test_float32_matrix_multiply():
+    m = Matrix(Float32).identity(4)
+    m2 = Matrix(Float32).identity(4)
+
+    m.diagonal()[2] = 2
+    m2.diagonal()[2] = 3
+
+    assert (m @ m2).diagonal().toList() == [1, 1, 6, 1]
+
+
+def test_float32_matrix_invert():
+    m = Matrix(Float32).identity(4) * 2
+
+    result = m @ ~m
+    identity = Matrix(Float32).identity(4)
+
+    diff = result - identity
+    assert diff.flatten().abs().sum() < 1e-4
 
 
 def test_matrix_product_with_transpose():

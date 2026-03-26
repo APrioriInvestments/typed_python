@@ -710,7 +710,7 @@ def Matrix(T):
             )
 
             # do a workspace query
-            work = ListOf(float)([1])
+            work = ListOf(T)([1])
             lwork = ListOf(Int32)([-1])
 
             info = getri(
