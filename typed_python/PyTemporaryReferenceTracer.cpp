@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 #include "PyTemporaryReferenceTracer.hpp"
+#include "PyVersionCompat.hpp"
 
 bool PyTemporaryReferenceTracer::isLineNewStatement(PyObject* code, int line) {
     PyErrorStasher stashCurrentException;
@@ -61,10 +62,12 @@ int PyTemporaryReferenceTracer::globalTraceFun(PyObject* dummyObj, PyFrameObject
         );
 
         // we process any statement on a line that's a new statement
+        PyObject* code = (PyObject*)PyFrame_GetCode(frame);
         bool shouldProcess = globalTracer.isLineNewStatement(
-            (PyObject*)frame->f_code,
+            code,
             PyFrame_GetLineNumber(frame)
         );
+        Py_DECREF(code);
 
         if (shouldProcess || forceProcess) {
             auto it = globalTracer.frameToActions.find(frame);
@@ -165,19 +168,21 @@ void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o, PyF
 
 void PyTemporaryReferenceTracer::traceObject(PyObject* o) {
     PyThreadState *tstate = PyThreadState_GET();
-    PyFrameObject *f = tstate->frame;
+    PyFrameObject *f = PyCompat::getFrame(tstate);
 
     if (f) {
         PyTemporaryReferenceTracer::traceObject(o, f);
+        PyCompat::NewRefIf311 guard((PyObject*)f);
     }
 }
 
 void PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(PyObject* o) {
     PyThreadState *tstate = PyThreadState_GET();
-    PyFrameObject *f = tstate->frame;
+    PyFrameObject *f = PyCompat::getFrame(tstate);
 
     if (f) {
         PyTemporaryReferenceTracer::keepaliveForCurrentInstruction(o, f);
+        PyCompat::NewRefIf311 guard((PyObject*)f);
     }
 }
 

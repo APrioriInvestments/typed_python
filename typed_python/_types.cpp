@@ -39,6 +39,25 @@
 #include "PyModuleRepresentation.hpp"
 #include "_types.hpp"
 #include "CompilerVisibleObjectVisitor.hpp"
+#include "PyVersionCompat.hpp"
+
+// Get the __name__ from the current frame's globals, or empty string if unavailable.
+static std::string getCallerModuleName() {
+    PyThreadState* ts = PyThreadState_Get();
+    PyFrameObject* frame = PyCompat::getFrame(ts);
+    if (!frame) return "";
+    PyCompat::NewRefIf311 frameGuard((PyObject*)frame);
+
+    PyObject* globals = PyCompat::getFrameGlobals(frame);
+    if (!globals) return "";
+    PyCompat::NewRefIf311 globalsGuard(globals);
+
+    PyObject* pyModuleName = PyDict_GetItemString(globals, "__name__");
+    if (pyModuleName && PyUnicode_Check(pyModuleName)) {
+        return PyUnicode_AsUTF8(pyModuleName);
+    }
+    return "";
+}
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
@@ -2933,16 +2952,7 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
 PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
     int num_args = PyTuple_Size(args);
 
-    PyThreadState * ts = PyThreadState_Get();
-    std::string moduleName;
-    PyObject* pyModuleName;
-
-    if (ts->frame && ts->frame->f_globals &&
-            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
-        if (PyUnicode_Check(pyModuleName)) {
-            moduleName = PyUnicode_AsUTF8(pyModuleName);
-        }
-    }
+    std::string moduleName = getCallerModuleName();
 
     if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
@@ -2967,54 +2977,80 @@ PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
 }
 
 /*********
-calls PyCode_New and faithfully maintains the identities of tuples passed in.
-
-this has signature
-    PyCode_New(
-        int argcount,
-        int kwonlyargcount,
-        int nlocals,
-        int stacksize,
-        int flags,
-        PyObject *code,
-        PyObject *consts,
-        PyObject *names,
-        PyObject *varnames,
-        PyObject *freevars,
-        PyObject *cellvars,
-        PyObject *filename,
-        PyObject *name,
-        int firstlineno,
-        PyObject *lnotab
-    )
-
-you may also call, after 3.8, PyCode_NewWithPosOnlyArgs which has signature
-
-PyCodeObject* PyCode_NewWithPosOnlyArgs(
-    int argcount,
-    int posonlyargcount,
-    int kwonlyargcount,
-    int nlocals,
-    int stacksize,
-    int flags,
-    PyObject *code,
-    PyObject *consts,
-    PyObject *names,
-    PyObject *varnames,
-    PyObject *freevars,
-    PyObject *cellvars,
-    PyObject *filename,
-    PyObject *name,
-    int firstlineno,
-    PyObject *lnotab
-)
+Build a code object using the appropriate API for the Python version.
+3.10:  PyCode_NewWithPosOnlyArgs (16 args)
+3.11+: PyCode_NewWithPosOnlyArgs (18 args, added qualname + exceptiontable)
 ********/
 PyObject* buildCodeObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+#if PY_VERSION_HEX >= 0x030b0000
     static const char *kwlist[] = {
         "co_argcount",
-#   if PY_MINOR_VERSION >= 8
         "co_posonlyargcount",
-#   endif
+        "co_kwonlyargcount",
+        "co_nlocals",
+        "co_stacksize",
+        "co_flags",
+        "co_code",
+        "co_consts",
+        "co_names",
+        "co_varnames",
+        "co_freevars",
+        "co_cellvars",
+        "co_filename",
+        "co_name",
+        "co_qualname",
+        "co_firstlineno",
+        "co_lnotab",
+        "co_exceptiontable",
+        NULL
+    };
+
+    int co_argcount, co_posonlyargcount, co_kwonlyargcount;
+    int co_nlocals, co_stacksize, co_flags, co_firstlineno;
+    PyObject* co_code;
+    PyObject* co_consts;
+    PyObject* co_names;
+    PyObject* co_varnames;
+    PyObject* co_freevars;
+    PyObject* co_cellvars;
+    PyObject* co_filename;
+    PyObject* co_name;
+    PyObject* co_qualname;
+    PyObject* co_lnotab;
+    PyObject* co_exceptiontable;
+
+    return translateExceptionToPyObject([&]() {
+        if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "iiiiiiiOOOOOOOOiOO", (char**)kwlist,
+            &co_argcount, &co_posonlyargcount, &co_kwonlyargcount,
+            &co_nlocals, &co_stacksize, &co_flags,
+            &co_code, &co_consts, &co_names, &co_varnames,
+            &co_freevars, &co_cellvars, &co_filename,
+            &co_name, &co_qualname, &co_firstlineno,
+            &co_lnotab, &co_exceptiontable
+        )) {
+            throw PythonExceptionSet();
+        }
+
+        PyCodeObject* result = PyCode_NewWithPosOnlyArgs(
+            co_argcount, co_posonlyargcount, co_kwonlyargcount,
+            co_nlocals, co_stacksize, co_flags,
+            co_code, co_consts, co_names, co_varnames,
+            co_freevars, co_cellvars, co_filename,
+            co_name, co_qualname, co_firstlineno,
+            co_lnotab, co_exceptiontable
+        );
+
+        if (!result) {
+            throw PythonExceptionSet();
+        }
+
+        return (PyObject*)result;
+    });
+#else
+    static const char *kwlist[] = {
+        "co_argcount",
+        "co_posonlyargcount",
         "co_kwonlyargcount",
         "co_nlocals",
         "co_stacksize",
@@ -3032,83 +3068,36 @@ PyObject* buildCodeObject(PyObject* nullValue, PyObject* args, PyObject* kwargs)
         NULL
     };
 
-    static const char* operatorList = (
-        PY_MINOR_VERSION < 8 ? "iiiiiOOOOOOOOiO" : "iiiiiiOOOOOOOOiO"
-    );
-
-    int co_argcount;
-
-#   if PY_MINOR_VERSION >= 8
-    int co_posonlyargcount;
-#   endif
-
-    int co_kwonlyargcount;
-    int co_nlocals;
-    int co_stacksize;
-    int co_flags;
+    int co_argcount, co_posonlyargcount, co_kwonlyargcount;
+    int co_nlocals, co_stacksize, co_flags, co_firstlineno;
     PyObject* co_code;
     PyObject* co_consts;
     PyObject* co_names;
     PyObject* co_varnames;
-    PyObject* co_filename;
-    PyObject* co_name;
-    int co_firstlineno;
-    PyObject* co_lnotab;
     PyObject* co_freevars;
     PyObject* co_cellvars;
+    PyObject* co_filename;
+    PyObject* co_name;
+    PyObject* co_lnotab;
 
     return translateExceptionToPyObject([&]() {
         if (!PyArg_ParseTupleAndKeywords(
-            args,
-            kwargs,
-            operatorList,
-            (char**)kwlist,
-            &co_argcount,
-        #   if PY_MINOR_VERSION >= 8
-            &co_posonlyargcount,
-        #   endif
-            &co_kwonlyargcount,
-            &co_nlocals,
-            &co_stacksize,
-            &co_flags,
-            &co_code,
-            &co_consts,
-            &co_names,
-            &co_varnames,
-            &co_freevars,
-            &co_cellvars,
-            &co_filename,
-            &co_name,
-            &co_firstlineno,
-            &co_lnotab
-        ))
-        {
+            args, kwargs, "iiiiiiOOOOOOOOiO", (char**)kwlist,
+            &co_argcount, &co_posonlyargcount, &co_kwonlyargcount,
+            &co_nlocals, &co_stacksize, &co_flags,
+            &co_code, &co_consts, &co_names, &co_varnames,
+            &co_freevars, &co_cellvars, &co_filename,
+            &co_name, &co_firstlineno, &co_lnotab
+        )) {
             throw PythonExceptionSet();
         }
 
-#if PY_MINOR_VERSION < 8
-        PyCodeObject* result = PyCode_New(
-#else
         PyCodeObject* result = PyCode_NewWithPosOnlyArgs(
-#endif
-            co_argcount,
-        #   if PY_MINOR_VERSION >= 8
-            co_posonlyargcount,
-        #   endif
-            co_kwonlyargcount,
-            co_nlocals,
-            co_stacksize,
-            co_flags,
-            co_code,
-            co_consts,
-            co_names,
-            co_varnames,
-            co_freevars,
-            co_cellvars,
-            co_filename,
-            co_name,
-            co_firstlineno,
-            co_lnotab
+            co_argcount, co_posonlyargcount, co_kwonlyargcount,
+            co_nlocals, co_stacksize, co_flags,
+            co_code, co_consts, co_names, co_varnames,
+            co_freevars, co_cellvars, co_filename,
+            co_name, co_firstlineno, co_lnotab
         );
 
         if (!result) {
@@ -3117,6 +3106,7 @@ PyObject* buildCodeObject(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 
         return (PyObject*)result;
     });
+#endif
 }
 
 PyObject* buildPyFunctionObject(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -3211,16 +3201,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 
     static_assert(PY_MAJOR_VERSION >= 3, "typed_python is a python3 project only");
 
-    PyThreadState * ts = PyThreadState_Get();
-    std::string moduleName;
-    PyObject* pyModuleName;
-
-    if (ts->frame && ts->frame->f_globals &&
-            (pyModuleName = PyDict_GetItemString(ts->frame->f_globals, "__name__"))) {
-        if (PyUnicode_Check(pyModuleName)) {
-            moduleName = PyUnicode_AsUTF8(pyModuleName);
-        }
-    }
+    std::string moduleName = getCallerModuleName();
 
     if (PY_MINOR_VERSION <= 5) {
         //we cannot rely on the ordering of 'kwargs' here because of the python version, so

@@ -22,6 +22,7 @@
 #include "Format.hpp"
 #include "SpecialModuleNames.hpp"
 #include "PyInstance.hpp"
+#include "PyVersionCompat.hpp"
 
 class Function;
 
@@ -1082,7 +1083,12 @@ public:
             static PyObject* moduleHashName = PyUnicode_FromString("__module_hash__");
             outSequences.push_back(std::vector<PyObject*>({moduleHashName}));
 
-            PyBytes_AsStringAndSize(((PyCodeObject*)code)->co_code, (char**)&bytes, &bytecount);
+            PyObject* codeBytes = PyCompat::codeGetCode(code);
+            PyCompat::NewRefIf311 codeBytesGuard(codeBytes);
+            PyBytes_AsStringAndSize(codeBytes, (char**)&bytes, &bytecount);
+
+            PyObject* names = PyCompat::codeGetNames(code);
+            PyCompat::NewRefIf311 namesGuard(names);
 
             long opcodeCount = bytecount / 2;
 
@@ -1103,7 +1109,7 @@ public:
             for (long ix = 0; ix < opcodeCount; ix++) {
                 // if we're loading an attr on an existing sequence, just make it bigger
                 if ((opcodeFor(ix) == LOAD_ATTR || opcodeFor(ix) == LOAD_METHOD) && curDotSequence.size()) {
-                    curDotSequence.push_back(PyTuple_GetItem(code->co_names, opcodeTargetFor(ix)));
+                    curDotSequence.push_back(PyTuple_GetItem(names, opcodeTargetFor(ix)));
                 } else if (curDotSequence.size()) {
                     // any other operation should flush the buffer
                     outSequences.push_back(curDotSequence);
@@ -1112,12 +1118,12 @@ public:
 
                 // if we're loading a global, we start a new sequence
                 if (opcodeFor(ix) == LOAD_GLOBAL) {
-                    curDotSequence.push_back(PyTuple_GetItem(code->co_names, opcodeTargetFor(ix)));
+                    curDotSequence.push_back(PyTuple_GetItem(names, opcodeTargetFor(ix)));
                 } else if (
                     opcodeFor(ix) == STORE_GLOBAL
                     || opcodeFor(ix) == DELETE_GLOBAL
                 ) {
-                    outSequences.push_back({PyTuple_GetItem(code->co_names, opcodeTargetFor(ix))});
+                    outSequences.push_back({PyTuple_GetItem(names, opcodeTargetFor(ix))});
                 }
             }
 
@@ -1127,7 +1133,9 @@ public:
             }
 
             // recurse into sub code objects
-            iterate(code->co_consts, [&](PyObject* o) {
+            PyObject* consts = PyCompat::codeGetConsts(code);
+            PyCompat::NewRefIf311 constsGuard(consts);
+            iterate(consts, [&](PyObject* o) {
                 if (PyCode_Check(o)) {
                     extractDottedGlobalAccessesFromCode((PyCodeObject*)o, outSequences);
                 }
@@ -1138,7 +1146,12 @@ public:
             uint8_t* bytes;
             Py_ssize_t bytecount;
 
-            PyBytes_AsStringAndSize(((PyCodeObject*)code)->co_code, (char**)&bytes, &bytecount);
+            PyObject* codeBytes = PyCompat::codeGetCode(code);
+            PyCompat::NewRefIf311 codeBytesGuard(codeBytes);
+            PyBytes_AsStringAndSize(codeBytes, (char**)&bytes, &bytecount);
+
+            PyObject* names = PyCompat::codeGetNames(code);
+            PyCompat::NewRefIf311 namesGuard(names);
 
             long opcodeCount = bytecount / 2;
 
@@ -1155,7 +1168,7 @@ public:
             for (long ix = 0; ix < opcodeCount; ix++) {
                 // if we're loading a global, we start a new sequence
                 if (opcodeFor(ix) == LOAD_GLOBAL) {
-                    PyObject* name = PyTuple_GetItem(code->co_names, opcodeTargetFor(ix));
+                    PyObject* name = PyTuple_GetItem(names, opcodeTargetFor(ix));
                     if (!PyUnicode_Check(name)) {
                         throw std::runtime_error("Function had a non-string object in co_names");
                     }
@@ -1164,7 +1177,7 @@ public:
                     opcodeFor(ix) == STORE_GLOBAL
                     || opcodeFor(ix) == DELETE_GLOBAL
                 ) {
-                    PyObject* name = PyTuple_GetItem(code->co_names, opcodeTargetFor(ix));
+                    PyObject* name = PyTuple_GetItem(names, opcodeTargetFor(ix));
                     if (!PyUnicode_Check(name)) {
                         throw std::runtime_error("Function had a non-string object in co_names");
                     }
@@ -1173,7 +1186,9 @@ public:
             }
 
             // recurse into sub code objects
-            iterate(code->co_consts, [&](PyObject* o) {
+            PyObject* consts = PyCompat::codeGetConsts(code);
+            PyCompat::NewRefIf311 constsGuard(consts);
+            iterate(consts, [&](PyObject* o) {
                 if (PyCode_Check(o)) {
                     extractGlobalAccessesFromCode((PyCodeObject*)o, outAccesses);
                 }
@@ -1183,14 +1198,25 @@ public:
         }
 
         static void extractNamesFromCode(PyCodeObject* code, std::set<PyObject*>& outNames) {
-            iterate(code->co_names, [&](PyObject* o) { outNames.insert(o); });
-            iterate(code->co_freevars, [&](PyObject* o) { outNames.insert(o); });
-
-            iterate(code->co_consts, [&](PyObject* o) {
-                if (PyCode_Check(o)) {
-                    extractNamesFromCode((PyCodeObject*)o, outNames);
-                }
-            });
+            {
+                PyObject* names = PyCompat::codeGetNames(code);
+                PyCompat::NewRefIf311 guard(names);
+                iterate(names, [&](PyObject* o) { outNames.insert(o); });
+            }
+            {
+                PyObject* freevars = PyCompat::codeGetFreevars(code);
+                PyCompat::NewRefIf311 guard(freevars);
+                iterate(freevars, [&](PyObject* o) { outNames.insert(o); });
+            }
+            {
+                PyObject* consts = PyCompat::codeGetConsts(code);
+                PyCompat::NewRefIf311 guard(consts);
+                iterate(consts, [&](PyObject* o) {
+                    if (PyCode_Check(o)) {
+                        extractNamesFromCode((PyCodeObject*)o, outNames);
+                    }
+                });
+            }
 
             static PyObject* moduleHashName = PyUnicode_FromString("__module_hash__");
             outNames.insert(moduleHashName);

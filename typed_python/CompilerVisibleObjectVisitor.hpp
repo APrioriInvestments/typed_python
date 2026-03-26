@@ -18,6 +18,7 @@
 
 #include "ShaHash.hpp"
 #include "SpecialModuleNames.hpp"
+#include "PyVersionCompat.hpp"
 #include "util.hpp"
 #include <unordered_map>
 
@@ -680,30 +681,58 @@ private:
             PyCodeObject* co = (PyCodeObject*)obj.pyobj();
 
             visitor.visitHash(ShaHash(4));
-            visitor.visitHash(ShaHash(co->co_argcount));
-            visitor.visitHash(co->co_kwonlyargcount);
-            visitor.visitHash(co->co_nlocals);
-            visitor.visitHash(co->co_stacksize);
+            visitor.visitHash(ShaHash(PyCompat::codeGetArgcount(co)));
+            visitor.visitHash(PyCompat::codeGetKwonlyargcount(co));
+            visitor.visitHash(PyCompat::codeGetNlocals(co));
+            visitor.visitHash(PyCompat::codeGetStacksize(co));
             // don't serialize the 'co_flags' field because it's not actually stable
             // and it doesn't contain any semantic information not available elsewhere.
             // visitor.visitHash(co->co_flags);
-            visitor.visitHash(co->co_firstlineno);
-            visitor.visitHash(ShaHash::SHA1(PyBytes_AsString(co->co_code), PyBytes_GET_SIZE(co->co_code)));
-            visitor.visitTuple(co->co_consts);
-            visitor.visitTuple(co->co_names);
-            visitor.visitTuple(co->co_varnames);
-            visitor.visitTuple(co->co_freevars);
-            visitor.visitTuple(co->co_cellvars);
+            visitor.visitHash(PyCompat::codeGetFirstlineno(co));
+
+            {
+                PyObject* code = PyCompat::codeGetCode(co);
+                PyCompat::NewRefIf311 guard(code);
+                visitor.visitHash(ShaHash::SHA1(PyBytes_AsString(code), PyBytes_GET_SIZE(code)));
+            }
+            {
+                PyObject* consts = PyCompat::codeGetConsts(co);
+                PyCompat::NewRefIf311 guard(consts);
+                visitor.visitTuple(consts);
+            }
+            {
+                PyObject* names = PyCompat::codeGetNames(co);
+                PyCompat::NewRefIf311 guard(names);
+                visitor.visitTuple(names);
+            }
+            {
+                PyObject* varnames = PyCompat::codeGetVarnames(co);
+                PyCompat::NewRefIf311 guard(varnames);
+                visitor.visitTuple(varnames);
+            }
+            {
+                PyObject* freevars = PyCompat::codeGetFreevars(co);
+                PyCompat::NewRefIf311 guard(freevars);
+                visitor.visitTuple(freevars);
+            }
+            {
+                PyObject* cellvars = PyCompat::codeGetCellvars(co);
+                PyCompat::NewRefIf311 guard(cellvars);
+                visitor.visitTuple(cellvars);
+            }
             // we ignore this, because otherwise, we'd have the hash change
             // whenever we instantiate code in a new location
             // visit(co->co_filename)
-            visitor.visitTopo(co->co_name);
-
-    #       if PY_MINOR_VERSION >= 10
-                visitor.visitTopo(co->co_linetable);
-    #       else
-                visitor.visitTopo(co->co_lnotab);
-    #       endif
+            {
+                PyObject* name = PyCompat::codeGetName(co);
+                PyCompat::NewRefIf311 guard(name);
+                visitor.visitTopo(name);
+            }
+            {
+                PyObject* linetable = PyCompat::codeGetLinetable(co);
+                PyCompat::NewRefIf311 guard(linetable);
+                visitor.visitTopo(linetable);
+            }
             return;
         }
 

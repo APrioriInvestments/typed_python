@@ -1,4 +1,4 @@
-llvmlite>=0.38,<0.45
+llvmlite>=0.38,<0.39
 numpy
 scipy
 psutil
