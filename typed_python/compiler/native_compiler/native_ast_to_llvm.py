@@ -341,6 +341,7 @@ class NativeAstToLlvmConverter:
 
                     func = self._functions_by_name[name]
                     func.attributes.personality = external_function_references["tp_gxx_personality_v0"]
+                    func.attributes.add("uwtable")
 
                     arg_assignments = {}
                     for i in range(len(func.args)):

@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-    "llvmlite>=0.38,<0.39",
+    "llvmlite>=0.38,<0.45",
     "numpy",
     "scipy",
     "psutil",
