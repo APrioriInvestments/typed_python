@@ -4,3 +4,36 @@ requires = [
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "typed_python"
+version = "0.2.6"
+description = "opt-in strong typing at runtime for python, plus a compiler."
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "Braxton Mckee", email = "braxton.mckee@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+    "llvmlite==0.38",
+    "numpy",
+    "psutil",
+    "pytz",
+    "sortedcontainers",
+]
+
+[project.urls]
+Homepage = "https://github.com/aprioriinvestments/typed_python"
+
+[tool.setuptools.packages.find]
+include = ["typed_python*"]
+
+[tool.setuptools.package-data]
+typed_python = [
+    "*.hpp", "*.h", "*.cpp",
+    "direct_types/*.hpp", "direct_types/*.cpp",
+    "lz4/*.h", "lz4/*.c",
+]
