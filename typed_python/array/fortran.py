@@ -1,6 +1,6 @@
 import os
-import numpy
 import ctypes
+import ctypes.util
 
 from typed_python import Int32, Float32, Entrypoint, PointerTo, ListOf, TupleOf, UInt8
 from typed_python.compiler.conversion_level import ConversionLevel
@@ -9,62 +9,85 @@ from typed_python.compiler.type_wrappers.runtime_functions import externalCallTa
 import typed_python.compiler.native_compiler.native_ast as native_ast
 
 
-# search for lapack_lite or 'blas' in the numpy or scipy installation
-def searchForLapackLib():
+def _isValidBlas(libPath):
+    """Check if a shared library exports the BLAS symbols we need."""
+    if 'cython' in libPath:
+        return False
+    try:
+        lib = ctypes.CDLL(libPath, mode=ctypes.RTLD_GLOBAL)
+        lib.daxpy_
+        lib.dgemm_
+        return True
+    except Exception:
+        return False
+
+
+def _searchForBlasLib():
+    """Find a shared library with a full BLAS/LAPACK implementation.
+
+    Search order:
+        1. scipy's bundled BLAS (most reliable when scipy is installed)
+        2. System BLAS/LAPACK via ctypes.util.find_library (uses ldconfig)
+        3. Well-known library names loaded directly
+        4. numpy's bundled libraries (fallback)
+    """
+    # 1. scipy bundles a full BLAS
     try:
         import scipy.linalg._fblas as fblas
         return fblas.__file__
     except Exception:
         pass
 
-    libdirs = [os.path.dirname(numpy.__file__)]
+    # 2. System libraries via find_library (calls ldconfig / ld.so on Linux)
+    for name in ['openblas', 'blas', 'mkl_rt', 'lapack']:
+        path = ctypes.util.find_library(name)
+        if path and _isValidBlas(path):
+            return path
 
-    for libdirPath in libdirs:
-        for substrToFind in ['blas', 'lapack_lite']:
-            for subdir in os.listdir(libdirPath):
-                dpath = os.path.join(libdirPath, subdir)
-                if substrToFind in subdir:
-                    if isValidLapack(dpath):
-                        return dpath
+    # 3. Try loading well-known library names directly
+    for name in [
+        'libopenblas.so', 'libopenblas.so.0',
+        'libblas.so', 'libblas.so.3',
+        'libmkl_rt.so', 'libmkl_rt.so.2',
+        'liblapack.so', 'liblapack.so.3',
+    ]:
+        try:
+            if _isValidBlas(name):
+                return name
+        except Exception:
+            pass
 
-                if os.path.isdir(dpath):
-                    for possibleLib in os.listdir(dpath):
-                        if substrToFind in possibleLib:
-                            dpath = os.path.join(dpath, possibleLib)
+    # 4. Fall back to searching inside numpy/scipy installation dirs
+    for modname in ['numpy', 'scipy']:
+        try:
+            mod = __import__(modname)
+            libdir = os.path.dirname(mod.__file__)
+        except Exception:
+            continue
 
-                            if isValidLapack(dpath):
-                                return dpath
+        for root, dirs, files in os.walk(libdir):
+            for fname in files:
+                if not any(s in fname for s in ['blas', 'lapack_lite']):
+                    continue
+                fpath = os.path.join(root, fname)
+                if _isValidBlas(fpath):
+                    return fpath
 
-
-def isValidLapack(blasLibPath):
-    if 'cython' in blasLibPath:
-        return False
-
-    blas = ctypes.CDLL(blasLibPath, mode=ctypes.RTLD_GLOBAL)
-
-    # verify we can get 'daxpy_', which means we found a real blas.
-    try:
-        blas.daxpy_
-        blas.dgemm_
-        return True
-    except Exception:
-        return False
+    return None
 
 
-blasLibPath = searchForLapackLib()
-
+blasLibPath = _searchForBlasLib()
 
 if blasLibPath is None:
-    raise Exception("Couldn't find a valid implementation of lapack.")
+    raise Exception(
+        "Couldn't find a valid BLAS/LAPACK implementation. "
+        "Install one of: libopenblas-dev, libblas-dev, or scipy."
+    )
 
-# this loads the blas shared library as a 'global' library, which allows our llvm instructions
-# to find the functions they bind to. If we don't do this, then when we compile things like
-# 'daxpy_', when we go to link the library it will just blow up. Maybe at some point
-# we can figure out how to make a library dependency on the blas library at linktime instead
-# of loading global symbols like this...
+# Load BLAS as a global library so our LLVM-compiled code can resolve
+# symbols like daxpy_ and dgemm_ at link time.
 blas = ctypes.CDLL(blasLibPath, mode=ctypes.RTLD_GLOBAL)
 
-# verify we can get 'daxpy_', which means we found a real blas.
 try:
     blas.daxpy_
     blas.dgemm_

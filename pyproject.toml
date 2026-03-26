@@ -1,7 +1,6 @@
 [build-system]
 requires = [
-    "setuptools",
+    "setuptools>=64",
     "wheel",
-    'oldest-supported-numpy',
 ]
-# build-backend = "setuptools.build_meta:__legacy__"
+build-backend = "setuptools.build_meta"

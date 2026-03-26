@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <numpy/arrayscalars.h>
 #include "PyInstance.hpp"
+#include "NumpyInterop.hpp"
 #include "PromotesTo.hpp"
 #include <cmath>
 
@@ -443,55 +443,19 @@ public:
     inline T get() { return *(T*)dataPtr(); }
 
     static bool isNumpyFloatType(PyTypeObject* t) {
-        return (
-            t == &PyHalfArrType_Type
-            || t == &PyFloatArrType_Type
-            || t == &PyDoubleArrType_Type
-            || t == &PyLongDoubleArrType_Type
-        );
+        return NumpyInterop::isNumpyFloatType(t);
     }
 
     static bool isNumpyIntType(PyTypeObject* t) {
-        return (
-            t == &PyByteArrType_Type
-            || t == &PyShortArrType_Type
-            || t == &PyIntArrType_Type
-            || t == &PyLongArrType_Type
-            || t == &PyLongLongArrType_Type
-            || t == &PyUByteArrType_Type
-            || t == &PyUShortArrType_Type
-            || t == &PyUIntArrType_Type
-            || t == &PyULongArrType_Type
-            || t == &PyULongLongArrType_Type
-        );
+        return NumpyInterop::isNumpyIntType(t);
     }
 
     static bool isNumpyScalarType(PyTypeObject* t) {
-        return t == &PyBoolArrType_Type || isNumpyFloatType(t) || isNumpyIntType(t);
+        return NumpyInterop::isNumpyScalarType(t);
     }
 
     static Type::TypeCategory numpyScalarTypeToBestCategory(PyTypeObject* t) {
-        if (t == &PyBoolArrType_Type) { return Type::TypeCategory::catBool; }
-        if (t == &PyHalfArrType_Type) { return Type::TypeCategory::catFloat32; }
-        if (t == &PyFloatArrType_Type) { return Type::TypeCategory::catFloat32; }
-        if (t == &PyDoubleArrType_Type) { return Type::TypeCategory::catFloat64; }
-        if (t == &PyLongDoubleArrType_Type) { return Type::TypeCategory::catFloat64; }
-        if (t == &PyByteArrType_Type) { return Type::TypeCategory::catInt8; }
-        if (t == &PyShortArrType_Type) { return Type::TypeCategory::catInt16; }
-        if (t == &PyIntArrType_Type) { return Type::TypeCategory::catInt32; }
-        if (t == &PyLongArrType_Type) {
-            return sizeof(long) == 8 ? Type::TypeCategory::catInt64 : Type::TypeCategory::catInt32;
-        }
-        if (t == &PyLongLongArrType_Type) { return Type::TypeCategory::catInt64; }
-        if (t == &PyUByteArrType_Type) { return Type::TypeCategory::catUInt8; }
-        if (t == &PyUShortArrType_Type) { return Type::TypeCategory::catUInt16; }
-        if (t == &PyUIntArrType_Type) { return Type::TypeCategory::catUInt32; }
-        if (t == &PyULongArrType_Type) {
-            return sizeof(long) == 8 ? Type::TypeCategory::catUInt64 : Type::TypeCategory::catUInt32;
-        }
-        if (t == &PyULongLongArrType_Type) { return Type::TypeCategory::catUInt64; }
-
-        throw std::runtime_error("Type is not a numpy type.");
+        return NumpyInterop::numpyScalarTypeToBestCategory(t);
     }
 
     static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* targetType, instance_ptr tgt, PyObject* pyRepresentation, ConversionLevel level) {
@@ -552,7 +516,7 @@ public:
             }
         }
 
-        if (PyBool_Check(pyRepresentation) || pyRepresentation->ob_type == &PyBoolArrType_Type) {
+        if (PyBool_Check(pyRepresentation) || (NumpyInterop::getCache().available && pyRepresentation->ob_type == NumpyInterop::getCache().bool_type)) {
             if (RegisterTypeProperties::isValidConversion(Type::TypeCategory::catBool, targetCat, level)) {
                 ((T*)tgt)[0] = PyObject_IsTrue(pyRepresentation);
                 return;

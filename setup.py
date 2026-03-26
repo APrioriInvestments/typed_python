@@ -12,20 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import pkg_resources
 import setuptools
-
-from distutils.command.build_ext import build_ext
-from distutils.extension import Extension
-
-
-class TypedPythonBuildExtension(build_ext):
-    def run(self):
-        self.include_dirs.append(
-            pkg_resources.resource_filename('numpy', 'core/include')
-        )
-
-        build_ext.run(self)
+from setuptools import Extension
 
 
 extra_compile_args = [
@@ -68,7 +56,6 @@ setuptools.setup(
     author_email='braxton.mckee@gmail.com',
     url='https://github.com/aprioriinvestments/typed_python',
     packages=setuptools.find_packages(),
-    cmdclass={'build_ext': TypedPythonBuildExtension},
     ext_modules=ext_modules,
     install_requires=INSTALL_REQUIRES,
 

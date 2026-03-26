@@ -17,7 +17,6 @@
 
 #include <Python.h>
 #include <frameobject.h>
-#include <numpy/arrayobject.h>
 #include <map>
 #include <memory>
 #include <vector>
@@ -27,6 +26,7 @@
 
 #include "AllTypes.hpp"
 #include "NullSerializationContext.hpp"
+#include "NumpyInterop.hpp"
 #include "util.hpp"
 #include "PyInstance.hpp"
 #include "PyFunctionInstance.hpp"
@@ -3380,10 +3380,8 @@ PyInit__types(void)
     // initialize unicode property table, for StringType
     initialize_uprops();
 
-    //initialize numpy. This is only OK because all the .cpp files get
-    //glommed together in a single file. If we were to change that behavior,
-    //then additional steps must be taken as per the API documentation.
-    import_array();
+    //initialize numpy interop (caches numpy type objects if numpy is available)
+    NumpyInterop::init();
 
     PyObject *module = PyModule_Create(&moduledef);
 

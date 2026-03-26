@@ -17,7 +17,6 @@
 #include <Python.h>
 #include <pystate.h>
 
-#include <numpy/arrayobject.h>
 #include <type_traits>
 
 #include "AllTypes.hpp"

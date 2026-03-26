@@ -26,8 +26,6 @@ TP_BUILD_OPT_LEVEL ?= 2
 
 # location of python include paths
 PYINCLUDE = $(shell python3 -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
-# location of numpy
-NUMPYINCLUDE = $(shell python3 -c 'import pkg_resources; print(pkg_resources.resource_filename("numpy", "core/include"))')
 # name of the _types binary, which we can infer from the name of the _ssl binary
 TYPES_SO_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types"))')
 TYPES_O_NAME = $(shell python3 -c 'import _ssl; import os; print(os.path.split(_ssl.__file__)[1].replace("_ssl", "_types")[:-2] + "o")')
@@ -40,7 +38,6 @@ CPP_FLAGS = -std=c++14  -O$(TP_BUILD_OPT_LEVEL)  -Wall  -pthread  -DNDEBUG  -g  
             -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
             -I$(TP_SRC_PATH)/lz4                                  			\
             -I$(PYINCLUDE)                                       			\
-            -I$(NUMPYINCLUDE)											    \
 
 
 LINKER_FLAGS = -Wl,-O1 \
