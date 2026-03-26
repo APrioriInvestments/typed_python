@@ -48,8 +48,6 @@ jobs:
         os: [ubuntu-latest]
         python-version: ['3.10']
     steps:
-    - uses: actions/checkout@v4
-
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
@@ -59,12 +57,11 @@ jobs:
       run: |
         python --version
         pip --version
-        pip freeze
         pip install -v git+https://github.com/APrioriInvestments/typed_python.git@${GITHUB_SHA}
 
     - name: import typed_python
       run : |
-        python -c "import typed_python"
+        cd /tmp && python -c "from typed_python._types import bytecount; print('OK')"
 
   lint:
     runs-on: ubuntu-latest
