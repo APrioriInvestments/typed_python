@@ -3021,7 +3021,7 @@ PyObject* buildCodeObject(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 
     return translateExceptionToPyObject([&]() {
         if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "iiiiiiiOOOOOOOOiOO", (char**)kwlist,
+            args, kwargs, "iiiiiiOOOOOOOOOiOO", (char**)kwlist,
             &co_argcount, &co_posonlyargcount, &co_kwonlyargcount,
             &co_nlocals, &co_stacksize, &co_flags,
             &co_code, &co_consts, &co_names, &co_varnames,

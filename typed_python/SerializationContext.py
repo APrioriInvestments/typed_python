@@ -59,7 +59,9 @@ def buildCodeObject(
     co_name,
     co_firstlineno,
     co_lnotab,
-    co_posonlyargcount=0
+    co_posonlyargcount=0,
+    co_qualname=None,
+    co_exceptiontable=None
 ):
     if sys.version_info.minor < 8 and co_posonlyargcount:
         raise Exception(
@@ -67,6 +69,14 @@ def buildCodeObject(
             "of python that uses positional-only arguments."
 
         )
+
+    extra_args = []
+    if sys.version_info >= (3, 11):
+        extra_args.append(co_qualname if co_qualname is not None else co_name)
+    extra_args.append(co_firstlineno)
+    extra_args.append(co_lnotab)
+    if sys.version_info >= (3, 11):
+        extra_args.append(co_exceptiontable if co_exceptiontable is not None else b'')
 
     codeObj = _types.buildCodeObject(
         co_argcount,
@@ -83,8 +93,7 @@ def buildCodeObject(
         co_cellvars,
         co_filename,
         co_name,
-        co_firstlineno,
-        co_lnotab,
+        *extra_args,
     )
 
     cacheAstForCode(codeObj, ast)
@@ -641,6 +650,13 @@ class SerializationContext(Class, Final):
                 keepLineInformation=self.encodeLineInformationForCode
             )
 
+            extra_kwargs = {}
+            if sys.version_info.minor >= 8 and inst.co_posonlyargcount != 0:
+                extra_kwargs['co_posonlyargcount'] = inst.co_posonlyargcount
+            if sys.version_info >= (3, 11):
+                extra_kwargs['co_qualname'] = inst.co_qualname
+                extra_kwargs['co_exceptiontable'] = inst.co_exceptiontable
+
             return (
                 buildCodeObject,
                 (
@@ -660,11 +676,8 @@ class SerializationContext(Class, Final):
                     inst.co_name,
                     inst.co_firstlineno if self.encodeLineInformationForCode else 0,
                     inst.co_lnotab if sys.version_info.minor < 10 else inst.co_linetable
-                ) + (
-                    () if sys.version_info.minor < 8 or inst.co_posonlyargcount == 0 else
-                    (inst.co_posonlyargcount,)
                 ),
-                {}
+                extra_kwargs
             )
 
         if isinstance(inst, FunctionType):
