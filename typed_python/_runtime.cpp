@@ -1060,24 +1060,29 @@ extern "C" {
             PyObject* prevTraceback;
             PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
 
-            if (prevValue) {
+            if (prevValue && prevValue != Py_None) {
                 PyException_SetContext(exception, prevValue);
+            } else {
+                Py_XDECREF(prevValue);
             }
-            decref(prevType);
-            decref(prevTraceback);
+            Py_XDECREF(prevType);
+            Py_XDECREF(prevTraceback);
 
             PyErr_SetObject((PyObject*)exception->ob_type, exception);
         }
         else {
+            // bare 'raise' — re-raise the current exception
             PyObject* prevType;
             PyObject* prevValue;
             PyObject* prevTraceback;
             PyErr_GetExcInfo(&prevType, &prevValue, &prevTraceback);
 
-            if (!prevValue) {
-                decref(prevType);
-                decref(prevValue);
-                decref(prevTraceback);
+            // On Python 3.11+, PyErr_GetExcInfo returns (None, None, None)
+            // instead of (NULL, NULL, NULL) when there's no active exception.
+            if (!prevValue || prevValue == Py_None) {
+                Py_XDECREF(prevType);
+                Py_XDECREF(prevValue);
+                Py_XDECREF(prevTraceback);
                 PyErr_SetString(PyExc_RuntimeError, "No active exception to reraise");
                 throw PythonExceptionSet();
             }
@@ -1215,6 +1220,9 @@ extern "C" {
 
     void np_add_traceback(const char* funcname, const char* filename, int lineno) {
         PyEnsureGilAcquired getTheGil;
+        if (!PyErr_Occurred()) {
+            return;
+        }
         _PyTraceback_Add(funcname, filename, lineno);
     }
 

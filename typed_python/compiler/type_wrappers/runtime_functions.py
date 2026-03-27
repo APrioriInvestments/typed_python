@@ -210,7 +210,8 @@ trunc64 = externalCallTarget("llvm.trunc.f64", Float64, Float64, intrinsic=True)
 initialize_exception = externalCallTarget(
     "np_initialize_exception",
     Void,
-    Void.pointer()
+    Void.pointer(),
+    canThrow=True
 )
 
 initialize_exception_w_cause = externalCallTarget(

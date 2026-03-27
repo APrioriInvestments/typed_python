@@ -1076,6 +1076,25 @@ public:
 
         This transformation just figures out what the dotting sequences are.
         */
+        // Helper: decode a bytecode instruction's name index from co_names.
+        // In Python 3.11+, LOAD_GLOBAL encodes (namei << 1 | push_null) in the arg,
+        // so we need to shift right by 1 to get the actual name index.
+        // LOAD_ATTR in 3.11 does NOT shift; in 3.12+ it does (namei << 1 | is_method).
+        static int decodeNameIndex(uint8_t opcode, int arg) {
+#if PY_VERSION_HEX >= 0x030c0000
+            // Python 3.12+: both LOAD_GLOBAL and LOAD_ATTR encode namei << 1
+            if (opcode == 116 || opcode == 106) {  // LOAD_GLOBAL or LOAD_ATTR
+                return arg >> 1;
+            }
+#elif PY_VERSION_HEX >= 0x030b0000
+            // Python 3.11: only LOAD_GLOBAL encodes namei << 1
+            if (opcode == 116) {  // LOAD_GLOBAL
+                return arg >> 1;
+            }
+#endif
+            return arg;
+        }
+
         static void extractDottedGlobalAccessesFromCode(PyCodeObject* code, std::vector<std::vector<PyObject*> >& outSequences) {
             uint8_t* bytes;
             Py_ssize_t bytecount;
@@ -1090,26 +1109,31 @@ public:
             PyObject* names = PyCompat::codeGetNames(code);
             PyCompat::NewRefIf311 namesGuard(names);
 
-            long opcodeCount = bytecount / 2;
+            long wordCount = bytecount / 2;
 
-            // opcodes are encoded in the low byte
-            auto opcodeFor = [&](int i) { return bytes[i * 2]; };
+            // Each instruction word: low byte = opcode, high byte = arg
+            auto opcodeFor = [&](long i) -> uint8_t { return bytes[i * 2]; };
+            auto rawArgFor = [&](long i) -> uint8_t { return bytes[i * 2 + 1]; };
 
-            // opcode targets are encoded in the high byte
-            auto opcodeTargetFor = [&](int i) { return bytes[i * 2 + 1]; };
-
+            const uint8_t CACHE = 0;
             const uint8_t LOAD_ATTR = 106;
             const uint8_t LOAD_GLOBAL = 116;
             const uint8_t DELETE_GLOBAL = 98;
             const uint8_t STORE_GLOBAL = 97;
             const uint8_t LOAD_METHOD = 160;
 
-
             std::vector<PyObject*> curDotSequence;
-            for (long ix = 0; ix < opcodeCount; ix++) {
+            for (long ix = 0; ix < wordCount; ix++) {
+                uint8_t op = opcodeFor(ix);
+
+                // Skip CACHE entries (opcode 0) introduced in Python 3.11+
+                if (op == CACHE) continue;
+
+                int nameIdx = decodeNameIndex(op, rawArgFor(ix));
+
                 // if we're loading an attr on an existing sequence, just make it bigger
-                if ((opcodeFor(ix) == LOAD_ATTR || opcodeFor(ix) == LOAD_METHOD) && curDotSequence.size()) {
-                    curDotSequence.push_back(PyTuple_GetItem(names, opcodeTargetFor(ix)));
+                if ((op == LOAD_ATTR || op == LOAD_METHOD) && curDotSequence.size()) {
+                    curDotSequence.push_back(PyTuple_GetItem(names, nameIdx));
                 } else if (curDotSequence.size()) {
                     // any other operation should flush the buffer
                     outSequences.push_back(curDotSequence);
@@ -1117,13 +1141,10 @@ public:
                 }
 
                 // if we're loading a global, we start a new sequence
-                if (opcodeFor(ix) == LOAD_GLOBAL) {
-                    curDotSequence.push_back(PyTuple_GetItem(names, opcodeTargetFor(ix)));
-                } else if (
-                    opcodeFor(ix) == STORE_GLOBAL
-                    || opcodeFor(ix) == DELETE_GLOBAL
-                ) {
-                    outSequences.push_back({PyTuple_GetItem(names, opcodeTargetFor(ix))});
+                if (op == LOAD_GLOBAL) {
+                    curDotSequence.push_back(PyTuple_GetItem(names, nameIdx));
+                } else if (op == STORE_GLOBAL || op == DELETE_GLOBAL) {
+                    outSequences.push_back({PyTuple_GetItem(names, nameIdx)});
                 }
             }
 
@@ -1153,31 +1174,23 @@ public:
             PyObject* names = PyCompat::codeGetNames(code);
             PyCompat::NewRefIf311 namesGuard(names);
 
-            long opcodeCount = bytecount / 2;
+            long wordCount = bytecount / 2;
 
-            // opcodes are encoded in the low byte
-            auto opcodeFor = [&](int i) { return bytes[i * 2]; };
+            auto opcodeFor = [&](long i) -> uint8_t { return bytes[i * 2]; };
+            auto rawArgFor = [&](long i) -> uint8_t { return bytes[i * 2 + 1]; };
 
-            // opcode targets are encoded in the high byte
-            auto opcodeTargetFor = [&](int i) { return bytes[i * 2 + 1]; };
-
+            const uint8_t CACHE = 0;
             const uint8_t LOAD_GLOBAL = 116;
             const uint8_t DELETE_GLOBAL = 98;
             const uint8_t STORE_GLOBAL = 97;
 
-            for (long ix = 0; ix < opcodeCount; ix++) {
-                // if we're loading a global, we start a new sequence
-                if (opcodeFor(ix) == LOAD_GLOBAL) {
-                    PyObject* name = PyTuple_GetItem(names, opcodeTargetFor(ix));
-                    if (!PyUnicode_Check(name)) {
-                        throw std::runtime_error("Function had a non-string object in co_names");
-                    }
-                    outAccesses.insert(PyUnicode_AsUTF8(name));
-                } else if (
-                    opcodeFor(ix) == STORE_GLOBAL
-                    || opcodeFor(ix) == DELETE_GLOBAL
-                ) {
-                    PyObject* name = PyTuple_GetItem(names, opcodeTargetFor(ix));
+            for (long ix = 0; ix < wordCount; ix++) {
+                uint8_t op = opcodeFor(ix);
+                if (op == CACHE) continue;
+
+                if (op == LOAD_GLOBAL || op == STORE_GLOBAL || op == DELETE_GLOBAL) {
+                    int nameIdx = decodeNameIndex(op, rawArgFor(ix));
+                    PyObject* name = PyTuple_GetItem(names, nameIdx);
                     if (!PyUnicode_Check(name)) {
                         throw std::runtime_error("Function had a non-string object in co_names");
                     }
