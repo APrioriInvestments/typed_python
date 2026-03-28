@@ -7,6 +7,13 @@ typed_python
 ========================================
 Strong typing and an LLVM-based JIT compiler for Python.
 
+.. include::  ../README.md
+   :parser: myst_parser.sphinx_
+
+
+Contents
+========================================
+
 .. toctree::
    :maxdepth: 1
    :caption: For Users

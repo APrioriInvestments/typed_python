@@ -23,8 +23,8 @@ hedge fund in New York.  If you're interested in working with us, drop us a line
 
 ## Getting started
 
-You can read the [introductory tutorial](docs/introduction.md) for using `typed_python` or
-check out the documentation [typed_python](docs/typed_python.md).
+You can read the [introductory tutorial](https://github.com/APrioriInvestments/typed_python/docs/introduction.md) for using `typed_python` or
+check out the documentation [here](https://typed-python.readthedocs.io/en/latest/).
 
 ## Where did this come from?
 
