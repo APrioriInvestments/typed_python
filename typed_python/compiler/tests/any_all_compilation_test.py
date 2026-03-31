@@ -32,3 +32,5 @@ def test_compiles_any_and_all():
         assert callAll(T([1, 2, 3])) == all(T([1, 2, 3]))
         assert callAny(T([0, 0, 0])) == any(T([0, 0, 0]))
         assert callAll(T([0, 0, 0])) == all(T([0, 0, 0]))
+        assert callAny(T([0, 1, 2])) == any(T([0, 1, 2]))
+        assert callAll(T([0, 1, 2])) == all(T([0, 1, 2]))
